@@ -132,7 +132,7 @@ const Index = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <GlassMorphicCard key={index} className="p-6 animate-fade-in" style={{ animationDelay: `${feature.delay}ms` }}>
+              <GlassMorphicCard key={index} className={`p-6 animate-fade-in delay-${feature.delay}`}>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <feature.icon size={24} className="text-primary" />
                 </div>
