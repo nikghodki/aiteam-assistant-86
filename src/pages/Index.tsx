@@ -22,7 +22,7 @@ const features = [
   },
   {
     title: 'Documentation Search',
-    description: 'Instant answers from your company's documentation and best practices.',
+    description: "Instant answers from your company's documentation and best practices.",
     icon: Search,
     delay: 600,
   },
