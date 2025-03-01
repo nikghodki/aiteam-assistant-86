@@ -13,6 +13,7 @@ import AccessControl from "./pages/AccessControl";
 import KubernetesDebug from "./pages/KubernetesDebug";
 import Documentation from "./pages/Documentation";
 import NotFound from "./pages/NotFound";
+import AuthCallback from "./pages/AuthCallback";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/access" element={<AccessControl />} />
             <Route path="/kubernetes" element={<KubernetesDebug />} />
             <Route path="/docs" element={<Documentation />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
