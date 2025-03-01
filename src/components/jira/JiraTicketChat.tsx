@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, RefreshCw, XCircle, Ticket } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { jiraApi, ChatResponse, JiraTicket as JiraTicketType } from '@/services/api';
 
 interface ChatMessage {
   id: string;
@@ -32,24 +32,6 @@ interface JiraTicketInfo {
 interface JiraTicketChatProps {
   onTicketCreated?: (ticket: JiraTicketInfo) => void;
 }
-
-// Mock function to simulate creating a Jira ticket
-const createJiraTicket = async (summary: string, description: string): Promise<JiraTicketInfo> => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // Generate a random Jira ticket key
-  const key = `JIRA-${Math.floor(1000 + Math.random() * 9000)}`;
-  
-  return {
-    key,
-    url: `https://jira.example.com/browse/${key}`,
-    summary,
-    description,
-    priority: 'Medium',
-    status: 'Open'
-  };
-};
 
 // Helper function to format message content
 const formatMessageContent = (content: string) => {
@@ -121,8 +103,8 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
     setIsLoading(true);
     
     try {
-      // Simulate chat API response
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Use the Jira API chat assistant
+      const response = await jiraApi.chatWithAssistant(inputMessage);
       
       // Check if the message is about creating a ticket
       const isTicketRequest = /create\s+ticket|new\s+ticket|make\s+ticket|submit\s+ticket|create\s+issue|add\s+issue/i.test(inputMessage);
@@ -139,7 +121,7 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
         
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
-          content: "I can help you create a Jira ticket. Please fill out the form that appears below, or continue providing more details about your issue.",
+          content: response.response || "I can help you create a Jira ticket. Please fill out the form that appears below, or continue providing more details about your issue.",
           sender: 'assistant',
           timestamp: new Date(),
           isTicketCreation: true
@@ -147,10 +129,10 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
         
         setMessages(prev => [...prev, assistantMessage]);
       } else {
-        // General response
+        // General response from the API
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
-          content: "I understand you're looking for help. To create a Jira ticket, please provide a brief description of the issue you're experiencing. You can say something like 'Create a ticket for...' followed by your issue description.",
+          content: response.response,
           sender: 'assistant',
           timestamp: new Date()
         };
@@ -190,7 +172,18 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
     setIsLoading(true);
     
     try {
-      const ticket = await createJiraTicket(ticketSummary, ticketDescription);
+      // Create a real Jira ticket using the API
+      const ticketResponse = await jiraApi.createTicket(ticketSummary, ticketDescription);
+      
+      // Create a ticket info object to pass to the parent component
+      const ticket: JiraTicketInfo = {
+        key: ticketResponse.key,
+        url: ticketResponse.url,
+        summary: ticketSummary,
+        description: ticketDescription,
+        priority: 'Medium',
+        status: 'Open'
+      };
       
       // Add confirmation message
       const confirmationMessage: ChatMessage = {

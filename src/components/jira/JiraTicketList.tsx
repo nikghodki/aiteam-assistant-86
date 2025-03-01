@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { jiraApi } from '@/services/api';
 
 interface JiraTicket {
   key: string;
@@ -30,21 +31,33 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
       setIsLoading(true);
       
       try {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Fetch tickets from the API
+        const userTickets = await jiraApi.getUserTickets();
         
-        // Check if there are any saved tickets in localStorage
+        // Transform the API response to match our JiraTicket interface
+        const transformedTickets = userTickets.map((ticket: any) => ({
+          key: ticket.key,
+          url: ticket.url || `https://jira.example.com/browse/${ticket.key}`,
+          summary: ticket.summary || ticket.title || 'No summary available',
+          description: ticket.description || 'No description available',
+          status: ticket.status || 'Open',
+          priority: ticket.priority || 'Medium',
+          createdAt: new Date(ticket.created || ticket.createdAt || Date.now())
+        }));
+        
+        setTickets(transformedTickets);
+      } catch (error) {
+        console.error('Error fetching Jira tickets:', error);
+        
+        // Fallback to localStorage if API fails
         const savedTickets = localStorage.getItem('jiraTickets');
         if (savedTickets) {
-          // Parse the stored tickets and convert date strings back to Date objects
           const parsedTickets = JSON.parse(savedTickets).map((ticket: any) => ({
             ...ticket,
             createdAt: new Date(ticket.createdAt)
           }));
           setTickets(parsedTickets);
         }
-      } catch (error) {
-        console.error('Error fetching Jira tickets:', error);
       } finally {
         setIsLoading(false);
       }
@@ -53,7 +66,7 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
     fetchTickets();
   }, [refreshTrigger]);
 
-  // Save any new tickets to localStorage whenever tickets change
+  // Save tickets to localStorage as backup
   useEffect(() => {
     if (tickets.length > 0) {
       localStorage.setItem('jiraTickets', JSON.stringify(tickets));

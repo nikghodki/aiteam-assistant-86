@@ -1,3 +1,4 @@
+
 // API base URL should be configured in your environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -19,6 +20,11 @@ export interface User {
 export interface JiraTicket {
   key: string;
   url: string;
+  summary?: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  created?: string;
 }
 
 export interface AccessRequest {

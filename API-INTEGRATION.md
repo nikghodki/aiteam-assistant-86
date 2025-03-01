@@ -1,6 +1,6 @@
 # AI Team Assistant - API Integration Guide
 
-This document provides step-by-step instructions for integrating the frontend application with your backend API services. It covers the configuration and implementation for each feature of the application: Access Management, Kubernetes Debugging, and Documentation Search.
+This document provides step-by-step instructions for integrating the frontend application with your backend API services. It covers the configuration and implementation for each feature of the application: Access Management, Kubernetes Debugging, Documentation Search, and Jira Ticket Management.
 
 ## Table of Contents
 
@@ -255,7 +255,31 @@ export interface DashboardStats {
 
 ## Jira Ticket Integration
 
-Jira ticket integration is used across multiple features for tracking access requests and debugging sessions.
+The Jira ticket integration provides functionality for creating and managing Jira tickets through a chat interface.
+
+### Required API Endpoints
+
+1. **Create Ticket**
+   - Endpoint: `/jira/ticket`
+   - Method: POST
+   - Request Body: `{ summary: string, description: string, priority?: string }`
+   - Response: Jira ticket information
+   
+2. **Get User's Tickets**
+   - Endpoint: `/jira/tickets`
+   - Method: GET
+   - Response: Array of user's Jira tickets
+   
+3. **Get Ticket Details**
+   - Endpoint: `/jira/tickets/{ticketKey}`
+   - Method: GET
+   - Response: Detailed ticket information
+   
+4. **Chat with Assistant**
+   - Endpoint: `/jira/chat`
+   - Method: POST
+   - Request Body: `{ message: string }`
+   - Response: Assistant's response
 
 ### Data Models
 
@@ -263,17 +287,59 @@ Jira ticket integration is used across multiple features for tracking access req
 export interface JiraTicket {
   key: string;
   url: string;
+  summary?: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  created?: string;
 }
 
-export interface JiraTicketCreationResult {
-  success: boolean;
-  ticket: JiraTicket;
+export interface ChatResponse {
+  response: string;
 }
+```
+
+### Implementation Example
+
+```typescript
+// Example of creating a ticket
+const handleCreateTicket = async () => {
+  try {
+    const ticket = await jiraApi.createTicket(
+      'Bug in login page', 
+      'Users cannot login due to a validation error', 
+      'High'
+    );
+    console.log('Ticket created:', ticket.key);
+  } catch (error) {
+    console.error('Failed to create ticket:', error);
+  }
+};
+
+// Example of getting user tickets
+const fetchUserTickets = async () => {
+  try {
+    const tickets = await jiraApi.getUserTickets();
+    setTickets(tickets);
+  } catch (error) {
+    console.error('Failed to fetch tickets:', error);
+  }
+};
+
+// Example of chatting with the assistant
+const sendChatMessage = async (message: string) => {
+  try {
+    const response = await jiraApi.chatWithAssistant(message);
+    addMessage('assistant', response.response);
+  } catch (error) {
+    console.error('Failed to get response:', error);
+  }
+};
 ```
 
 ## Sample Backend Implementation
 
-Below is an updated Python implementation using Flask for the required API endpoints, including the new Kubernetes clusters endpoint:
+Below is a Python implementation using Flask for the required API endpoints:
 
 ```python
 from flask import Flask, request, jsonify
@@ -298,6 +364,7 @@ groups = [
 
 debug_sessions = []
 doc_queries = []
+jira_tickets = []
 
 # Mock Kubernetes clusters
 kubernetes_clusters = [
@@ -313,12 +380,21 @@ kubernetes_clusters = [
 ]
 
 # Helper to generate a mock Jira ticket
-def create_jira_ticket(summary, description, ticket_type="Task"):
+def create_jira_ticket(summary, description, priority="Medium", ticket_type="Task"):
     key = f"JIRA-{random.randint(1000, 9999)}"
-    return {
+    ticket = {
         "key": key,
-        "url": f"https://jira.example.com/browse/{key}"
+        "url": f"https://jira.example.com/browse/{key}",
+        "summary": summary,
+        "description": description,
+        "status": "Open",
+        "priority": priority,
+        "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "assignee": "Current User",
+        "reporter": "Current User"
     }
+    jira_tickets.append(ticket)
+    return ticket
 
 # Access Management API
 @app.route('/api/access/groups', methods=['POST'])
@@ -727,6 +803,68 @@ def get_dashboard_stats():
         "jiraTickets": 42
     }
     return jsonify(stats)
+
+# Jira Ticket API
+@app.route('/api/jira/ticket', methods=['POST'])
+def create_ticket():
+    data = request.json
+    summary = data.get('summary')
+    description = data.get('description')
+    priority = data.get('priority', 'Medium')
+    
+    if not summary:
+        return jsonify({"error": "Summary is required"}), 400
+        
+    ticket = create_jira_ticket(summary, description, priority)
+    return jsonify(ticket)
+
+@app.route('/api/jira/tickets', methods=['GET'])
+def get_user_tickets():
+    # In a real implementation, you would filter tickets for the current user
+    return jsonify(jira_tickets)
+
+@app.route('/api/jira/tickets/<string:ticket_key>', methods=['GET'])
+def get_ticket_details(ticket_key):
+    for ticket in jira_tickets:
+        if ticket["key"] == ticket_key:
+            # Add some additional details for the detailed view
+            ticket_details = ticket.copy()
+            ticket_details["comments"] = [
+                {
+                    "author": "John Doe",
+                    "content": "Working on this issue now",
+                    "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 3600))
+                },
+                {
+                    "author": "Jane Smith",
+                    "content": "Let me know if you need any help",
+                    "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 1800))
+                }
+            ]
+            return jsonify(ticket_details)
+    
+    return jsonify({"error": "Ticket not found"}), 404
+
+@app.route('/api/jira/chat', methods=['POST'])
+def jira_chat():
+    data = request.json
+    message = data.get('message')
+    
+    # In a real implementation, you would use an AI service to process the message
+    # For demo purposes, we'll provide simulated responses
+    
+    if "create ticket" in message.lower() or "new ticket" in message.lower():
+        response = "I can help you create a new Jira ticket. Please provide a summary and description of the issue."
+    elif "status" in message.lower() and ("ticket" in message.lower() or "issue" in message.lower()):
+        response = "To check the status of a ticket, I need the ticket key. For example, 'What's the status of JIRA-1234?'"
+    elif "assign" in message.lower():
+        response = "To assign a ticket to someone, I need the ticket key and the username. For example, 'Assign JIRA-1234 to johndoe'"
+    elif "priority" in message.lower():
+        response = "Tickets can have different priority levels: Low, Medium, High, or Critical. What priority would you like to set?"
+    else:
+        response = "I'm your Jira ticket assistant. I can help you create tickets, check their status, assign them to team members, and more. How can I assist you today?"
+    
+    return jsonify({"response": response})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)
