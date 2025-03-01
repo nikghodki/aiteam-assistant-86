@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Server, Database, Terminal, Search, Menu, X, User, Settings } from 'lucide-react';
+import { Server, Database, Terminal, Search, Menu, X, User, Settings, Ticket } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -24,6 +24,7 @@ export const Header = () => {
     { name: 'Access Control', href: '/access', icon: Database },
     { name: 'Kubernetes', href: '/kubernetes', icon: Terminal },
     { name: 'Documentation', href: '/docs', icon: Search },
+    { name: 'Jira Ticket', href: '/jira', icon: Ticket },
   ];
 
   useEffect(() => {
