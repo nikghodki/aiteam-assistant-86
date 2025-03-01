@@ -60,8 +60,6 @@ const KubernetesDebugger = () => {
   const [selectedEnvironment, setSelectedEnvironment] = useState<Environment>('qa');
   const [selectedCluster, setSelectedCluster] = useState<string>('');
   const [selectedClusterArn, setSelectedClusterArn] = useState<string>('');
-  const [activeClusters, setActiveClusters] = useState<string[]>([]);
-  const [activeClusterArns, setActiveClusterArns] = useState<Record<string, string>>({});
   
   // Chat state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
@@ -92,25 +90,8 @@ const KubernetesDebugger = () => {
     if (clusters && clusters.length > 0 && !selectedCluster) {
       setSelectedCluster(clusters[0].name);
       setSelectedClusterArn(clusters[0].arn);
-      
-      // Add to active clusters
-      if (!activeClusters.includes(clusters[0].name)) {
-        setActiveClusters(prev => [...prev, clusters[0].name]);
-        setActiveClusterArns(prev => ({...prev, [clusters[0].name]: clusters[0].arn}));
-      }
     }
   }, [clusters]);
-
-  // Add selected cluster to active clusters
-  useEffect(() => {
-    if (selectedCluster && !activeClusters.includes(selectedCluster) && clusters) {
-      const clusterInfo = clusters.find(c => c.name === selectedCluster);
-      if (clusterInfo) {
-        setActiveClusters(prev => [...prev, selectedCluster]);
-        setActiveClusterArns(prev => ({...prev, [selectedCluster]: clusterInfo.arn}));
-      }
-    }
-  }, [selectedCluster, activeClusters, clusters]);
 
   const handleCommandSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,28 +205,6 @@ const KubernetesDebugger = () => {
     setSelectedClusterArn(arn);
   };
 
-  const handleRemoveClusterTab = (clusterName: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveClusters(prev => prev.filter(name => name !== clusterName));
-    
-    // Update active cluster ARNs
-    const newActiveClusterArns = {...activeClusterArns};
-    delete newActiveClusterArns[clusterName];
-    setActiveClusterArns(newActiveClusterArns);
-    
-    // If removing the selected cluster, select another one
-    if (selectedCluster === clusterName) {
-      const remainingClusters = activeClusters.filter(name => name !== clusterName);
-      if (remainingClusters.length > 0) {
-        setSelectedCluster(remainingClusters[0]);
-        setSelectedClusterArn(activeClusterArns[remainingClusters[0]]);
-      } else {
-        setSelectedCluster('');
-        setSelectedClusterArn('');
-      }
-    }
-  };
-
   const clearOutput = () => {
     setCommandOutput('');
   };
@@ -275,11 +234,11 @@ const KubernetesDebugger = () => {
 
     switch(env.color) {
       case 'green':
-        return { textColor: "text-green-700", bgColor: "bg-green-50" };
+        return { textColor: "text-professional-green-600", bgColor: "bg-professional-purple-light/20" };
       case 'amber':
-        return { textColor: "text-amber-700", bgColor: "bg-amber-50" };
+        return { textColor: "text-amber-600", bgColor: "bg-amber-50" };
       case 'blue':
-        return { textColor: "text-blue-700", bgColor: "bg-blue-50" };
+        return { textColor: "text-professional-blue-DEFAULT", bgColor: "bg-professional-blue-light/20" };
       default:
         return { textColor: "text-gray-500", bgColor: "bg-gray-100" };
     }
@@ -288,42 +247,40 @@ const KubernetesDebugger = () => {
   return (
     <div className="space-y-6">
       {/* Environment and Cluster Selection */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
-        <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pb-4">
+        <div className="md:col-span-8 space-y-4 bg-gradient-professional rounded-lg p-4 border border-border/50 shadow-sm">
           {/* Environment Selection */}
           <div className="flex items-center space-x-4">
             <div className="text-sm font-medium">Environment:</div>
-            <div className="flex gap-2 flex-wrap">
-              {environments.map((env) => {
-                const { textColor, bgColor } = getEnvironmentStyle(env.id);
-                return (
-                  <button
-                    key={env.id}
-                    onClick={() => handleEnvironmentChange(env.id as Environment)}
-                    className={cn(
-                      "flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
-                      selectedEnvironment === env.id
-                        ? `${bgColor} ${textColor} border-current`
-                        : "bg-background border-input hover:bg-muted"
-                    )}
+            <Tabs 
+              value={selectedEnvironment} 
+              onValueChange={(value) => handleEnvironmentChange(value as Environment)}
+              className="w-full"
+            >
+              <TabsList className="w-full h-9 bg-background/50">
+                {environments.map((env) => (
+                  <TabsTrigger 
+                    key={env.id} 
+                    value={env.id}
+                    className="flex-1"
                   >
-                    <span>{env.name}</span>
-                  </button>
-                );
-              })}
-            </div>
+                    {env.name}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           </div>
 
           {/* Cluster Selection Dropdown */}
           <div className="flex items-center space-x-4">
             <div className="text-sm font-medium">Cluster:</div>
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 text-sm border rounded-md bg-background hover:bg-muted transition-colors min-w-[200px]">
+              <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 text-sm border rounded-md bg-background hover:bg-muted transition-colors min-w-[200px] w-full">
                 {isLoadingClusters ? (
                   <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
                 ) : selectedCluster ? (
                   <>
-                    <Server size={14} className="text-primary" />
+                    <Server size={14} className="text-professional-purple-DEFAULT" />
                     <span className="flex-1 text-left font-medium truncate">
                       {selectedCluster}
                     </span>
@@ -335,7 +292,7 @@ const KubernetesDebugger = () => {
                 )}
                 <ChevronDown size={14} className="ml-auto" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="min-w-[200px]">
+              <DropdownMenuContent className="min-w-[200px] w-full">
                 <DropdownMenuLabel>
                   {environments.find(e => e.id === selectedEnvironment)?.name} Clusters
                 </DropdownMenuLabel>
@@ -368,66 +325,47 @@ const KubernetesDebugger = () => {
           </div>
         </div>
         
-        {/* Download button */}
-        {debugSession && (
-          <Button
-            onClick={downloadDebugSession}
-            className="flex items-center gap-2"
-            variant="outline"
-          >
-            <Download size={16} />
-            Download Debug Log
-          </Button>
-        )}
+        {/* Selected Cluster Information & Download button */}
+        <div className="md:col-span-4">
+          {selectedCluster ? (
+            <div className="bg-gradient-soft h-full flex flex-col justify-between rounded-lg p-4 border border-border/50 shadow-sm text-white">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Server size={18} className="text-white" />
+                  <div className="text-sm font-medium">Selected Cluster</div>
+                </div>
+                <div className="text-lg font-semibold mt-1">{selectedCluster}</div>
+                <div className="text-xs bg-black/20 backdrop-blur-sm px-2 py-1 rounded-full mt-2 truncate">
+                  {selectedClusterArn}
+                </div>
+              </div>
+              
+              {debugSession && (
+                <Button
+                  onClick={downloadDebugSession}
+                  className="flex items-center gap-2 mt-2 bg-white/20 hover:bg-white/30 text-white"
+                  variant="outline"
+                >
+                  <Download size={16} />
+                  Download Debug Log
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center bg-muted/20 rounded-lg p-4 border border-border/50 shadow-sm">
+              <div className="text-center text-muted-foreground">
+                <Server size={24} className="mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Select a cluster to begin debugging</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-
-      {/* Active Cluster Tabs */}
-      {activeClusters.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-          {activeClusters.map(clusterName => (
-            <button
-              key={clusterName}
-              onClick={() => handleClusterSelect(
-                clusterName, 
-                activeClusterArns[clusterName]
-              )}
-              className={cn(
-                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors whitespace-nowrap",
-                selectedCluster === clusterName
-                  ? "bg-purple-600 text-white" // Changed from "bg-primary text-primary-foreground" to purple
-                  : "bg-muted hover:bg-muted/80"
-              )}
-            >
-              <Server size={14} />
-              <span>{clusterName}</span>
-              <X 
-                size={14} 
-                className="ml-1 opacity-70 hover:opacity-100"
-                onClick={(e) => handleRemoveClusterTab(clusterName, e)}
-              />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Selected Cluster Banner */}
-      {selectedCluster && (
-        <div className="bg-primary/5 border border-primary/20 rounded-md p-3 flex items-center gap-2">
-          <Server size={18} className="text-primary" />
-          <div>
-            <div className="text-sm font-medium">Selected Cluster</div>
-            <div className="text-lg font-semibold">{selectedCluster}</div>
-          </div>
-          <div className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full ml-auto">
-            {selectedClusterArn}
-          </div>
-        </div>
-      )}
 
       {/* Main Debug Interface */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Command Terminal */}
-        <GlassMorphicCard className="md:col-span-8">
+        <GlassMorphicCard className="md:col-span-8 bg-gradient-professional">
           <div className="p-4 border-b bg-muted/40">
             <form onSubmit={handleCommandSubmit} className="flex gap-2">
               <div className="flex-1 relative">
@@ -438,14 +376,14 @@ const KubernetesDebugger = () => {
                   type="text"
                   value={command}
                   onChange={(e) => setCommand(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
+                  className="w-full pl-10 pr-4 py-2 bg-background border rounded-md text-sm focus:ring-1 focus:ring-professional-purple-DEFAULT focus:border-professional-purple-DEFAULT focus:outline-none"
                   placeholder="Enter kubectl command..."
                   disabled={!selectedClusterArn || commandLoading}
                 />
               </div>
               <Button
                 type="submit"
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 bg-professional-purple-DEFAULT hover:bg-professional-purple-dark"
                 disabled={commandLoading || !selectedClusterArn}
               >
                 {commandLoading ? (
@@ -458,11 +396,11 @@ const KubernetesDebugger = () => {
             </form>
           </div>
           
-          <div className="relative min-h-[250px] max-h-[350px] overflow-auto bg-gray-900 text-gray-100 p-4 font-mono text-sm">
+          <div className="relative min-h-[250px] max-h-[350px] overflow-auto bg-gradient-terminal text-gray-100 p-4 font-mono text-sm rounded-b-lg">
             {commandLoading ? (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
                 <div className="flex flex-col items-center">
-                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
+                  <div className="w-6 h-6 border-2 border-professional-purple-DEFAULT border-t-transparent rounded-full animate-spin mb-2"></div>
                   <span className="text-gray-300">Running command...</span>
                 </div>
               </div>
@@ -499,12 +437,12 @@ const KubernetesDebugger = () => {
         </GlassMorphicCard>
         
         {/* Command History */}
-        <GlassMorphicCard className="md:col-span-4">
-          <div className="p-4 border-b bg-muted/40">
+        <GlassMorphicCard className="md:col-span-4 overflow-hidden">
+          <div className="p-4 border-b bg-gradient-professional">
             <h3 className="font-medium text-sm">Command History</h3>
           </div>
           
-          <div className="p-3 max-h-[350px] overflow-auto">
+          <div className="p-3 max-h-[350px] overflow-auto bg-gradient-to-b from-muted/10 to-muted/30">
             <div className="space-y-2">
               {commandHistory.map((cmd, index) => (
                 <button
@@ -512,7 +450,7 @@ const KubernetesDebugger = () => {
                   onClick={() => handleHistoryClick(cmd)}
                   className={cn(
                     "w-full p-2 text-left text-xs rounded-md transition-colors",
-                    cmd === command ? "bg-primary/10 text-primary" : "hover:bg-muted"
+                    cmd === command ? "bg-professional-purple-DEFAULT/10 text-professional-purple-DEFAULT border-l-2 border-professional-purple-DEFAULT pl-3" : "hover:bg-muted"
                   )}
                 >
                   <div className="truncate">{cmd}</div>
@@ -533,14 +471,14 @@ const KubernetesDebugger = () => {
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Chat Interface */}
         <GlassMorphicCard className="md:col-span-8">
-          <div className="p-4 border-b bg-muted/40">
+          <div className="p-4 border-b bg-gradient-professional">
             <h3 className="font-medium text-sm">Kubernetes Assistant</h3>
             <p className="text-xs text-muted-foreground mt-1">
               Ask questions in natural language to debug your Kubernetes issues
             </p>
           </div>
           
-          <div className="p-4 h-[350px] flex flex-col">
+          <div className="p-4 h-[350px] flex flex-col bg-gradient-to-b from-white/5 to-white/20">
             <div className="flex-1 space-y-4 mb-4 overflow-auto">
               {chatHistory.map((chat, index) => (
                 <div 
@@ -553,8 +491,8 @@ const KubernetesDebugger = () => {
                   <div className={cn(
                     "max-w-[80%] rounded-lg p-3 text-sm",
                     chat.role === 'assistant' 
-                      ? "bg-muted text-foreground rounded-tl-none" 
-                      : "bg-primary text-primary-foreground rounded-tr-none"
+                      ? "bg-background text-foreground rounded-tl-none border border-border/40 shadow-sm" 
+                      : "bg-gradient-purple text-white rounded-tr-none"
                   )}>
                     {chat.content}
                   </div>
@@ -563,11 +501,11 @@ const KubernetesDebugger = () => {
               
               {chatLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[80%] p-3">
+                  <div className="bg-background text-foreground rounded-lg rounded-tl-none max-w-[80%] p-3 border border-border/40 shadow-sm">
                     <div className="flex space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse"></div>
-                      <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                      <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                      <div className="w-2 h-2 rounded-full bg-professional-purple-DEFAULT/50 animate-pulse"></div>
+                      <div className="w-2 h-2 rounded-full bg-professional-purple-DEFAULT/50 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 rounded-full bg-professional-purple-DEFAULT/50 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
                     </div>
                   </div>
                 </div>
@@ -580,7 +518,7 @@ const KubernetesDebugger = () => {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyDown={handleChatKeyDown}
-                  className="w-full resize-none bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none min-h-[40px] py-2"
+                  className="w-full resize-none bg-background border rounded-md text-sm focus:ring-1 focus:ring-professional-purple-DEFAULT focus:border-professional-purple-DEFAULT focus:outline-none min-h-[40px] py-2"
                   placeholder={selectedClusterArn 
                     ? "Ask about your Kubernetes issues... (Press Enter to send)" 
                     : "Please select a cluster first..."
@@ -592,7 +530,7 @@ const KubernetesDebugger = () => {
               <Button
                 type="submit"
                 size="icon"
-                className="rounded-full h-10 w-10"
+                className="rounded-full h-10 w-10 bg-professional-purple-DEFAULT hover:bg-professional-purple-dark"
                 disabled={chatLoading || !message.trim() || !selectedClusterArn}
               >
                 <Send size={16} />
@@ -603,7 +541,7 @@ const KubernetesDebugger = () => {
         
         {/* Debug Steps */}
         <GlassMorphicCard className="md:col-span-4">
-          <div className="p-4 border-b bg-muted/40 flex justify-between items-center">
+          <div className="p-4 border-b bg-gradient-professional flex justify-between items-center">
             <h3 className="font-medium text-sm">Debugging Steps</h3>
             
             <button 
@@ -616,11 +554,11 @@ const KubernetesDebugger = () => {
             </button>
           </div>
           
-          <div className="p-3 h-[350px] overflow-auto">
+          <div className="p-3 h-[350px] overflow-auto bg-gradient-to-b from-muted/10 to-muted/30">
             {debugSteps.length > 0 ? (
               <ol className="space-y-3 list-decimal list-inside">
                 {debugSteps.map((step, index) => (
-                  <li key={index} className="text-xs border-b pb-2 whitespace-pre-wrap">
+                  <li key={index} className="text-xs border-b border-border/20 pb-2 whitespace-pre-wrap">
                     {step}
                   </li>
                 ))}
