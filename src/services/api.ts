@@ -60,6 +60,15 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export interface KubernetesCluster {
+  id: string;
+  name: string;
+  status: 'healthy' | 'warning' | 'error';
+  version: string;
+  environment: 'production' | 'qa' | 'staging';
+  nodeCount?: number;
+}
+
 // Helper function for API calls
 const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -163,6 +172,10 @@ export const docsApi = {
 
 // Kubernetes Debugger API
 export const kubernetesApi = {
+  // Get clusters by environment
+  getClusters: (environment?: 'production' | 'qa' | 'staging') => 
+    apiCall<KubernetesCluster[]>(`/kubernetes/clusters${environment ? `?environment=${environment}` : ''}`),
+
   // Create a debugging session
   createSession: (cluster: string, description: string) => 
     apiCall<JiraTicket>('/kubernetes/session', {

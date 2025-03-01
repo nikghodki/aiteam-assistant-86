@@ -110,35 +110,41 @@ export interface ChatResponse {
 
 ### Required API Endpoints
 
-1. **Create Session**
+1. **Get Clusters**
+   - Endpoint: `/kubernetes/clusters`
+   - Method: GET
+   - Query Parameters: `environment` (optional, can be 'production', 'qa', or 'staging')
+   - Response: Array of clusters with details like name, status, and environment
+
+2. **Create Session**
    - Endpoint: `/kubernetes/session`
    - Method: POST
    - Request Body: `{ cluster: string, description: string }`
    - Response: Jira ticket information
    
-2. **Run Command**
+3. **Run Command**
    - Endpoint: `/kubernetes/command`
    - Method: POST
    - Request Body: `{ cluster: string, command: string, jiraTicketKey?: string }`
    - Response: Command execution result
    
-3. **Chat with Assistant**
+4. **Chat with Assistant**
    - Endpoint: `/kubernetes/chat`
    - Method: POST
    - Request Body: `{ cluster: string, message: string, jiraTicketKey?: string }`
    - Response: Assistant's response
    
-4. **Get Debug Sessions**
+5. **Get Debug Sessions**
    - Endpoint: `/kubernetes/sessions`
    - Method: GET
    - Response: Array of debugging sessions
    
-5. **Get Session Details**
+6. **Get Session Details**
    - Endpoint: `/kubernetes/sessions/{sessionId}`
    - Method: GET
    - Response: Session details including commands and chat history
    
-6. **Get Cluster Health**
+7. **Get Cluster Health**
    - Endpoint: `/kubernetes/health/{cluster}`
    - Method: GET
    - Response: Cluster health information
@@ -164,6 +170,15 @@ export interface DebugSession {
   createdAt: string;
   jiraTicket: JiraTicket;
   status: 'active' | 'resolved';
+}
+
+export interface KubernetesCluster {
+  id: string;
+  name: string;
+  status: 'healthy' | 'warning' | 'error';
+  version: string;
+  environment: 'production' | 'qa' | 'staging';
+  nodeCount?: number;
 }
 ```
 
@@ -258,7 +273,7 @@ export interface JiraTicketCreationResult {
 
 ## Sample Backend Implementation
 
-Below is an updated Python implementation using Flask for the required API endpoints, including the userName parameter in the access management APIs:
+Below is an updated Python implementation using Flask for the required API endpoints, including the new Kubernetes clusters endpoint:
 
 ```python
 from flask import Flask, request, jsonify
@@ -283,6 +298,19 @@ groups = [
 
 debug_sessions = []
 doc_queries = []
+
+# Mock Kubernetes clusters
+kubernetes_clusters = [
+    {"id": "prod-cluster-1", "name": "Primary Production", "status": "healthy", "version": "1.26.3", "environment": "production", "nodeCount": 15},
+    {"id": "prod-cluster-2", "name": "Secondary Production", "status": "warning", "version": "1.26.3", "environment": "production", "nodeCount": 10},
+    {"id": "prod-cluster-3", "name": "US East Production", "status": "healthy", "version": "1.26.2", "environment": "production", "nodeCount": 8},
+    
+    {"id": "qa-cluster-1", "name": "QA Main", "status": "healthy", "version": "1.27.0", "environment": "qa", "nodeCount": 5},
+    {"id": "qa-cluster-2", "name": "QA Testing", "status": "error", "version": "1.27.0", "environment": "qa", "nodeCount": 3},
+    
+    {"id": "staging-cluster-1", "name": "Staging Main", "status": "healthy", "version": "1.27.1", "environment": "staging", "nodeCount": 6},
+    {"id": "staging-cluster-2", "name": "Pre-Prod", "status": "healthy", "version": "1.27.0", "environment": "staging", "nodeCount": 4},
+]
 
 # Helper to generate a mock Jira ticket
 def create_jira_ticket(summary, description, ticket_type="Task"):
@@ -358,6 +386,16 @@ def access_chat():
     return jsonify({"response": response})
 
 # Kubernetes Debugger API
+@app.route('/api/kubernetes/clusters', methods=['GET'])
+def get_clusters():
+    environment = request.args.get('environment')
+    
+    if environment:
+        filtered_clusters = [c for c in kubernetes_clusters if c["environment"] == environment]
+        return jsonify(filtered_clusters)
+    
+    return jsonify(kubernetes_clusters)
+
 @app.route('/api/kubernetes/session', methods=['POST'])
 def create_session():
     data = request.json

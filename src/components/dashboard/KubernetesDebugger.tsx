@@ -1,11 +1,18 @@
-
 import { useState, useEffect } from 'react';
-import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server, Link, ExternalLink, Plus, RotateCcw, History } from 'lucide-react';
+import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server, Link, ExternalLink, Plus, RotateCcw, History, ChevronDown } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { cn } from '@/lib/utils';
-import { kubernetesApi, JiraTicket } from '@/services/api';
+import { kubernetesApi, JiraTicket, KubernetesCluster } from '@/services/api';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface DebugSession {
   id: string;
@@ -14,6 +21,15 @@ interface DebugSession {
   jiraTicket: JiraTicket;
   status: 'active' | 'resolved' | 'pending';
 }
+
+// Environment type and styling definitions
+const environments = [
+  { id: 'production', name: 'Production', color: 'green' },
+  { id: 'qa', name: 'QA', color: 'amber' },
+  { id: 'staging', name: 'Staging', color: 'blue' }
+] as const;
+
+type Environment = typeof environments[number]['id'];
 
 const KubernetesDebugger = () => {
   const { toast } = useToast();
@@ -24,7 +40,8 @@ const KubernetesDebugger = () => {
     'kubectl describe pod prometheus-0 -n monitoring',
     'kubectl logs -n kube-system -l k8s-app=kube-dns'
   ]);
-  const [selectedCluster, setSelectedCluster] = useState('production');
+  const [selectedCluster, setSelectedCluster] = useState<string>('');
+  const [selectedEnvironment, setSelectedEnvironment] = useState<Environment>('production');
   const [message, setMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([
     { role: 'assistant', content: 'How can I help you debug your Kubernetes cluster today?' }
@@ -34,6 +51,21 @@ const KubernetesDebugger = () => {
   const [currentJiraTicket, setCurrentJiraTicket] = useState<JiraTicket | null>(null);
   const [showPastSessions, setShowPastSessions] = useState(false);
   const [debuggingSteps, setDebuggingSteps] = useState<string[]>([]);
+
+  // Query for clusters by environment
+  const { data: clusters, isLoading: isLoadingClusters } = useQuery({
+    queryKey: ['clusters', selectedEnvironment],
+    queryFn: () => kubernetesApi.getClusters(selectedEnvironment),
+    // Keep the last successful result when refetching
+    staleTime: 30000,
+  });
+
+  // Set the first cluster as selected when clusters are loaded
+  useEffect(() => {
+    if (clusters && clusters.length > 0 && !selectedCluster) {
+      setSelectedCluster(clusters[0].id);
+    }
+  }, [clusters, selectedCluster]);
 
   // Mock past debug sessions
   const mockPastSessions: DebugSession[] = [
@@ -58,14 +90,6 @@ const KubernetesDebugger = () => {
       jiraTicket: { key: 'OPS-125', url: '#' },
       status: 'pending'
     }
-  ];
-
-  // Available clusters
-  const clusters = [
-    { id: 'production', name: 'Production', status: 'healthy' },
-    { id: 'staging', name: 'Staging', status: 'warning' },
-    { id: 'development', name: 'Development', status: 'healthy' },
-    { id: 'test', name: 'Test Environment', status: 'error' }
   ];
 
   // Query past debug sessions
@@ -177,38 +201,17 @@ const KubernetesDebugger = () => {
   const { data: clusterHealth } = useQuery({
     queryKey: ['cluster-health', selectedCluster],
     queryFn: () => {
-      // This would be a real API call in production
-      // For now, we'll return mock data based on the cluster status
-      const cluster = clusters.find(c => c.id === selectedCluster);
-      if (cluster?.status === 'error') {
-        return { 
-          controlPlane: 'warning',
-          etcd: 'error',
-          scheduler: 'healthy',
-          apiGateway: 'error'
-        };
-      } else if (cluster?.status === 'warning') {
-        return { 
-          controlPlane: 'healthy',
-          etcd: 'healthy',
-          scheduler: 'healthy',
-          apiGateway: 'warning'
-        };
-      }
-      return { 
-        controlPlane: 'healthy',
-        etcd: 'healthy',
-        scheduler: 'healthy',
-        apiGateway: 'healthy'
-      };
+      if (!selectedCluster) return null;
+      return kubernetesApi.getClusterHealth(selectedCluster);
     },
     // Keep last successful result when refetching
     staleTime: 30000,
+    enabled: !!selectedCluster
   });
   
   const handleCreateSession = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sessionDescription.trim()) return;
+    if (!sessionDescription.trim() || !selectedCluster) return;
     
     createSessionMutation.mutate({
       cluster: selectedCluster,
@@ -217,7 +220,7 @@ const KubernetesDebugger = () => {
   };
   
   const runCommand = () => {
-    if (!command.trim()) return;
+    if (!command.trim() || !selectedCluster) return;
     commandMutation.mutate({ 
       cluster: selectedCluster, 
       command,
@@ -240,7 +243,7 @@ const KubernetesDebugger = () => {
 
   const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim()) return;
+    if (!message.trim() || !selectedCluster) return;
 
     // Add user message to chat
     const userMessage = { role: 'user' as const, content: message };
@@ -291,33 +294,117 @@ const KubernetesDebugger = () => {
     setShowPastSessions(false);
   };
 
+  const getEnvironmentStyle = (envId: string) => {
+    const env = environments.find(e => e.id === envId);
+    if (!env) return { textColor: "text-gray-500", bgColor: "bg-gray-100" };
+
+    switch(env.color) {
+      case 'green':
+        return { textColor: "text-green-700", bgColor: "bg-green-50" };
+      case 'amber':
+        return { textColor: "text-amber-700", bgColor: "bg-amber-50" };
+      case 'blue':
+        return { textColor: "text-blue-700", bgColor: "bg-blue-50" };
+      default:
+        return { textColor: "text-gray-500", bgColor: "bg-gray-100" };
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Session and Cluster Management */}
+      {/* Environment and Cluster Selection */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
-        <div className="flex items-center space-x-4">
-          <div className="text-sm font-medium">Select Cluster:</div>
-          <div className="flex gap-2 flex-wrap">
-            {clusters.map((cluster) => (
-              <button
-                key={cluster.id}
-                onClick={() => setSelectedCluster(cluster.id)}
-                className={cn(
-                  "flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
-                  selectedCluster === cluster.id
-                    ? "bg-primary text-white border-primary"
-                    : "bg-background border-input hover:bg-muted"
+        <div className="space-y-4">
+          {/* Environment Selection */}
+          <div className="flex items-center space-x-4">
+            <div className="text-sm font-medium">Environment:</div>
+            <div className="flex gap-2 flex-wrap">
+              {environments.map((env) => {
+                const { textColor, bgColor } = getEnvironmentStyle(env.id);
+                return (
+                  <button
+                    key={env.id}
+                    onClick={() => {
+                      setSelectedEnvironment(env.id as Environment);
+                      setSelectedCluster(''); // Reset cluster selection when environment changes
+                    }}
+                    className={cn(
+                      "flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
+                      selectedEnvironment === env.id
+                        ? `${bgColor} ${textColor} border-current`
+                        : "bg-background border-input hover:bg-muted"
+                    )}
+                  >
+                    <span>{env.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Cluster Selection Dropdown */}
+          <div className="flex items-center space-x-4">
+            <div className="text-sm font-medium">Cluster:</div>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-2 px-4 py-2 text-sm border rounded-md bg-background hover:bg-muted transition-colors min-w-[200px]">
+                {isLoadingClusters ? (
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
+                ) : selectedCluster ? (
+                  <>
+                    <Server size={14} />
+                    <span className="flex-1 text-left">
+                      {clusters?.find(c => c.id === selectedCluster)?.name || selectedCluster}
+                    </span>
+                    <span className={cn(
+                      "inline-block w-2 h-2 rounded-full ml-1",
+                      clusters?.find(c => c.id === selectedCluster)?.status === 'healthy' ? "bg-green-500" : 
+                      clusters?.find(c => c.id === selectedCluster)?.status === 'warning' ? "bg-amber-500" : "bg-red-500"
+                    )} />
+                  </>
+                ) : (
+                  <>
+                    <span className="text-muted-foreground">Select a cluster</span>
+                  </>
                 )}
-              >
-                <Server size={14} />
-                <span>{cluster.name}</span>
-                <span className={cn(
-                  "inline-block w-2 h-2 rounded-full ml-1",
-                  cluster.status === 'healthy' ? "bg-green-500" : 
-                  cluster.status === 'warning' ? "bg-amber-500" : "bg-red-500"
-                )} />
-              </button>
-            ))}
+                <ChevronDown size={14} className="ml-auto" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="min-w-[200px]">
+                <DropdownMenuLabel>
+                  {environments.find(e => e.id === selectedEnvironment)?.name} Clusters
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {isLoadingClusters ? (
+                  <div className="flex items-center justify-center py-2">
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <span className="text-sm">Loading clusters...</span>
+                  </div>
+                ) : clusters && clusters.length > 0 ? (
+                  clusters.map((cluster) => (
+                    <DropdownMenuItem 
+                      key={cluster.id} 
+                      onClick={() => setSelectedCluster(cluster.id)}
+                      className="cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                          <Server size={14} />
+                          <span>{cluster.name}</span>
+                        </div>
+                        <span className={cn(
+                          "inline-block w-2 h-2 rounded-full",
+                          cluster.status === 'healthy' ? "bg-green-500" : 
+                          cluster.status === 'warning' ? "bg-amber-500" : "bg-red-500"
+                        )} />
+                      </div>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <div className="text-center py-2 text-sm text-muted-foreground">
+                    No clusters found
+                  </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         
@@ -348,6 +435,7 @@ const KubernetesDebugger = () => {
               <button
                 onClick={() => setShowCreateSession(true)}
                 className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors"
+                disabled={!selectedCluster}
               >
                 <Plus size={14} />
                 <span>Create Debug Session</span>
@@ -477,12 +565,13 @@ const KubernetesDebugger = () => {
                   onChange={(e) => setCommand(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
                   placeholder="Enter kubectl command..."
+                  disabled={!selectedCluster}
                 />
               </div>
               <button 
                 type="submit"
-                className="flex items-center gap-1 bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
-                disabled={commandMutation.isPending}
+                className="flex items-center gap-1 bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={commandMutation.isPending || !selectedCluster}
               >
                 {commandMutation.isPending ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
