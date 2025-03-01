@@ -216,182 +216,130 @@ const AccessManagement = () => {
       </GlassMorphicCard>
       
       <GlassMorphicCard className="md:col-span-2 p-0 overflow-hidden">
-        <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between p-5 border-b">
-            <div className="flex items-center">
-              <Lock className="text-primary mr-2" size={20} />
-              <h3 className="font-medium">Group Access Management</h3>
-            </div>
+        <div className="flex items-center justify-between p-5 border-b">
+          <div className="flex items-center">
+            <Lock className="text-primary mr-2" size={20} />
+            <h3 className="font-medium">Group Access Management</h3>
           </div>
+        </div>
             
-          <div className="flex flex-col md:flex-row flex-1 divide-y md:divide-y-0 md:divide-x">
-            <div className="md:w-3/5 overflow-auto p-5">
-              <div className="space-y-3">
-                {(groups || []).map(group => {
-                  const pendingRequest = accessRequests.find(
-                    r => r.group === group.id
-                  );
+        <div className="flex flex-col h-full">
+          <div className="flex-1 p-5">
+            {showAccessRequestForm && selectedGroup && (
+              <div className="mt-2 p-4 border border-primary/20 bg-primary/5 rounded-md animate-fade-in">
+                <h4 className="text-sm font-medium mb-2">
+                  Request Access for {groups?.find(g => g.id === selectedGroup)?.name}
+                </h4>
+                <form onSubmit={handleAccessRequest} className="space-y-4">
+                  <div>
+                    <label htmlFor="reason" className="block text-xs font-medium mb-1">
+                      Reason for Access
+                    </label>
+                    <textarea
+                      id="reason"
+                      value={requestReason}
+                      onChange={(e) => setRequestReason(e.target.value)}
+                      className="w-full px-3 py-2 text-sm bg-background border rounded-md focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
+                      placeholder="Please provide a business justification..."
+                      rows={3}
+                      required
+                    />
+                  </div>
                   
-                  return (
-                    <div 
-                      key={group.id}
-                      onClick={() => handleGroupClick(group.id)}
-                      className={cn(
-                        "border rounded-md p-4 transition-colors cursor-pointer",
-                        selectedGroup === group.id 
-                          ? "border-primary/50 bg-primary/5" 
-                          : "hover:bg-muted/50"
-                      )}
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAccessRequestForm(false)}
+                      className="px-3 py-1.5 text-xs border rounded-md hover:bg-muted transition-colors"
                     >
-                      <div className="flex justify-between">
-                        <h5 className="font-medium">{group.name}</h5>
-                        {getStatusBadge(group.status)}
-                      </div>
-                      
-                      <p className="text-xs text-muted-foreground mt-1 mb-2">{group.description}</p>
-                      
-                      <div className="flex justify-end items-center mt-3">
-                        {pendingRequest && (
-                          <a 
-                            href={pendingRequest.jira.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <LinkIcon size={12} />
-                            {pendingRequest.jira.key}
-                            <ExternalLink size={10} />
-                          </a>
-                        )}
-                        
-                        {group.status === 'none' && !pendingRequest && (
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRequestAccess(group.id);
-                            }}
-                            className="px-3 py-1 text-xs bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
-                          >
-                            Request Access
-                          </button>
-                        )}
-                        
-                        {group.status === 'member' && (
-                          <button className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors">
-                            Leave Group
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              {showAccessRequestForm && selectedGroup && (
-                <div className="mt-6 p-4 border border-primary/20 bg-primary/5 rounded-md animate-fade-in">
-                  <h4 className="text-sm font-medium mb-2">
-                    Request Access for {groups?.find(g => g.id === selectedGroup)?.name}
-                  </h4>
-                  <form onSubmit={handleAccessRequest} className="space-y-4">
-                    <div>
-                      <label htmlFor="reason" className="block text-xs font-medium mb-1">
-                        Reason for Access
-                      </label>
-                      <textarea
-                        id="reason"
-                        value={requestReason}
-                        onChange={(e) => setRequestReason(e.target.value)}
-                        className="w-full px-3 py-2 text-sm bg-background border rounded-md focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
-                        placeholder="Please provide a business justification..."
-                        rows={3}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowAccessRequestForm(false)}
-                        className="px-3 py-1.5 text-xs border rounded-md hover:bg-muted transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={accessRequestMutation.isPending}
-                        className="px-3 py-1.5 text-xs bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
-                      >
-                        {accessRequestMutation.isPending ? (
-                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
-                        ) : (
-                          "Submit Request"
-                        )}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-            </div>
-            
-            <div className="md:w-2/5 flex flex-col h-full">
-              <div className="p-4 border-b bg-muted/30">
-                <h4 className="text-sm font-medium">Access Assistant</h4>
-              </div>
-              
-              <div className="flex-1 p-4 overflow-auto">
-                <div className="space-y-4 mb-4">
-                  {chatHistory.map((chat, index) => (
-                    <div 
-                      key={index} 
-                      className={cn(
-                        "flex",
-                        chat.role === 'assistant' ? "justify-start" : "justify-end"
-                      )}
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={accessRequestMutation.isPending}
+                      className="px-3 py-1.5 text-xs bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
                     >
-                      <div className={cn(
-                        "max-w-[85%] rounded-lg p-3 text-sm",
-                        chat.role === 'assistant' 
-                          ? "bg-muted text-foreground rounded-tl-none" 
-                          : "bg-primary text-primary-foreground rounded-tr-none"
-                      )}>
-                        {chat.content}
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {chatMutation.isPending && (
-                    <div className="flex justify-start">
-                      <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[85%] p-3">
-                        <div className="flex space-x-2">
-                          <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse"></div>
-                          <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                          <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="p-4 border-t">
-                <form onSubmit={handleChatSubmit} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Ask about access management..."
-                    className="flex-1 px-3 py-2 text-sm bg-background border rounded-md focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    disabled={chatMutation.isPending || !message.trim()}
-                    className="p-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
-                  >
-                    <Send size={16} />
-                  </button>
+                      {accessRequestMutation.isPending ? (
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      ) : (
+                        "Submit Request"
+                      )}
+                    </button>
+                  </div>
                 </form>
               </div>
+            )}
+
+            {!showAccessRequestForm && (
+              <div className="flex justify-center items-center h-full text-center p-10">
+                <div>
+                  <Lock size={40} className="mx-auto text-muted-foreground/50 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Access Management Console</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    Select a group from the left panel to request access or manage your existing permissions.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="border-t">
+            <div className="p-4 border-b bg-muted/30">
+              <h4 className="text-sm font-medium">Access Assistant</h4>
+            </div>
+            
+            <div className="h-64 p-4 overflow-auto">
+              <div className="space-y-4 mb-4">
+                {chatHistory.map((chat, index) => (
+                  <div 
+                    key={index} 
+                    className={cn(
+                      "flex",
+                      chat.role === 'assistant' ? "justify-start" : "justify-end"
+                    )}
+                  >
+                    <div className={cn(
+                      "max-w-[85%] rounded-lg p-3 text-sm",
+                      chat.role === 'assistant' 
+                        ? "bg-muted text-foreground rounded-tl-none" 
+                        : "bg-primary text-primary-foreground rounded-tr-none"
+                    )}>
+                      {chat.content}
+                    </div>
+                  </div>
+                ))}
+                
+                {chatMutation.isPending && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[85%] p-3">
+                      <div className="flex space-x-2">
+                        <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse"></div>
+                        <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="p-4 border-t">
+              <form onSubmit={handleChatSubmit} className="flex gap-2">
+                <input
+                  type="text"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Ask about access management..."
+                  className="flex-1 px-3 py-2 text-sm bg-background border rounded-md focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={chatMutation.isPending || !message.trim()}
+                  className="p-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  <Send size={16} />
+                </button>
+              </form>
             </div>
           </div>
         </div>
