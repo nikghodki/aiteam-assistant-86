@@ -58,8 +58,8 @@ const AccessManagement = () => {
 
   // Leave group mutation
   const leaveGroupMutation = useMutation({
-    mutationFn: (groupId: number) => {
-      return accessApi.leaveGroup(groupId, user.name);
+    mutationFn: (groupName: string) => {
+      return accessApi.leaveGroup(groupName, user.name);
     },
     onSuccess: () => {
       toast({
@@ -95,7 +95,7 @@ const AccessManagement = () => {
 
   const handleLeaveGroup = (groupId: number, groupName: string) => {
     if (window.confirm(`Are you sure you want to leave ${groupName}?`)) {
-      leaveGroupMutation.mutate(groupId);
+      leaveGroupMutation.mutate(groupName);
     }
   };
 

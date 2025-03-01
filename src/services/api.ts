@@ -79,10 +79,10 @@ export const accessApi = {
     }),
 
   // Leave a group
-  leaveGroup: (groupId: number, userName: string) => 
+  leaveGroup: (groupName: string, userName: string) =>
     apiCall<{ success: boolean }>('/access/groups/leave', {
       method: 'POST',
-      body: JSON.stringify({ groupId, userName }),
+      body: JSON.stringify({ groupName, userName }),
     }),
 
   // Chat with the assistant
