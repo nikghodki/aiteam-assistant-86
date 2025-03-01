@@ -61,11 +61,12 @@ export interface ChatMessage {
 }
 
 export interface KubernetesCluster {
-  id: string;
+  id?: string;
+  arn: string;
   name: string;
-  status: 'healthy' | 'warning' | 'error';
-  version: string;
-  environment: 'production' | 'qa' | 'staging';
+  status?: 'healthy' | 'warning' | 'error';
+  version?: string;
+  environment?: 'production' | 'qa' | 'staging';
   nodeCount?: number;
 }
 
@@ -184,17 +185,17 @@ export const kubernetesApi = {
     }),
 
   // Run a kubectl command
-  runCommand: (cluster: string, command: string, jiraTicketKey?: string) => 
+  runCommand: (clusterArn: string, command: string, jiraTicketKey?: string) => 
     apiCall<CommandResult>('/kubernetes/command', {
       method: 'POST',
-      body: JSON.stringify({ cluster, command, jiraTicketKey }),
+      body: JSON.stringify({ clusterArn, command, jiraTicketKey }),
     }),
 
   // Chat with the assistant
-  chatWithAssistant: (cluster: string, message: string, jiraTicketKey?: string) => 
+  chatWithAssistant: (clusterArn: string, message: string, jiraTicketKey?: string) => 
     apiCall<ChatResponse>('/kubernetes/chat', {
       method: 'POST',
-      body: JSON.stringify({ cluster, message, jiraTicketKey }),
+      body: JSON.stringify({ clusterArn, message, jiraTicketKey }),
     }),
 
   // Get debugging sessions
@@ -208,6 +209,10 @@ export const kubernetesApi = {
   // Get cluster health
   getClusterHealth: (cluster: string) => 
     apiCall<any>(`/kubernetes/health/${cluster}`),
+    
+  // Download debug file
+  downloadDebugFile: (sessionId: string) =>
+    apiCall<{url: string}>(`/kubernetes/debug-file/${sessionId}`),
 };
 
 // Adding a function to get the mock user for demo purposes

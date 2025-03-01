@@ -1,10 +1,29 @@
+
 import { useState, useEffect, KeyboardEvent } from 'react';
-import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server, Link, ExternalLink, Plus, RotateCcw, History, ChevronDown, X } from 'lucide-react';
+import { 
+  Terminal, 
+  AlertCircle, 
+  CheckCircle, 
+  Play, 
+  Trash, 
+  Save, 
+  Send, 
+  Server, 
+  Download,
+  X, 
+  ChevronDown
+} from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { cn } from '@/lib/utils';
-import { kubernetesApi, JiraTicket, KubernetesCluster } from '@/services/api';
+import { kubernetesApi } from '@/services/api';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,13 +33,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
-interface DebugSession {
-  id: string;
-  description: string;
-  createdAt: string;
-  jiraTicket: JiraTicket;
-  status: 'active' | 'resolved' | 'pending';
+interface ClusterInfo {
+  arn: string;
+  name: string;
+  status?: 'healthy' | 'warning' | 'error';
+}
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: string;
 }
 
 const environments = [
@@ -33,149 +57,137 @@ type Environment = typeof environments[number]['id'];
 
 const KubernetesDebugger = () => {
   const { toast } = useToast();
-  const [command, setCommand] = useState('kubectl get pods -n default');
-  const [output, setOutput] = useState('');
-  const [history, setHistory] = useState<string[]>([
-    'kubectl get pods -n monitoring',
-    'kubectl describe pod prometheus-0 -n monitoring',
-    'kubectl logs -n kube-system -l k8s-app=kube-dns'
-  ]);
+  const [selectedEnvironment, setSelectedEnvironment] = useState<Environment>('qa');
   const [selectedCluster, setSelectedCluster] = useState<string>('');
-  const [selectedEnvironment, setSelectedEnvironment] = useState<Environment>('production');
-  const [message, setMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([
+  const [selectedClusterArn, setSelectedClusterArn] = useState<string>('');
+  const [activeClusters, setActiveClusters] = useState<string[]>([]);
+  const [activeClusterArns, setActiveClusterArns] = useState<Record<string, string>>({});
+  
+  // Chat state
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     { role: 'assistant', content: 'How can I help you debug your Kubernetes cluster today?' }
   ]);
-  const [showCreateSession, setShowCreateSession] = useState(false);
-  const [sessionDescription, setSessionDescription] = useState('');
-  const [currentJiraTicket, setCurrentJiraTicket] = useState<JiraTicket | null>(null);
-  const [showPastSessions, setShowPastSessions] = useState(false);
-  const [debuggingSteps, setDebuggingSteps] = useState<string[]>([]);
-  const [activeClusters, setActiveClusters] = useState<string[]>([]);
+  const [message, setMessage] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  
+  // Command execution state
+  const [command, setCommand] = useState('kubectl get pods -n default');
+  const [commandOutput, setCommandOutput] = useState('');
+  const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [commandLoading, setCommandLoading] = useState(false);
+  
+  // Debug session state
+  const [debugSession, setDebugSession] = useState<{id: string; debugLog: string} | null>(null);
+  const [debugSteps, setDebugSteps] = useState<string[]>([]);
 
+  // Get clusters based on environment
   const { data: clusters, isLoading: isLoadingClusters } = useQuery({
     queryKey: ['clusters', selectedEnvironment],
     queryFn: () => kubernetesApi.getClusters(selectedEnvironment),
     staleTime: 30000,
   });
 
+  // Set first cluster as selected when clusters load
   useEffect(() => {
     if (clusters && clusters.length > 0 && !selectedCluster) {
-      setSelectedCluster(clusters[0].id);
+      setSelectedCluster(clusters[0].name);
+      setSelectedClusterArn(clusters[0].arn);
+      
+      // Add to active clusters
+      if (!activeClusters.includes(clusters[0].name)) {
+        setActiveClusters(prev => [...prev, clusters[0].name]);
+        setActiveClusterArns(prev => ({...prev, [clusters[0].name]: clusters[0].arn}));
+      }
     }
-  }, [clusters, selectedCluster]);
+  }, [clusters]);
 
+  // Add selected cluster to active clusters
   useEffect(() => {
-    if (selectedCluster && !activeClusters.includes(selectedCluster)) {
-      setActiveClusters(prev => [...prev, selectedCluster]);
+    if (selectedCluster && !activeClusters.includes(selectedCluster) && clusters) {
+      const clusterInfo = clusters.find(c => c.name === selectedCluster);
+      if (clusterInfo) {
+        setActiveClusters(prev => [...prev, selectedCluster]);
+        setActiveClusterArns(prev => ({...prev, [selectedCluster]: clusterInfo.arn}));
+      }
     }
-  }, [selectedCluster, activeClusters]);
+  }, [selectedCluster, activeClusters, clusters]);
 
-  const mockPastSessions: DebugSession[] = [
-    {
-      id: 'session-123',
-      description: 'Investigate pod crash loops in monitoring namespace',
-      createdAt: '2023-05-18 14:30',
-      jiraTicket: { key: 'OPS-123', url: '#' },
-      status: 'resolved'
-    },
-    {
-      id: 'session-124',
-      description: 'Debug networking issues between services',
-      createdAt: '2023-05-15 09:15',
-      jiraTicket: { key: 'OPS-124', url: '#' },
-      status: 'active'
-    },
-    {
-      id: 'session-125',
-      description: 'Investigate high CPU usage on worker nodes',
-      createdAt: '2023-05-10 16:45',
-      jiraTicket: { key: 'OPS-125', url: '#' },
-      status: 'pending'
-    }
-  ];
-
-  const { data: pastSessions } = useQuery({
-    queryKey: ['debug-sessions'],
-    queryFn: async () => {
-      return new Promise<DebugSession[]>((resolve) => {
-        setTimeout(() => {
-          resolve(mockPastSessions);
-        }, 800);
-      });
-    },
-    staleTime: 60000,
-  });
-
-  const createSessionMutation = useMutation({
-    mutationFn: ({ cluster, description }: { cluster: string; description: string }) => 
-      kubernetesApi.createSession(cluster, description),
-    onSuccess: (data) => {
-      setCurrentJiraTicket(data);
-      setShowCreateSession(false);
-      setChatHistory([{ role: 'assistant', content: 'New debugging session started. How can I help you?' }]);
-      setOutput('');
-      setHistory([]);
-      setDebuggingSteps([]);
+  const handleCommandSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!command.trim() || !selectedClusterArn) return;
+    
+    setCommandLoading(true);
+    try {
+      const result = await kubernetesApi.runCommand(selectedClusterArn, command);
+      setCommandOutput(result.output);
       
-      toast({
-        title: "Debug Session Created",
-        description: `Jira ticket ${data.key} created successfully`,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Session Creation Error",
-        description: error.message || "Failed to create debug session",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const commandMutation = useMutation({
-    mutationFn: ({ cluster, command, jiraTicketKey }: { cluster: string; command: string; jiraTicketKey?: string }) => 
-      kubernetesApi.runCommand(cluster, command, jiraTicketKey),
-    onSuccess: (data) => {
-      setOutput(data.output);
-      
-      if (!history.includes(command)) {
-        setHistory(prev => [command, ...prev].slice(0, 10));
+      // Add to command history if unique
+      if (!commandHistory.includes(command)) {
+        setCommandHistory(prev => [command, ...prev].slice(0, 10));
       }
       
-      setDebuggingSteps(prev => [...prev, `Executed: ${command}\nResult: ${data.exitCode === 0 ? 'Success' : 'Error'}`]);
+      // Add to debug steps
+      setDebugSteps(prev => [...prev, `Executed: ${command}\nResult: ${result.exitCode === 0 ? 'Success' : 'Error'}`]);
       
-      if (data.exitCode !== 0) {
+      if (result.exitCode !== 0) {
         toast({
           title: "Command Error",
-          description: data.error || "Command execution failed",
+          description: result.error || "Command execution failed",
           variant: "destructive",
         });
       }
-    },
-    onError: (error: any) => {
+    } catch (error: any) {
       toast({
         title: "API Error",
         description: error.message || "Failed to execute command",
         variant: "destructive",
       });
+    } finally {
+      setCommandLoading(false);
     }
-  });
+  };
 
-  const chatMutation = useMutation({
-    mutationFn: ({ cluster, message, jiraTicketKey }: { cluster: string; message: string; jiraTicketKey?: string }) => 
-      kubernetesApi.chatWithAssistant(cluster, message, jiraTicketKey),
-    onSuccess: (data) => {
-      setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim() || !selectedClusterArn) return;
+
+    const userMessage = { role: 'user' as const, content: message };
+    setChatHistory(prev => [...prev, userMessage]);
+    
+    setDebugSteps(prev => [...prev, `User query: ${message}`]);
+    setChatLoading(true);
+    setMessage('');
+    
+    try {
+      const response = await kubernetesApi.chatWithAssistant(selectedClusterArn, message);
       
-      setDebuggingSteps(prev => [...prev, `AI Assistant: ${data.response.substring(0, 50)}${data.response.length > 50 ? '...' : ''}`]);
+      setChatHistory(prev => [...prev, { 
+        role: 'assistant', 
+        content: response.response 
+      }]);
       
-      const commandMatch = data.response.match(/```(?:bash|sh)?\s*(kubectl .+?)```/);
+      setDebugSteps(prev => [...prev, `AI Assistant: ${response.response.substring(0, 50)}${response.response.length > 50 ? '...' : ''}`]);
+      
+      // Check if assistant suggests a command
+      const commandMatch = response.response.match(/```(?:bash|sh)?\s*(kubectl .+?)```/);
       if (commandMatch && commandMatch[1]) {
         const suggestedCommand = commandMatch[1].trim();
         setCommand(suggestedCommand);
       }
-    },
-    onError: (error: any) => {
+      
+      // Update debug log
+      if (debugSession) {
+        setDebugSession({
+          ...debugSession,
+          debugLog: debugSession.debugLog + `\n\nUser: ${message}\n\nAssistant: ${response.response}`
+        });
+      } else {
+        setDebugSession({
+          id: `debug-${Date.now()}`,
+          debugLog: `Debug Session - ${new Date().toLocaleString()}\n\nCluster: ${selectedCluster}\n\nUser: ${message}\n\nAssistant: ${response.response}`
+        });
+      }
+    } catch (error: any) {
       toast({
         title: "Chat Error",
         description: error.message || "Failed to get assistant response",
@@ -185,67 +197,9 @@ const KubernetesDebugger = () => {
         role: 'assistant', 
         content: "Sorry, I encountered an error processing your request. Please try again." 
       }]);
+    } finally {
+      setChatLoading(false);
     }
-  });
-
-  const clusterHealth = useQuery({
-    queryKey: ['cluster-health', selectedCluster],
-    queryFn: () => {
-      if (!selectedCluster) return null;
-      return kubernetesApi.getClusterHealth(selectedCluster);
-    },
-    staleTime: 30000,
-    enabled: !!selectedCluster
-  });
-
-  const handleCreateSession = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sessionDescription.trim() || !selectedCluster) return;
-    
-    createSessionMutation.mutate({
-      cluster: selectedCluster,
-      description: sessionDescription
-    });
-  };
-
-  const runCommand = () => {
-    if (!command.trim() || !selectedCluster) return;
-    commandMutation.mutate({ 
-      cluster: selectedCluster, 
-      command,
-      jiraTicketKey: currentJiraTicket?.key 
-    });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    runCommand();
-  };
-
-  const handleHistoryClick = (cmd: string) => {
-    setCommand(cmd);
-  };
-
-  const clearOutput = () => {
-    setOutput('');
-  };
-
-  const handleChatSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim() || !selectedCluster) return;
-
-    const userMessage = { role: 'user' as const, content: message };
-    setChatHistory(prev => [...prev, userMessage]);
-    
-    setDebuggingSteps(prev => [...prev, `User query: ${message}`]);
-    
-    chatMutation.mutate({ 
-      cluster: selectedCluster, 
-      message,
-      jiraTicketKey: currentJiraTicket?.key
-    });
-    
-    setMessage('');
   };
 
   const handleChatKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -255,35 +209,64 @@ const KubernetesDebugger = () => {
     }
   };
 
-  const getStatusComponent = (status: string) => {
-    if (status === 'healthy') {
-      return (
-        <>
-          <CheckCircle size={16} className="text-green-500" />
-          <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded">Healthy</span>
-        </>
-      );
-    } else if (status === 'warning') {
-      return (
-        <>
-          <AlertCircle size={16} className="text-amber-500" />
-          <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded">Warning</span>
-        </>
-      );
-    } else {
-      return (
-        <>
-          <AlertCircle size={16} className="text-red-500" />
-          <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded">Error</span>
-        </>
-      );
+  const handleHistoryClick = (cmd: string) => {
+    setCommand(cmd);
+  };
+
+  const handleEnvironmentChange = (env: Environment) => {
+    setSelectedEnvironment(env);
+    setSelectedCluster('');
+    setSelectedClusterArn('');
+  };
+
+  const handleClusterSelect = (name: string, arn: string) => {
+    setSelectedCluster(name);
+    setSelectedClusterArn(arn);
+  };
+
+  const handleRemoveClusterTab = (clusterName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveClusters(prev => prev.filter(name => name !== clusterName));
+    
+    // Update active cluster ARNs
+    const newActiveClusterArns = {...activeClusterArns};
+    delete newActiveClusterArns[clusterName];
+    setActiveClusterArns(newActiveClusterArns);
+    
+    // If removing the selected cluster, select another one
+    if (selectedCluster === clusterName) {
+      const remainingClusters = activeClusters.filter(name => name !== clusterName);
+      if (remainingClusters.length > 0) {
+        setSelectedCluster(remainingClusters[0]);
+        setSelectedClusterArn(activeClusterArns[remainingClusters[0]]);
+      } else {
+        setSelectedCluster('');
+        setSelectedClusterArn('');
+      }
     }
   };
 
-  const handleSessionSelect = (session: DebugSession) => {
-    setCurrentJiraTicket(session.jiraTicket);
-    setChatHistory([{ role: 'assistant', content: `Loaded previous session: ${session.description}. How can I help continue debugging?` }]);
-    setShowPastSessions(false);
+  const clearOutput = () => {
+    setCommandOutput('');
+  };
+
+  const downloadDebugSession = () => {
+    if (!debugSession) return;
+    
+    const blob = new Blob([debugSession.debugLog], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kubernetes-debug-session-${selectedCluster}-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Debug Log Downloaded",
+      description: "The debug session log has been downloaded successfully",
+    });
   };
 
   const getEnvironmentStyle = (envId: string) => {
@@ -302,30 +285,12 @@ const KubernetesDebugger = () => {
     }
   };
 
-  const handleRemoveClusterTab = (clusterId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveClusters(prev => prev.filter(id => id !== clusterId));
-    
-    if (selectedCluster === clusterId) {
-      const remainingClusters = activeClusters.filter(id => id !== clusterId);
-      if (remainingClusters.length > 0) {
-        setSelectedCluster(remainingClusters[0]);
-      } else {
-        setSelectedCluster('');
-      }
-    }
-  };
-
-  const getClusterInfo = (clusterId: string) => {
-    return clusters?.find(c => c.id === clusterId);
-  };
-
-  const selectedClusterName = clusters?.find(c => c.id === selectedCluster)?.name || selectedCluster;
-
   return (
     <div className="space-y-6">
+      {/* Environment and Cluster Selection */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
         <div className="space-y-4">
+          {/* Environment Selection */}
           <div className="flex items-center space-x-4">
             <div className="text-sm font-medium">Environment:</div>
             <div className="flex gap-2 flex-wrap">
@@ -334,11 +299,7 @@ const KubernetesDebugger = () => {
                 return (
                   <button
                     key={env.id}
-                    onClick={() => {
-                      setSelectedEnvironment(env.id as Environment);
-                      setSelectedCluster('');
-                      setActiveClusters([]);
-                    }}
+                    onClick={() => handleEnvironmentChange(env.id as Environment)}
                     className={cn(
                       "flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
                       selectedEnvironment === env.id
@@ -353,6 +314,7 @@ const KubernetesDebugger = () => {
             </div>
           </div>
 
+          {/* Cluster Selection Dropdown */}
           <div className="flex items-center space-x-4">
             <div className="text-sm font-medium">Cluster:</div>
             <DropdownMenu>
@@ -363,13 +325,8 @@ const KubernetesDebugger = () => {
                   <>
                     <Server size={14} className="text-primary" />
                     <span className="flex-1 text-left font-medium truncate">
-                      {selectedClusterName}
+                      {selectedCluster}
                     </span>
-                    <span className={cn(
-                      "inline-block w-2 h-2 rounded-full ml-1",
-                      clusters?.find(c => c.id === selectedCluster)?.status === 'healthy' ? "bg-green-500" : 
-                      clusters?.find(c => c.id === selectedCluster)?.status === 'warning' ? "bg-amber-500" : "bg-red-500"
-                    )} />
                   </>
                 ) : (
                   <>
@@ -391,20 +348,13 @@ const KubernetesDebugger = () => {
                 ) : clusters && clusters.length > 0 ? (
                   clusters.map((cluster) => (
                     <DropdownMenuItem 
-                      key={cluster.id} 
-                      onClick={() => setSelectedCluster(cluster.id)}
+                      key={cluster.arn} 
+                      onClick={() => handleClusterSelect(cluster.name, cluster.arn)}
                       className="cursor-pointer"
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-2">
-                          <Server size={14} />
-                          <span>{cluster.name}</span>
-                        </div>
-                        <span className={cn(
-                          "inline-block w-2 h-2 rounded-full",
-                          cluster.status === 'healthy' ? "bg-green-500" : 
-                          cluster.status === 'warning' ? "bg-amber-500" : "bg-red-500"
-                        )} />
+                      <div className="flex items-center gap-2 w-full">
+                        <Server size={14} />
+                        <span>{cluster.name}</span>
                       </div>
                     </DropdownMenuItem>
                   ))
@@ -418,205 +368,68 @@ const KubernetesDebugger = () => {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          {currentJiraTicket ? (
-            <div className="flex items-center gap-2">
-              <a 
-                href={currentJiraTicket.url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
-              >
-                <Link size={14} />
-                <span>Jira: {currentJiraTicket.key}</span>
-                <ExternalLink size={12} />
-              </a>
-              
-              <button
-                onClick={() => setShowPastSessions(!showPastSessions)}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-muted hover:bg-muted/80 transition-colors rounded-full"
-              >
-                <History size={14} />
-                <span>Past Sessions</span>
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowCreateSession(true)}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors"
-                disabled={!selectedCluster}
-              >
-                <Plus size={14} />
-                <span>Create Debug Session</span>
-              </button>
-              
-              <button
-                onClick={() => setShowPastSessions(!showPastSessions)}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-muted hover:bg-muted/80 transition-colors rounded-full"
-              >
-                <History size={14} />
-                <span>Past Sessions</span>
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Download button */}
+        {debugSession && (
+          <Button
+            onClick={downloadDebugSession}
+            className="flex items-center gap-2"
+            variant="outline"
+          >
+            <Download size={16} />
+            Download Debug Log
+          </Button>
+        )}
       </div>
 
+      {/* Active Cluster Tabs */}
       {activeClusters.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-          {activeClusters.map(clusterId => {
-            const cluster = getClusterInfo(clusterId);
-            return (
-              <button
-                key={clusterId}
-                onClick={() => setSelectedCluster(clusterId)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors whitespace-nowrap",
-                  selectedCluster === clusterId
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted hover:bg-muted/80"
-                )}
-              >
-                <Server size={14} />
-                <span>{cluster?.name || clusterId}</span>
-                <span className={cn(
-                  "inline-block w-2 h-2 rounded-full",
-                  cluster?.status === 'healthy' ? "bg-green-500" : 
-                  cluster?.status === 'warning' ? "bg-amber-500" : "bg-red-500"
-                )} />
-                <X 
-                  size={14} 
-                  className="ml-1 opacity-70 hover:opacity-100"
-                  onClick={(e) => handleRemoveClusterTab(clusterId, e)}
-                />
-              </button>
-            );
-          })}
+          {activeClusters.map(clusterName => (
+            <button
+              key={clusterName}
+              onClick={() => handleClusterSelect(
+                clusterName, 
+                activeClusterArns[clusterName]
+              )}
+              className={cn(
+                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors whitespace-nowrap",
+                selectedCluster === clusterName
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted hover:bg-muted/80"
+              )}
+            >
+              <Server size={14} />
+              <span>{clusterName}</span>
+              <X 
+                size={14} 
+                className="ml-1 opacity-70 hover:opacity-100"
+                onClick={(e) => handleRemoveClusterTab(clusterName, e)}
+              />
+            </button>
+          ))}
         </div>
       )}
 
+      {/* Selected Cluster Banner */}
       {selectedCluster && (
         <div className="bg-primary/5 border border-primary/20 rounded-md p-3 flex items-center gap-2">
           <Server size={18} className="text-primary" />
           <div>
             <div className="text-sm font-medium">Selected Cluster</div>
-            <div className="text-lg font-semibold">{selectedClusterName}</div>
+            <div className="text-lg font-semibold">{selectedCluster}</div>
           </div>
-          <div className="ml-auto">
-            <div className={cn(
-              "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
-              (clusters?.find(c => c.id === selectedCluster)?.status === 'healthy') 
-                ? "bg-green-50 text-green-600" 
-                : (clusters?.find(c => c.id === selectedCluster)?.status === 'warning')
-                  ? "bg-amber-50 text-amber-600" 
-                  : "bg-red-50 text-red-600"
-            )}>
-              {(clusters?.find(c => c.id === selectedCluster)?.status || 'unknown').toUpperCase()}
-            </div>
+          <div className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full ml-auto">
+            {selectedClusterArn}
           </div>
         </div>
       )}
 
-      {showPastSessions && (
-        <GlassMorphicCard className="animate-fade-in">
-          <div className="p-4 border-b bg-muted/40">
-            <h3 className="text-sm font-medium">Past Debugging Sessions</h3>
-          </div>
-          <div className="p-4">
-            <div className="space-y-3">
-              {(pastSessions || mockPastSessions).map((session) => (
-                <button
-                  key={session.id}
-                  onClick={() => handleSessionSelect(session)}
-                  className="w-full flex items-center justify-between border rounded-md p-3 hover:bg-muted/50 transition-colors text-left"
-                >
-                  <div>
-                    <div className="font-medium text-sm">{session.description}</div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-muted-foreground">{session.createdAt}</span>
-                      <a 
-                        href={session.jiraTicket.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 flex items-center gap-1 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Link size={12} />
-                        {session.jiraTicket.key}
-                      </a>
-                    </div>
-                  </div>
-                  <div className={cn(
-                    "text-xs px-2 py-0.5 rounded-full",
-                    session.status === 'resolved' 
-                      ? "bg-green-50 text-green-600" 
-                      : session.status === 'active' 
-                        ? "bg-blue-50 text-blue-600" 
-                        : "bg-amber-50 text-amber-600"
-                  )}>
-                    {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </GlassMorphicCard>
-      )}
-
-      {showCreateSession && (
-        <GlassMorphicCard className="animate-fade-in">
-          <div className="p-4">
-            <h3 className="text-sm font-medium mb-2">Create Debugging Session</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              This will create a Jira ticket to track this debugging session
-            </p>
-            
-            <form onSubmit={handleCreateSession} className="space-y-4">
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium mb-1">
-                  Description
-                </label>
-                <textarea
-                  id="description"
-                  value={sessionDescription}
-                  onChange={(e) => setSessionDescription(e.target.value)}
-                  placeholder="Describe the issue you're trying to debug..."
-                  className="w-full px-3 py-2 bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
-                  rows={3}
-                  required
-                />
-              </div>
-              
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateSession(false)}
-                  className="px-4 py-2 text-sm border rounded-md hover:bg-muted transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createSessionMutation.isPending}
-                  className="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
-                >
-                  {createSessionMutation.isPending ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
-                  ) : (
-                    "Create Session"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </GlassMorphicCard>
-      )}
-
+      {/* Main Debug Interface */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* Command Terminal */}
         <GlassMorphicCard className="md:col-span-8">
           <div className="p-4 border-b bg-muted/40">
-            <form onSubmit={handleSubmit} className="flex gap-2">
+            <form onSubmit={handleCommandSubmit} className="flex gap-2">
               <div className="flex-1 relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                   <Terminal size={16} className="text-muted-foreground" />
@@ -627,26 +440,26 @@ const KubernetesDebugger = () => {
                   onChange={(e) => setCommand(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
                   placeholder="Enter kubectl command..."
-                  disabled={!selectedCluster}
+                  disabled={!selectedClusterArn || commandLoading}
                 />
               </div>
-              <button 
+              <Button
                 type="submit"
-                className="flex items-center gap-1 bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={commandMutation.isPending || !selectedCluster}
+                className="flex items-center gap-1"
+                disabled={commandLoading || !selectedClusterArn}
               >
-                {commandMutation.isPending ? (
+                {commandLoading ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   <Play size={14} />
                 )}
                 Run
-              </button>
+              </Button>
             </form>
           </div>
           
-          <div className="relative min-h-[350px] max-h-[450px] overflow-auto bg-gray-900 text-gray-100 p-4 font-mono text-sm">
-            {commandMutation.isPending ? (
+          <div className="relative min-h-[250px] max-h-[350px] overflow-auto bg-gray-900 text-gray-100 p-4 font-mono text-sm">
+            {commandLoading ? (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
                 <div className="flex flex-col items-center">
                   <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
@@ -655,8 +468,8 @@ const KubernetesDebugger = () => {
               </div>
             ) : null}
             
-            {output ? (
-              <pre className="whitespace-pre-wrap">{output}</pre>
+            {commandOutput ? (
+              <pre className="whitespace-pre-wrap">{commandOutput}</pre>
             ) : (
               <div className="h-full flex items-center justify-center text-gray-400">
                 <span>Command output will appear here</span>
@@ -664,7 +477,7 @@ const KubernetesDebugger = () => {
             )}
           </div>
           
-          {output && (
+          {commandOutput && (
             <div className="p-3 border-t bg-muted/40 flex justify-between items-center">
               <div className="flex gap-2">
                 <button 
@@ -681,23 +494,19 @@ const KubernetesDebugger = () => {
                   Save Output
                 </button>
               </div>
-              
-              <div className="flex items-center gap-2">
-                <AlertCircle size={16} className="text-amber-500" />
-                <span className="text-xs">Found 1 pod with errors</span>
-              </div>
             </div>
           )}
         </GlassMorphicCard>
         
+        {/* Command History */}
         <GlassMorphicCard className="md:col-span-4">
           <div className="p-4 border-b bg-muted/40">
             <h3 className="font-medium text-sm">Command History</h3>
           </div>
           
-          <div className="p-3 max-h-[400px] overflow-auto">
+          <div className="p-3 max-h-[350px] overflow-auto">
             <div className="space-y-2">
-              {history.map((cmd, index) => (
+              {commandHistory.map((cmd, index) => (
                 <button
                   key={index}
                   onClick={() => handleHistoryClick(cmd)}
@@ -710,7 +519,7 @@ const KubernetesDebugger = () => {
                 </button>
               ))}
               
-              {history.length === 0 && (
+              {commandHistory.length === 0 && (
                 <div className="text-center text-muted-foreground text-xs p-4">
                   <p>No command history yet</p>
                 </div>
@@ -720,15 +529,19 @@ const KubernetesDebugger = () => {
         </GlassMorphicCard>
       </div>
 
+      {/* Chat and Debug Steps */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* Chat Interface */}
         <GlassMorphicCard className="md:col-span-8">
           <div className="p-4 border-b bg-muted/40">
             <h3 className="font-medium text-sm">Kubernetes Assistant</h3>
-            <p className="text-xs text-muted-foreground mt-1">Ask questions in natural language to debug your Kubernetes issues</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Ask questions in natural language to debug your Kubernetes issues
+            </p>
           </div>
           
-          <div className="p-4 max-h-[400px] overflow-auto flex flex-col">
-            <div className="flex-1 space-y-4 mb-4">
+          <div className="p-4 h-[350px] flex flex-col">
+            <div className="flex-1 space-y-4 mb-4 overflow-auto">
               {chatHistory.map((chat, index) => (
                 <div 
                   key={index} 
@@ -748,7 +561,7 @@ const KubernetesDebugger = () => {
                 </div>
               ))}
               
-              {chatMutation.isPending && (
+              {chatLoading && (
                 <div className="flex justify-start">
                   <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[80%] p-3">
                     <div className="flex space-x-2">
@@ -761,47 +574,52 @@ const KubernetesDebugger = () => {
               )}
             </div>
             
-            <form onSubmit={handleChatSubmit} className="flex gap-2 mt-2">
+            <form onSubmit={handleChatSubmit} className="flex gap-2 mt-auto">
               <div className="relative flex-1">
                 <Textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyDown={handleChatKeyDown}
                   className="w-full resize-none bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none min-h-[40px] py-2"
-                  placeholder="Ask about your Kubernetes issues... (Press Enter to send)"
-                  disabled={chatMutation.isPending || !selectedCluster}
+                  placeholder={selectedClusterArn 
+                    ? "Ask about your Kubernetes issues... (Press Enter to send)" 
+                    : "Please select a cluster first..."
+                  }
+                  disabled={chatLoading || !selectedClusterArn}
                   rows={2}
                 />
               </div>
-              <button
+              <Button
                 type="submit"
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={chatMutation.isPending || !message.trim() || !selectedCluster}
+                size="icon"
+                className="rounded-full h-10 w-10"
+                disabled={chatLoading || !message.trim() || !selectedClusterArn}
               >
                 <Send size={16} />
-              </button>
+              </Button>
             </form>
           </div>
         </GlassMorphicCard>
         
+        {/* Debug Steps */}
         <GlassMorphicCard className="md:col-span-4">
           <div className="p-4 border-b bg-muted/40 flex justify-between items-center">
             <h3 className="font-medium text-sm">Debugging Steps</h3>
             
             <button 
-              onClick={() => setDebuggingSteps([])}
+              onClick={() => setDebugSteps([])}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-              disabled={debuggingSteps.length === 0}
+              disabled={debugSteps.length === 0}
             >
-              <RotateCcw size={14} />
+              <Trash size={14} />
               Clear
             </button>
           </div>
           
-          <div className="p-3 max-h-[400px] overflow-auto">
-            {debuggingSteps.length > 0 ? (
+          <div className="p-3 h-[350px] overflow-auto">
+            {debugSteps.length > 0 ? (
               <ol className="space-y-3 list-decimal list-inside">
-                {debuggingSteps.map((step, index) => (
+                {debugSteps.map((step, index) => (
                   <li key={index} className="text-xs border-b pb-2 whitespace-pre-wrap">
                     {step}
                   </li>
@@ -816,44 +634,6 @@ const KubernetesDebugger = () => {
           </div>
         </GlassMorphicCard>
       </div>
-      
-      <GlassMorphicCard>
-        <div className="p-4 border-b bg-muted/40">
-          <h3 className="font-medium text-sm">Cluster Health</h3>
-        </div>
-        
-        <div className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="border rounded-md p-3">
-              <div className="text-xs text-muted-foreground">Control Plane</div>
-              <div className="flex items-center gap-2 mt-2">
-                {clusterHealth.data && getStatusComponent(clusterHealth.data.controlPlane)}
-              </div>
-            </div>
-            
-            <div className="border rounded-md p-3">
-              <div className="text-xs text-muted-foreground">etcd</div>
-              <div className="flex items-center gap-2 mt-2">
-                {clusterHealth.data && getStatusComponent(clusterHealth.data.etcd)}
-              </div>
-            </div>
-            
-            <div className="border rounded-md p-3">
-              <div className="text-xs text-muted-foreground">Scheduler</div>
-              <div className="flex items-center gap-2 mt-2">
-                {clusterHealth.data && getStatusComponent(clusterHealth.data.scheduler)}
-              </div>
-            </div>
-            
-            <div className="border rounded-md p-3">
-              <div className="text-xs text-muted-foreground">API Gateway</div>
-              <div className="flex items-center gap-2 mt-2">
-                {clusterHealth.data && getStatusComponent(clusterHealth.data.apiGateway)}
-              </div>
-            </div>
-          </div>
-        </div>
-      </GlassMorphicCard>
     </div>
   );
 };
