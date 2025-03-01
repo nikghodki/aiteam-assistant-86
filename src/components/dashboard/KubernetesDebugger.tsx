@@ -394,7 +394,7 @@ const KubernetesDebugger = () => {
               className={cn(
                 "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors whitespace-nowrap",
                 selectedCluster === clusterName
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-purple-600 text-white" // Changed from "bg-primary text-primary-foreground" to purple
                   : "bg-muted hover:bg-muted/80"
               )}
             >
