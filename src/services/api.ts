@@ -38,23 +38,13 @@ export interface ChatResponse {
   response: string;
 }
 
-export interface AuthResponse {
-  user: User;
-  token: string;
-}
-
 // Helper function for API calls
 const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
-  const token = localStorage.getItem('auth_token');
   
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
   };
-  
-  if (token) {
-    defaultHeaders['Authorization'] = `Bearer ${token}`;
-  }
 
   const response = await fetch(url, {
     ...options,
@@ -70,26 +60,6 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   return response.json();
-};
-
-// Auth API
-export const authApi = {
-  // Standard login
-  login: (email: string, password: string) => 
-    apiCall<AuthResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    }),
-    
-  // Get current user
-  getCurrentUser: () => 
-    apiCall<User>('/auth/me'),
-    
-  // Logout
-  logout: () => {
-    localStorage.removeItem('auth_token');
-    return Promise.resolve(true);
-  }
 };
 
 // Access Management API
@@ -185,4 +155,13 @@ export const kubernetesApi = {
   // Get cluster health
   getClusterHealth: (cluster: string) => 
     apiCall<any>(`/kubernetes/health/${cluster}`),
+};
+
+// Adding a function to get the mock user for demo purposes
+export const getUserInfo = (): User => {
+  return {
+    id: '1',
+    name: 'Demo User',
+    email: 'demo@example.com',
+  };
 };
