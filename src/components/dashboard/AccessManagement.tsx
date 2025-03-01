@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { accessApi, UserAccess, AccessRequest, JiraTicket } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { Textarea } from '../ui/textarea';
+import { Input } from '../ui/input';
 
 interface Group {
   id: number;
@@ -19,9 +21,6 @@ interface Group {
 const AccessManagement = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
-  const [requestReason, setRequestReason] = useState('');
-  const [accessRequests, setAccessRequests] = useState<{group: number, jira: JiraTicket}[]>([]);
   const [message, setMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([
     { role: 'assistant', content: 'How can I help you with access management today?' }
@@ -50,36 +49,6 @@ const AccessManagement = () => {
     },
   });
 
-  // Access request mutation
-  const accessRequestMutation = useMutation({
-    mutationFn: (request: { groupId: number, reason: string }) => 
-      accessApi.requestGroupAccess(request.groupId, request.reason, user.name),
-    onSuccess: (data, variables) => {
-      toast({
-        title: "Access Request Created",
-        description: `Jira ticket ${data.key} created for the access request`,
-      });
-      
-      // Add to our local requests list
-      setAccessRequests(prev => [
-        ...prev, 
-        {
-          group: variables.groupId,
-          jira: data
-        }
-      ]);
-      
-      setRequestReason('');
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Access Request Failed",
-        description: error.message || "Failed to create the access request",
-        variant: "destructive",
-      });
-    }
-  });
-
   // Chat mutation
   const chatMutation = useMutation({
     mutationFn: (message: string) => accessApi.chatWithAssistant(message, user.name),
@@ -99,10 +68,6 @@ const AccessManagement = () => {
       }]);
     }
   });
-
-  const handleGroupClick = (groupId: number) => {
-    setSelectedGroup(groupId);
-  };
 
   const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,13 +129,7 @@ const AccessManagement = () => {
           {(groups || []).map(group => (
             <div 
               key={group.id}
-              onClick={() => handleGroupClick(group.id)}
-              className={cn(
-                "flex flex-col p-3 rounded-md transition-colors cursor-pointer",
-                selectedGroup === group.id 
-                  ? "bg-primary/10 border border-primary/20" 
-                  : "hover:bg-secondary"
-              )}
+              className="flex flex-col p-3 rounded-md transition-colors cursor-pointer hover:bg-secondary"
             >
               <div className="flex justify-between items-center mb-1">
                 <div className="font-medium text-sm">{group.name}</div>
@@ -197,7 +156,7 @@ const AccessManagement = () => {
       </GlassMorphicCard>
       
       {/* Access Management Assistant */}
-      <GlassMorphicCard className="md:col-span-2 p-0 overflow-hidden">
+      <GlassMorphicCard className="md:col-span-2 p-0 overflow-hidden flex flex-col h-full">
         <div className="flex items-center justify-between p-5 border-b">
           <div className="flex items-center">
             <Lock className="text-primary mr-2" size={20} />
@@ -205,62 +164,58 @@ const AccessManagement = () => {
           </div>
         </div>
         
-        <div className="flex flex-col h-full">
-          <div className="flex-1 p-4 overflow-auto">
-            <div className="h-64 overflow-auto mb-4">
-              <div className="space-y-4">
-                {chatHistory.map((chat, index) => (
-                  <div 
-                    key={index} 
-                    className={cn(
-                      "flex",
-                      chat.role === 'assistant' ? "justify-start" : "justify-end"
-                    )}
-                  >
-                    <div className={cn(
-                      "max-w-[85%] rounded-lg p-3 text-sm",
-                      chat.role === 'assistant' 
-                        ? "bg-muted text-foreground rounded-tl-none" 
-                        : "bg-primary text-primary-foreground rounded-tr-none"
-                    )}>
-                      {chat.content}
-                    </div>
-                  </div>
-                ))}
-                
-                {chatMutation.isPending && (
-                  <div className="flex justify-start">
-                    <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[85%] p-3">
-                      <div className="flex space-x-2">
-                        <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse"></div>
-                        <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                        <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                      </div>
-                    </div>
-                  </div>
+        <div className="flex-1 p-4 overflow-y-auto">
+          <div className="space-y-4">
+            {chatHistory.map((chat, index) => (
+              <div 
+                key={index} 
+                className={cn(
+                  "flex",
+                  chat.role === 'assistant' ? "justify-start" : "justify-end"
                 )}
-              </div>
-            </div>
-          </div>
-          
-          <div className="p-4 border-t mt-auto">
-            <form onSubmit={handleChatSubmit} className="flex gap-2">
-              <input
-                type="text"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Ask about access management..."
-                className="flex-1 px-3 py-2 text-sm bg-background border rounded-md focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={chatMutation.isPending || !message.trim()}
-                className="p-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
-                <Send size={16} />
-              </button>
-            </form>
+                <div className={cn(
+                  "max-w-[85%] rounded-lg p-3 text-sm",
+                  chat.role === 'assistant' 
+                    ? "bg-muted text-foreground rounded-tl-none" 
+                    : "bg-primary text-primary-foreground rounded-tr-none"
+                )}>
+                  {chat.content}
+                </div>
+              </div>
+            ))}
+            
+            {chatMutation.isPending && (
+              <div className="flex justify-start">
+                <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[85%] p-3">
+                  <div className="flex space-x-2">
+                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse"></div>
+                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
+        </div>
+        
+        <div className="p-4 border-t mt-auto">
+          <form onSubmit={handleChatSubmit} className="flex gap-2">
+            <Input
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Ask about access management..."
+              className="flex-1"
+            />
+            <button
+              type="submit"
+              disabled={chatMutation.isPending || !message.trim()}
+              className="p-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <Send size={16} />
+            </button>
+          </form>
         </div>
       </GlassMorphicCard>
     </div>
