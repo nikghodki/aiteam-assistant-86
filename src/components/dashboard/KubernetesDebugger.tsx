@@ -1,3 +1,4 @@
+
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server, Link, ExternalLink, Plus, RotateCcw, History, ChevronDown } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -787,4 +788,17 @@ const KubernetesDebugger = () => {
               </div>
             </div>
             
-            <div className="border rounded-md p-3
+            <div className="border rounded-md p-3">
+              <div className="text-xs text-muted-foreground">API Gateway</div>
+              <div className="flex items-center gap-2 mt-2">
+                {clusterHealth.data && getStatusComponent(clusterHealth.data.apiGateway)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </GlassMorphicCard>
+    </div>
+  );
+};
+
+export default KubernetesDebugger;
