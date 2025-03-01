@@ -38,7 +38,7 @@ export const Header = () => {
           className="flex items-center gap-2 text-primary font-medium text-lg transition-opacity hover:opacity-80"
         >
           <Terminal size={24} className="text-primary" />
-          <span className="font-semibold tracking-tight">SRE Assistant</span>
+          <span className="font-semibold tracking-tight">AI Team Assistant</span>
         </Link>
         
         {/* Desktop Navigation */}

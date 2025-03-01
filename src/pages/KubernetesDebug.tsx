@@ -13,7 +13,7 @@ const KubernetesDebug = () => {
           <div>
             <h1 className="text-3xl font-bold">Kubernetes Debugger</h1>
             <p className="text-muted-foreground mt-1">
-              Troubleshoot and resolve Kubernetes issues with the API-connected debugger
+              Troubleshoot and resolve Kubernetes issues with the AI-connected debugger
             </p>
           </div>
           

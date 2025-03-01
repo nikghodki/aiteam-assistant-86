@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server, Link, ExternalLink, Plus } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { cn } from '@/lib/utils';
-import { kubernetesApi } from '@/services/api';
+import { kubernetesApi, JiraTicket } from '@/services/api';
 
 const KubernetesDebugger = () => {
   const { toast } = useToast();
@@ -20,6 +20,9 @@ const KubernetesDebugger = () => {
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([
     { role: 'assistant', content: 'How can I help you debug your Kubernetes cluster today?' }
   ]);
+  const [showCreateSession, setShowCreateSession] = useState(false);
+  const [sessionDescription, setSessionDescription] = useState('');
+  const [currentJiraTicket, setCurrentJiraTicket] = useState<JiraTicket | null>(null);
 
   // Available clusters
   const clusters = [
@@ -29,10 +32,31 @@ const KubernetesDebugger = () => {
     { id: 'test', name: 'Test Environment', status: 'error' }
   ];
 
+  // Create Jira ticket for debugging session
+  const createSessionMutation = useMutation({
+    mutationFn: ({ cluster, description }: { cluster: string; description: string }) => 
+      kubernetesApi.createSession(cluster, description),
+    onSuccess: (data) => {
+      setCurrentJiraTicket(data);
+      setShowCreateSession(false);
+      toast({
+        title: "Debug Session Created",
+        description: `Jira ticket ${data.key} created successfully`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Session Creation Error",
+        description: error.message || "Failed to create debug session",
+        variant: "destructive",
+      });
+    }
+  });
+
   // Command execution mutation
   const commandMutation = useMutation({
-    mutationFn: ({ cluster, command }: { cluster: string; command: string }) => 
-      kubernetesApi.runCommand(cluster, command),
+    mutationFn: ({ cluster, command, jiraTicketKey }: { cluster: string; command: string; jiraTicketKey?: string }) => 
+      kubernetesApi.runCommand(cluster, command, jiraTicketKey),
     onSuccess: (data) => {
       setOutput(data.output);
       
@@ -59,8 +83,8 @@ const KubernetesDebugger = () => {
 
   // Chat mutation
   const chatMutation = useMutation({
-    mutationFn: ({ cluster, message }: { cluster: string; message: string }) => 
-      kubernetesApi.chatWithAssistant(cluster, message),
+    mutationFn: ({ cluster, message, jiraTicketKey }: { cluster: string; message: string; jiraTicketKey?: string }) => 
+      kubernetesApi.chatWithAssistant(cluster, message, jiraTicketKey),
     onSuccess: (data) => {
       setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
     },
@@ -110,9 +134,23 @@ const KubernetesDebugger = () => {
     staleTime: 30000,
   });
   
+  const handleCreateSession = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sessionDescription.trim()) return;
+    
+    createSessionMutation.mutate({
+      cluster: selectedCluster,
+      description: sessionDescription
+    });
+  };
+  
   const runCommand = () => {
     if (!command.trim()) return;
-    commandMutation.mutate({ cluster: selectedCluster, command });
+    commandMutation.mutate({ 
+      cluster: selectedCluster, 
+      command,
+      jiraTicketKey: currentJiraTicket?.key 
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -139,7 +177,8 @@ const KubernetesDebugger = () => {
     // Send to API
     chatMutation.mutate({ 
       cluster: selectedCluster, 
-      message 
+      message,
+      jiraTicketKey: currentJiraTicket?.key
     });
     
     setMessage('');
@@ -172,32 +211,107 @@ const KubernetesDebugger = () => {
 
   return (
     <div className="space-y-6">
-      {/* Cluster Selector */}
-      <div className="flex items-center space-x-4 pb-4">
-        <div className="text-sm font-medium">Select Cluster:</div>
-        <div className="flex gap-2 flex-wrap">
-          {clusters.map((cluster) => (
-            <button
-              key={cluster.id}
-              onClick={() => setSelectedCluster(cluster.id)}
-              className={cn(
-                "flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
-                selectedCluster === cluster.id
-                  ? "bg-primary text-white border-primary"
-                  : "bg-background border-input hover:bg-muted"
-              )}
+      {/* Session and Cluster Management */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
+        <div className="flex items-center space-x-4">
+          <div className="text-sm font-medium">Select Cluster:</div>
+          <div className="flex gap-2 flex-wrap">
+            {clusters.map((cluster) => (
+              <button
+                key={cluster.id}
+                onClick={() => setSelectedCluster(cluster.id)}
+                className={cn(
+                  "flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
+                  selectedCluster === cluster.id
+                    ? "bg-primary text-white border-primary"
+                    : "bg-background border-input hover:bg-muted"
+                )}
+              >
+                <Server size={14} />
+                <span>{cluster.name}</span>
+                <span className={cn(
+                  "inline-block w-2 h-2 rounded-full ml-1",
+                  cluster.status === 'healthy' ? "bg-green-500" : 
+                  cluster.status === 'warning' ? "bg-amber-500" : "bg-red-500"
+                )} />
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {currentJiraTicket ? (
+            <a 
+              href={currentJiraTicket.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
             >
-              <Server size={14} />
-              <span>{cluster.name}</span>
-              <span className={cn(
-                "inline-block w-2 h-2 rounded-full ml-1",
-                cluster.status === 'healthy' ? "bg-green-500" : 
-                cluster.status === 'warning' ? "bg-amber-500" : "bg-red-500"
-              )} />
+              <Link size={14} />
+              <span>Jira: {currentJiraTicket.key}</span>
+              <ExternalLink size={12} />
+            </a>
+          ) : (
+            <button
+              onClick={() => setShowCreateSession(true)}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors"
+            >
+              <Plus size={14} />
+              <span>Create Debug Session</span>
             </button>
-          ))}
+          )}
         </div>
       </div>
+
+      {/* Create Debug Session Form */}
+      {showCreateSession && (
+        <GlassMorphicCard className="animate-fade-in">
+          <div className="p-4">
+            <h3 className="text-sm font-medium mb-2">Create Debugging Session</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              This will create a Jira ticket to track this debugging session
+            </p>
+            
+            <form onSubmit={handleCreateSession} className="space-y-4">
+              <div>
+                <label htmlFor="description" className="block text-sm font-medium mb-1">
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  value={sessionDescription}
+                  onChange={(e) => setSessionDescription(e.target.value)}
+                  placeholder="Describe the issue you're trying to debug..."
+                  className="w-full px-3 py-2 bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
+                  rows={3}
+                  required
+                />
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateSession(false)}
+                  className="px-4 py-2 text-sm border rounded-md hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createSessionMutation.isPending}
+                  className="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+                >
+                  {createSessionMutation.isPending ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  ) : (
+                    "Create Session"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </GlassMorphicCard>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <GlassMorphicCard className="md:col-span-3">
