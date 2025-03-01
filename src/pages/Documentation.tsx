@@ -18,16 +18,23 @@ const Documentation = () => {
             </p>
           </div>
           
-          <div className="bg-muted/30 rounded-lg p-6">
-            <DocumentationSearch />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-1">
+              <div className="bg-muted/30 rounded-lg p-6">
+                <DocumentationSearch />
+              </div>
+            </div>
+            
+            <div className="md:col-span-2">
+              <div className="bg-muted/30 rounded-lg p-6">
+                <DocumentationChat showInline={true} />
+              </div>
+            </div>
           </div>
         </div>
       </main>
       
       <Footer />
-      
-      {/* Chat interface */}
-      <DocumentationChat />
     </div>
   );
 };

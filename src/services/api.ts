@@ -1,3 +1,4 @@
+
 // API base URL should be configured in your environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -35,6 +36,28 @@ export interface CommandResult {
 
 export interface ChatResponse {
   response: string;
+}
+
+export interface DocumentResult {
+  id: number;
+  title: string;
+  excerpt: string;
+  content: string;
+  url: string;
+  category: string;
+}
+
+export interface QueryHistoryItem {
+  id: number;
+  query: string;
+  timestamp: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
 }
 
 // Helper function for API calls
@@ -96,14 +119,14 @@ export const accessApi = {
 export const docsApi = {
   // Search documentation
   searchDocumentation: (query: string) => 
-    apiCall<any[]>('/docs/search', {
+    apiCall<DocumentResult[]>('/docs/search', {
       method: 'POST',
       body: JSON.stringify({ query }),
     }),
 
   // Get document by ID
   getDocumentById: (id: number) => 
-    apiCall<any>(`/docs/${id}`),
+    apiCall<DocumentResult>(`/docs/${id}`),
 
   // Submit feedback on documentation
   submitFeedback: (documentId: number, helpful: boolean) => 
@@ -113,15 +136,29 @@ export const docsApi = {
     }),
 
   // Chat with assistant
-  chatWithAssistant: (message: string) => 
+  chatWithAssistant: (message: string, context?: string[], history?: ChatMessage[]) => 
     apiCall<ChatResponse>('/docs/chat', {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ 
+        message, 
+        context, 
+        history 
+      }),
     }),
+
+  // Get chat history
+  getChatHistory: () => 
+    apiCall<ChatMessage[]>('/docs/chat/history'),
 
   // Get query history
   getQueryHistory: () => 
-    apiCall<any[]>('/docs/history'),
+    apiCall<QueryHistoryItem[]>('/docs/history'),
+
+  // Clear chat history
+  clearChatHistory: () => 
+    apiCall<{success: boolean}>('/docs/chat/clear', {
+      method: 'POST'
+    }),
 };
 
 // Kubernetes Debugger API
