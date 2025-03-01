@@ -295,6 +295,9 @@ const KubernetesDebugger = () => {
     }
   };
 
+  // Find the selected cluster name
+  const selectedClusterName = clusters?.find(c => c.id === selectedCluster)?.name || selectedCluster;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
@@ -334,8 +337,8 @@ const KubernetesDebugger = () => {
                 ) : selectedCluster ? (
                   <>
                     <Server size={14} className="text-primary" />
-                    <span className="flex-1 text-left font-medium">
-                      {clusters?.find(c => c.id === selectedCluster)?.name || selectedCluster}
+                    <span className="flex-1 text-left font-medium truncate">
+                      {selectedClusterName}
                     </span>
                     <span className={cn(
                       "inline-block w-2 h-2 rounded-full ml-1",
@@ -686,14 +689,14 @@ const KubernetesDebugger = () => {
                   onKeyDown={handleChatKeyDown}
                   className="w-full resize-none bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none min-h-[40px] py-2"
                   placeholder="Ask about your Kubernetes issues... (Press Enter to send)"
-                  disabled={chatMutation.isPending}
+                  disabled={chatMutation.isPending || !selectedCluster}
                   rows={2}
                 />
               </div>
               <button
                 type="submit"
                 className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={chatMutation.isPending || !message.trim()}
+                disabled={chatMutation.isPending || !message.trim() || !selectedCluster}
               >
                 <Send size={16} />
               </button>
