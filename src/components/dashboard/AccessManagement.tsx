@@ -1,6 +1,6 @@
 
-import { useState, useEffect } from 'react';
-import { Users, Lock, Key, Check, X, Link as LinkIcon, ExternalLink, AlertCircle, Send, UserCheck, Shield, Clock, XCircle, Search } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Users, Lock, Key, Check, X, Link as LinkIcon, ExternalLink, AlertCircle, Send, UserCheck, Shield, Clock, XCircle, Search, RefreshCw, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { useToast } from "@/hooks/use-toast";
@@ -23,12 +23,15 @@ const AccessManagement = () => {
   const { toast } = useToast();
   const [message, setMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshTimerRef = useRef<number | null>(null);
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([
     { role: 'assistant', content: 'How can I help you with access management today?' }
   ]);
 
   // Fetch groups data for the current user
-  const { data: groups, isLoading: isLoadingGroups } = useQuery({
+  const { data: groups, isLoading: isLoadingGroups, refetch } = useQuery({
     queryKey: ['user-groups', user.name],
     queryFn: async () => {
       // In a real app, use the API
@@ -70,6 +73,37 @@ const AccessManagement = () => {
     }
   });
 
+  // Leave group mutation
+  const leaveGroupMutation = useMutation({
+    mutationFn: (groupId: number) => {
+      // In a real app, call the API 
+      // return accessApi.leaveGroup(groupId, user.name);
+      
+      // For now, simulate API call
+      return new Promise<{ success: boolean }>((resolve) => {
+        setTimeout(() => {
+          resolve({ success: true });
+        }, 500);
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "You have left the group",
+      });
+      
+      // Refetch groups to update the UI
+      refetch();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to leave group",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
@@ -83,6 +117,41 @@ const AccessManagement = () => {
     
     setMessage('');
   };
+
+  const handleLeaveGroup = (groupId: number, groupName: string) => {
+    if (window.confirm(`Are you sure you want to leave ${groupName}?`)) {
+      leaveGroupMutation.mutate(groupId);
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await refetch();
+    setIsRefreshing(false);
+  };
+
+  const toggleAutoRefresh = () => {
+    setAutoRefresh(prev => !prev);
+  };
+
+  // Set up auto-refresh
+  useEffect(() => {
+    if (autoRefresh) {
+      refreshTimerRef.current = window.setInterval(() => {
+        refetch();
+      }, 30000); // 30 seconds
+    } else if (refreshTimerRef.current) {
+      clearInterval(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+
+    // Clean up on unmount
+    return () => {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+      }
+    };
+  }, [autoRefresh, refetch]);
 
   // Filter groups based on search query
   const filteredGroups = groups?.filter(group => 
@@ -127,9 +196,35 @@ const AccessManagement = () => {
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* My Group Memberships */}
       <GlassMorphicCard className="md:col-span-1 p-5">
-        <div className="flex items-center mb-4">
-          <Users className="text-primary mr-2" size={20} />
-          <h3 className="font-medium">My Group Memberships</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <Users className="text-primary mr-2" size={20} />
+            <h3 className="font-medium">My Group Memberships</h3>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={toggleAutoRefresh}
+              className={cn(
+                "text-xs p-1 rounded flex items-center gap-1",
+                autoRefresh ? "text-green-600" : "text-gray-400"
+              )}
+              title={autoRefresh ? "Auto-refresh enabled (30s)" : "Auto-refresh disabled"}
+            >
+              <RefreshCw size={14} className={autoRefresh ? "animate-spin-slow" : ""} />
+              <span className="sr-only md:not-sr-only md:inline">Auto</span>
+            </button>
+            
+            <button 
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="text-xs p-1 rounded text-primary flex items-center gap-1"
+              title="Refresh now"
+            >
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+              <span className="sr-only md:not-sr-only md:inline">Refresh</span>
+            </button>
+          </div>
         </div>
         
         {/* Search bar */}
@@ -157,7 +252,20 @@ const AccessManagement = () => {
                 {getStatusBadge(group.status)}
               </div>
               <div className="text-xs text-muted-foreground">{group.description}</div>
-              <div className="text-xs text-muted-foreground mt-2">{group.members} members</div>
+              <div className="flex justify-between items-center mt-2">
+                <div className="text-xs text-muted-foreground">{group.members} members</div>
+                
+                {group.status === 'member' && (
+                  <button
+                    onClick={() => handleLeaveGroup(group.id, group.name)}
+                    className="text-xs flex items-center gap-1 text-red-500 hover:text-red-700 transition-colors"
+                    title="Leave this group"
+                  >
+                    <LogOut size={12} />
+                    <span>Leave</span>
+                  </button>
+                )}
+              </div>
             </div>
           ))}
           
@@ -179,7 +287,7 @@ const AccessManagement = () => {
       </GlassMorphicCard>
       
       {/* Access Management Assistant */}
-      <GlassMorphicCard className="md:col-span-2 p-0 overflow-hidden flex flex-col h-full">
+      <GlassMorphicCard className="md:col-span-2 p-0 overflow-hidden flex flex-col h-full" style={{ maxHeight: "500px" }}>
         <div className="flex items-center justify-between p-5 border-b">
           <div className="flex items-center">
             <Lock className="text-primary mr-2" size={20} />
