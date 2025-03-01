@@ -1,4 +1,3 @@
-
 # AI Team Assistant - API Integration Guide
 
 This document provides step-by-step instructions for integrating the frontend application with your backend API services. It covers the configuration and implementation for each feature of the application: Access Management, Kubernetes Debugging, and Documentation Search.
@@ -75,13 +74,13 @@ The Access Management feature requires the following API endpoints:
 2. **Request Group Access**
    - Endpoint: `/access/groups/request`
    - Method: POST
-   - Request Body: `{ groupId: number, reason: string }`
+   - Request Body: `{ groupId: number, reason: string, userName: string }`
    - Response: Jira ticket information
 
 3. **Chat with Assistant**
    - Endpoint: `/access/chat`
    - Method: POST
-   - Request Body: `{ message: string }`
+   - Request Body: `{ message: string, userName: string }`
    - Response: Assistant's response
 
 ### Data Models
@@ -301,6 +300,7 @@ def request_group_access():
     data = request.json
     group_id = data.get('groupId')
     reason = data.get('reason')
+    user_name = data.get('userName', 'Anonymous User')
     
     # Find group name
     group_name = next((g['name'] for g in groups if g['id'] == group_id), f"Group {group_id}")
@@ -308,7 +308,7 @@ def request_group_access():
     # Create a Jira ticket for the group access request
     ticket = create_jira_ticket(
         f"Group Access Request: {group_name}", 
-        f"User requested access to group {group_name}. Reason: {reason}"
+        f"User {user_name} requested access to group {group_name}. Reason: {reason}"
     )
     
     # Update group status to pending
@@ -323,17 +323,18 @@ def request_group_access():
 def access_chat():
     data = request.json
     message = data.get('message')
+    user_name = data.get('userName', 'Anonymous User')
     
     # In a real implementation, you would process the message and 
     # generate a response based on user access requirements
     
     if "add me to" in message.lower():
         group_name = message.lower().split("add me to")[1].strip()
-        response = f"I've created a request to add you to the {group_name} group. A ticket has been created for approval."
+        response = f"I've created a request to add {user_name} to the {group_name} group. A ticket has been created for approval."
     elif "access" in message.lower():
-        response = "I can help you request access to groups. Please specify which group you need access to."
+        response = f"Hello {user_name}, I can help you request access to groups. Please specify which group you need access to."
     else:
-        response = "I'm your access management assistant. How can I help you today?"
+        response = f"Hello {user_name}, I'm your access management assistant. How can I help you today?"
     
     return jsonify({"response": response})
 

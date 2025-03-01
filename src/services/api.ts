@@ -25,6 +25,7 @@ export interface JiraTicket {
 export interface AccessRequest {
   groupId: number;
   reason: string;
+  userName?: string;
 }
 
 export interface CommandResult {
@@ -67,17 +68,17 @@ export const accessApi = {
   getUserGroups: () => apiCall<any[]>('/access/groups'),
 
   // Request access to a group
-  requestGroupAccess: (groupId: number, reason: string) => 
+  requestGroupAccess: (groupId: number, reason: string, userName: string) => 
     apiCall<JiraTicket>('/access/groups/request', {
       method: 'POST',
-      body: JSON.stringify({ groupId, reason }),
+      body: JSON.stringify({ groupId, reason, userName }),
     }),
 
   // Chat with the assistant
-  chatWithAssistant: (message: string) => 
+  chatWithAssistant: (message: string, userName: string) => 
     apiCall<ChatResponse>('/access/chat', {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, userName }),
     }),
 };
 

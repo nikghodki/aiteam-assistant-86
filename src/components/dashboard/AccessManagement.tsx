@@ -6,6 +6,7 @@ import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { accessApi, UserAccess, AccessRequest, JiraTicket } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Group {
   id: number;
@@ -16,6 +17,7 @@ interface Group {
 }
 
 const AccessManagement = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const [showAccessRequestForm, setShowAccessRequestForm] = useState(false);
@@ -53,7 +55,7 @@ const AccessManagement = () => {
   // Access request mutation
   const accessRequestMutation = useMutation({
     mutationFn: (request: { groupId: number, reason: string }) => 
-      accessApi.requestGroupAccess(request.groupId, request.reason),
+      accessApi.requestGroupAccess(request.groupId, request.reason, user.name),
     onSuccess: (data, variables) => {
       toast({
         title: "Access Request Created",
@@ -83,7 +85,7 @@ const AccessManagement = () => {
 
   // Chat mutation
   const chatMutation = useMutation({
-    mutationFn: (message: string) => accessApi.chatWithAssistant(message),
+    mutationFn: (message: string) => accessApi.chatWithAssistant(message, user.name),
     onSuccess: (data) => {
       setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
     },
