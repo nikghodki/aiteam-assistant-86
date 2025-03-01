@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  googleLogin: (googleToken: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -45,10 +45,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkAuth();
   }, [toast]);
 
-  const googleLogin = async (googleToken: string) => {
+  const login = async (email: string, password: string) => {
     try {
       setLoading(true);
-      const response = await authApi.googleLogin(googleToken);
+      const response = await authApi.login(email, password);
       localStorage.setItem('auth_token', response.token);
       setUser(response.user);
       toast({
@@ -56,10 +56,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: `Welcome back, ${response.user.name}!`,
       });
     } catch (error: any) {
-      console.error('Google login error:', error);
+      console.error('Login error:', error);
       toast({
         title: "Login Failed",
-        description: error.message || "Failed to authenticate with Google",
+        description: error.message || "Failed to authenticate",
         variant: "destructive",
       });
       throw error;
@@ -78,7 +78,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, googleLogin, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

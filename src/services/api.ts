@@ -74,11 +74,11 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
 
 // Auth API
 export const authApi = {
-  // Google login
-  googleLogin: (googleToken: string) => 
-    apiCall<AuthResponse>('/auth/google', {
+  // Standard login
+  login: (email: string, password: string) => 
+    apiCall<AuthResponse>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ token: googleToken }),
+      body: JSON.stringify({ email, password }),
     }),
     
   // Get current user
