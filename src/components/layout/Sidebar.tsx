@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Server, 
   Database, 
@@ -10,10 +10,12 @@ import {
   User, 
   Settings, 
   ChevronLeft, 
-  ChevronRight 
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRBAC } from '@/contexts/RBACContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,21 +24,57 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from 'react-router-dom';
 
 export const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { hasPermission } = useRBAC();
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: Server },
-    { name: 'Access Control', href: '/access', icon: Database },
-    { name: 'Kubernetes', href: '/kubernetes', icon: Terminal },
-    { name: 'Documentation', href: '/docs', icon: Search },
-    { name: 'Jira Ticket', href: '/jira', icon: Ticket },
+  // Define navigation items with required permissions
+  const navigationItems = [
+    { 
+      name: 'Dashboard', 
+      href: '/dashboard', 
+      icon: Server,
+      // Dashboard is accessible to all authenticated users
+      visible: true 
+    },
+    { 
+      name: 'Access Control', 
+      href: '/access', 
+      icon: Database,
+      visible: hasPermission('access', 'read') 
+    },
+    { 
+      name: 'Kubernetes', 
+      href: '/kubernetes', 
+      icon: Terminal,
+      visible: hasPermission('kubernetes', 'read') 
+    },
+    { 
+      name: 'Documentation', 
+      href: '/docs', 
+      icon: Search,
+      visible: hasPermission('documentation', 'read') 
+    },
+    { 
+      name: 'Jira Ticket', 
+      href: '/jira', 
+      icon: Ticket,
+      visible: hasPermission('jira', 'read') 
+    },
+    { 
+      name: 'Role Management', 
+      href: '/roles', 
+      icon: ShieldCheck,
+      visible: hasPermission('all', 'admin') 
+    },
   ];
+
+  // Filter out items the user doesn't have permission to see
+  const navigation = navigationItems.filter(item => item.visible);
 
   return (
     <aside className={cn(

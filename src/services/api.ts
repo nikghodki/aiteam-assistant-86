@@ -1,4 +1,3 @@
-
 // API base URL should be configured in your environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -73,6 +72,34 @@ export interface KubernetesCluster {
   version?: string;
   environment?: 'production' | 'qa' | 'staging';
   nodeCount?: number;
+}
+
+// RBAC interfaces
+export interface Role {
+  id: string;
+  name: string;
+  description: string;
+  isSystem: boolean;
+  permissions: Permission[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Permission {
+  id: string;
+  resource: 'access' | 'kubernetes' | 'documentation' | 'jira' | 'settings' | 'all';
+  action: 'read' | 'write' | 'admin' | 'all';
+}
+
+export interface UserRole {
+  userId: string;
+  roleId: string;
+  roleName: string;
+}
+
+export interface UserPermission {
+  userId: string;
+  permission: Permission;
 }
 
 // Helper function for API calls
@@ -245,7 +272,64 @@ export const jiraApi = {
     }),
 };
 
-// Adding a function to get the mock user for demo purposes
+// RBAC API
+export const rbacApi = {
+  // Roles management
+  getRoles: () => 
+    apiCall<Role[]>('/rbac/roles'),
+
+  getRole: (roleId: string) => 
+    apiCall<Role>(`/rbac/roles/${roleId}`),
+
+  createRole: (role: Omit<Role, 'id' | 'isSystem' | 'createdAt' | 'updatedAt'>) => 
+    apiCall<Role>('/rbac/roles', {
+      method: 'POST',
+      body: JSON.stringify(role),
+    }),
+
+  updateRole: (roleId: string, role: Partial<Omit<Role, 'id' | 'isSystem' | 'createdAt' | 'updatedAt'>>) => 
+    apiCall<Role>(`/rbac/roles/${roleId}`, {
+      method: 'PUT',
+      body: JSON.stringify(role),
+    }),
+
+  deleteRole: (roleId: string) => 
+    apiCall<{ success: boolean }>(`/rbac/roles/${roleId}`, {
+      method: 'DELETE',
+    }),
+
+  // User roles management
+  getUserRoles: (userId: string) => 
+    apiCall<UserRole[]>(`/rbac/users/${userId}/roles`),
+
+  assignRoleToUser: (userId: string, roleId: string) => 
+    apiCall<{ success: boolean }>(`/rbac/users/${userId}/roles`, {
+      method: 'POST',
+      body: JSON.stringify({ roleId }),
+    }),
+
+  removeRoleFromUser: (userId: string, roleId: string) => 
+    apiCall<{ success: boolean }>(`/rbac/users/${userId}/roles/${roleId}`, {
+      method: 'DELETE',
+    }),
+
+  // User permissions management
+  getUserPermissions: (userId: string) => 
+    apiCall<Permission[]>(`/rbac/users/${userId}/permissions`),
+
+  assignPermissionToUser: (userId: string, permission: Omit<Permission, 'id'>) => 
+    apiCall<{ success: boolean }>(`/rbac/users/${userId}/permissions`, {
+      method: 'POST',
+      body: JSON.stringify({ permission }),
+    }),
+
+  removePermissionFromUser: (userId: string, permissionId: string) => 
+    apiCall<{ success: boolean }>(`/rbac/users/${userId}/permissions/${permissionId}`, {
+      method: 'DELETE',
+    }),
+};
+
+// Getting the mock user for demo purposes
 export const getUserInfo = (): User => {
   return {
     id: '1',
