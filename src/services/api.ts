@@ -10,6 +10,13 @@ export interface UserAccess {
   avatar?: string;
 }
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  photoUrl?: string;
+}
+
 export interface JiraTicket {
   key: string;
   url: string;
@@ -31,12 +38,23 @@ export interface ChatResponse {
   response: string;
 }
 
+export interface AuthResponse {
+  user: User;
+  token: string;
+}
+
 // Helper function for API calls
 const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
-  const defaultHeaders = {
+  const token = localStorage.getItem('auth_token');
+  
+  const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
   };
+  
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`;
+  }
 
   const response = await fetch(url, {
     ...options,
@@ -54,40 +72,50 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json();
 };
 
+// Auth API
+export const authApi = {
+  // Google login
+  googleLogin: (googleToken: string) => 
+    apiCall<AuthResponse>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ token: googleToken }),
+    }),
+    
+  // Get current user
+  getCurrentUser: () => 
+    apiCall<User>('/auth/me'),
+    
+  // Logout
+  logout: () => {
+    localStorage.removeItem('auth_token');
+    return Promise.resolve(true);
+  }
+};
+
 // Access Management API
 export const accessApi = {
-  // Get all users
-  getUsers: () => apiCall<UserAccess[]>('/access/users'),
-
-  // Get user groups for a specific user
-  getUserGroups: (userId: number) => apiCall<any[]>(`/access/users/${userId}/groups`),
+  // Get user groups
+  getUserGroups: () => apiCall<any[]>('/access/groups'),
 
   // Request access to a service
-  requestAccess: (request: AccessRequest) => 
+  requestAccess: (service: string, reason: string) => 
     apiCall<JiraTicket>('/access/request', {
       method: 'POST',
-      body: JSON.stringify(request),
+      body: JSON.stringify({ service, reason }),
     }),
 
   // Request access to a group
-  requestGroupAccess: (userId: number, groupId: number, reason: string) => 
+  requestGroupAccess: (groupId: number, reason: string) => 
     apiCall<JiraTicket>('/access/groups/request', {
       method: 'POST',
-      body: JSON.stringify({ userId, groupId, reason }),
-    }),
-
-  // Update user access
-  updateAccess: (userId: number, services: string[]) => 
-    apiCall<{success: boolean}>(`/access/users/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ services }),
+      body: JSON.stringify({ groupId, reason }),
     }),
 
   // Chat with the assistant
-  chatWithAssistant: (message: string, userId: number) => 
+  chatWithAssistant: (message: string) => 
     apiCall<ChatResponse>('/access/chat', {
       method: 'POST',
-      body: JSON.stringify({ message, userId }),
+      body: JSON.stringify({ message }),
     }),
 };
 

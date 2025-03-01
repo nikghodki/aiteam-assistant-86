@@ -2,8 +2,11 @@
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import AccessManagement from '@/components/dashboard/AccessManagement';
+import { useAuth } from '@/contexts/AuthContext';
 
 const AccessControl = () => {
+  const { user } = useAuth();
+  
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -13,8 +16,13 @@ const AccessControl = () => {
           <div>
             <h1 className="text-3xl font-bold">Access Control</h1>
             <p className="text-muted-foreground mt-1">
-              Manage user access and permissions
+              Manage group memberships and access requests
             </p>
+            {user && (
+              <p className="text-sm mt-2">
+                Logged in as: <span className="font-medium">{user.email}</span>
+              </p>
+            )}
           </div>
           
           <div className="bg-muted/30 rounded-lg p-6">

@@ -1,13 +1,23 @@
 
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Server, Database, Terminal, Search, Menu, X } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Server, Database, Terminal, Search, Menu, X, LogOut, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Server },
@@ -24,6 +34,11 @@ export const Header = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   return (
     <header 
@@ -43,7 +58,7 @@ export const Header = () => {
         
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-8">
-          {navigation.map((item) => (
+          {user && navigation.map((item) => (
             <Link
               key={item.name}
               to={item.href}
@@ -60,6 +75,35 @@ export const Header = () => {
           ))}
         </nav>
 
+        {/* User Profile / Login Button */}
+        <div className="hidden md:block">
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                  {user.name ? user.name.charAt(0) : <User size={14} />}
+                </div>
+                <span className="font-medium">{user.name?.split(' ')[0]}</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <div className="px-3 py-2 text-sm text-muted-foreground">{user.email}</div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link
+              to="/login"
+              className="px-4 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary/90 transition-colors"
+            >
+              Sign In
+            </Link>
+          )}
+        </div>
+
         {/* Mobile Menu Toggle */}
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -74,7 +118,7 @@ export const Header = () => {
       {isMobileMenuOpen && (
         <div className="md:hidden absolute top-full left-0 right-0 bg-background border-b border-border animate-fade-in">
           <div className="max-w-7xl mx-auto py-4 px-6 space-y-3">
-            {navigation.map((item) => (
+            {user && navigation.map((item) => (
               <Link
                 key={item.name}
                 to={item.href}
@@ -90,6 +134,28 @@ export const Header = () => {
                 {item.name}
               </Link>
             ))}
+            
+            {user ? (
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="flex items-center gap-2 py-2 text-sm font-medium text-red-500 hover:text-red-600 transition-colors w-full"
+              >
+                <LogOut size={18} />
+                Log out
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center gap-2 py-2 text-sm font-medium text-primary hover:text-primary/90 transition-colors"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <User size={18} />
+                Sign In
+              </Link>
+            )}
           </div>
         </div>
       )}
