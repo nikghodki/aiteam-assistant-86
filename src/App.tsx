@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import AuthCallback from "./pages/AuthCallback";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
+import JiraTicket from "./pages/JiraTicket";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/docs" element={<Documentation />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/jira" element={<JiraTicket />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

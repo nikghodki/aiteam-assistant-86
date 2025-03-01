@@ -1,4 +1,3 @@
-
 // API base URL should be configured in your environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -213,6 +212,31 @@ export const kubernetesApi = {
   // Download debug file
   downloadDebugFile: (sessionId: string) =>
     apiCall<{url: string}>(`/kubernetes/debug-file/${sessionId}`),
+};
+
+// Jira Ticket API
+export const jiraApi = {
+  // Create a ticket
+  createTicket: (summary: string, description: string, priority: string = 'Medium') => 
+    apiCall<JiraTicket>('/jira/ticket', {
+      method: 'POST',
+      body: JSON.stringify({ summary, description, priority }),
+    }),
+
+  // Get user's tickets
+  getUserTickets: () => 
+    apiCall<any[]>('/jira/tickets'),
+
+  // Get ticket details
+  getTicketDetails: (ticketKey: string) => 
+    apiCall<any>(`/jira/tickets/${ticketKey}`),
+
+  // Chat with assistant
+  chatWithAssistant: (message: string) => 
+    apiCall<ChatResponse>('/jira/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }),
 };
 
 // Adding a function to get the mock user for demo purposes
