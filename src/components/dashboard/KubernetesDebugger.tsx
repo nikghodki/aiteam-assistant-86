@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, KeyboardEvent } from 'react';
 import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server, Link, ExternalLink, Plus, RotateCcw, History, ChevronDown } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Textarea } from "@/components/ui/textarea";
 
 interface DebugSession {
   id: string;
@@ -22,7 +23,6 @@ interface DebugSession {
   status: 'active' | 'resolved' | 'pending';
 }
 
-// Environment type and styling definitions
 const environments = [
   { id: 'production', name: 'Production', color: 'green' },
   { id: 'qa', name: 'QA', color: 'amber' },
@@ -52,22 +52,18 @@ const KubernetesDebugger = () => {
   const [showPastSessions, setShowPastSessions] = useState(false);
   const [debuggingSteps, setDebuggingSteps] = useState<string[]>([]);
 
-  // Query for clusters by environment
   const { data: clusters, isLoading: isLoadingClusters } = useQuery({
     queryKey: ['clusters', selectedEnvironment],
     queryFn: () => kubernetesApi.getClusters(selectedEnvironment),
-    // Keep the last successful result when refetching
     staleTime: 30000,
   });
 
-  // Set the first cluster as selected when clusters are loaded
   useEffect(() => {
     if (clusters && clusters.length > 0 && !selectedCluster) {
       setSelectedCluster(clusters[0].id);
     }
   }, [clusters, selectedCluster]);
 
-  // Mock past debug sessions
   const mockPastSessions: DebugSession[] = [
     {
       id: 'session-123',
@@ -92,14 +88,9 @@ const KubernetesDebugger = () => {
     }
   ];
 
-  // Query past debug sessions
   const { data: pastSessions } = useQuery({
     queryKey: ['debug-sessions'],
     queryFn: async () => {
-      // This would be a real API call in production
-      // return kubernetesApi.getDebugSessions();
-      
-      // For demo, use mock data
       return new Promise<DebugSession[]>((resolve) => {
         setTimeout(() => {
           resolve(mockPastSessions);
@@ -109,14 +100,12 @@ const KubernetesDebugger = () => {
     staleTime: 60000,
   });
 
-  // Create Jira ticket for debugging session
   const createSessionMutation = useMutation({
     mutationFn: ({ cluster, description }: { cluster: string; description: string }) => 
       kubernetesApi.createSession(cluster, description),
     onSuccess: (data) => {
       setCurrentJiraTicket(data);
       setShowCreateSession(false);
-      // Clear previous chat and commands when starting a new session
       setChatHistory([{ role: 'assistant', content: 'New debugging session started. How can I help you?' }]);
       setOutput('');
       setHistory([]);
@@ -136,7 +125,6 @@ const KubernetesDebugger = () => {
     }
   });
 
-  // Command execution mutation
   const commandMutation = useMutation({
     mutationFn: ({ cluster, command, jiraTicketKey }: { cluster: string; command: string; jiraTicketKey?: string }) => 
       kubernetesApi.runCommand(cluster, command, jiraTicketKey),
@@ -147,7 +135,6 @@ const KubernetesDebugger = () => {
         setHistory(prev => [command, ...prev].slice(0, 10));
       }
       
-      // Add to debugging steps
       setDebuggingSteps(prev => [...prev, `Executed: ${command}\nResult: ${data.exitCode === 0 ? 'Success' : 'Error'}`]);
       
       if (data.exitCode !== 0) {
@@ -167,17 +154,14 @@ const KubernetesDebugger = () => {
     }
   });
 
-  // Chat mutation
   const chatMutation = useMutation({
     mutationFn: ({ cluster, message, jiraTicketKey }: { cluster: string; message: string; jiraTicketKey?: string }) => 
       kubernetesApi.chatWithAssistant(cluster, message, jiraTicketKey),
     onSuccess: (data) => {
       setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
       
-      // Add to debugging steps
       setDebuggingSteps(prev => [...prev, `AI Assistant: ${data.response.substring(0, 50)}${data.response.length > 50 ? '...' : ''}`]);
       
-      // If the response contains a recommended command, extract it
       const commandMatch = data.response.match(/```(?:bash|sh)?\s*(kubectl .+?)```/);
       if (commandMatch && commandMatch[1]) {
         const suggestedCommand = commandMatch[1].trim();
@@ -197,18 +181,16 @@ const KubernetesDebugger = () => {
     }
   });
 
-  // Cluster health query
-  const { data: clusterHealth } = useQuery({
+  const clusterHealth = useQuery({
     queryKey: ['cluster-health', selectedCluster],
     queryFn: () => {
       if (!selectedCluster) return null;
       return kubernetesApi.getClusterHealth(selectedCluster);
     },
-    // Keep last successful result when refetching
     staleTime: 30000,
     enabled: !!selectedCluster
   });
-  
+
   const handleCreateSession = (e: React.FormEvent) => {
     e.preventDefault();
     if (!sessionDescription.trim() || !selectedCluster) return;
@@ -218,7 +200,7 @@ const KubernetesDebugger = () => {
       description: sessionDescription
     });
   };
-  
+
   const runCommand = () => {
     if (!command.trim() || !selectedCluster) return;
     commandMutation.mutate({ 
@@ -245,14 +227,11 @@ const KubernetesDebugger = () => {
     e.preventDefault();
     if (!message.trim() || !selectedCluster) return;
 
-    // Add user message to chat
     const userMessage = { role: 'user' as const, content: message };
     setChatHistory(prev => [...prev, userMessage]);
     
-    // Add to debugging steps
     setDebuggingSteps(prev => [...prev, `User query: ${message}`]);
     
-    // Send to API
     chatMutation.mutate({ 
       cluster: selectedCluster, 
       message,
@@ -260,6 +239,13 @@ const KubernetesDebugger = () => {
     });
     
     setMessage('');
+  };
+
+  const handleChatKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleChatSubmit(e as any);
+    }
   };
 
   const getStatusComponent = (status: string) => {
@@ -288,7 +274,6 @@ const KubernetesDebugger = () => {
   };
 
   const handleSessionSelect = (session: DebugSession) => {
-    // In a real app, this would load the session data from the backend
     setCurrentJiraTicket(session.jiraTicket);
     setChatHistory([{ role: 'assistant', content: `Loaded previous session: ${session.description}. How can I help continue debugging?` }]);
     setShowPastSessions(false);
@@ -312,10 +297,8 @@ const KubernetesDebugger = () => {
 
   return (
     <div className="space-y-6">
-      {/* Environment and Cluster Selection */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
         <div className="space-y-4">
-          {/* Environment Selection */}
           <div className="flex items-center space-x-4">
             <div className="text-sm font-medium">Environment:</div>
             <div className="flex gap-2 flex-wrap">
@@ -326,7 +309,7 @@ const KubernetesDebugger = () => {
                     key={env.id}
                     onClick={() => {
                       setSelectedEnvironment(env.id as Environment);
-                      setSelectedCluster(''); // Reset cluster selection when environment changes
+                      setSelectedCluster('');
                     }}
                     className={cn(
                       "flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
@@ -342,7 +325,6 @@ const KubernetesDebugger = () => {
             </div>
           </div>
 
-          {/* Cluster Selection Dropdown */}
           <div className="flex items-center space-x-4">
             <div className="text-sm font-medium">Cluster:</div>
             <DropdownMenu>
@@ -351,8 +333,8 @@ const KubernetesDebugger = () => {
                   <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
                 ) : selectedCluster ? (
                   <>
-                    <Server size={14} />
-                    <span className="flex-1 text-left">
+                    <Server size={14} className="text-primary" />
+                    <span className="flex-1 text-left font-medium">
                       {clusters?.find(c => c.id === selectedCluster)?.name || selectedCluster}
                     </span>
                     <span className={cn(
@@ -453,7 +435,6 @@ const KubernetesDebugger = () => {
         </div>
       </div>
 
-      {/* Past Debug Sessions */}
       {showPastSessions && (
         <GlassMorphicCard className="animate-fade-in">
           <div className="p-4 border-b bg-muted/40">
@@ -500,7 +481,6 @@ const KubernetesDebugger = () => {
         </GlassMorphicCard>
       )}
 
-      {/* Create Debug Session Form */}
       {showCreateSession && (
         <GlassMorphicCard className="animate-fade-in">
           <div className="p-4">
@@ -551,7 +531,6 @@ const KubernetesDebugger = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        {/* Terminal Section */}
         <GlassMorphicCard className="md:col-span-8">
           <div className="p-4 border-b bg-muted/40">
             <form onSubmit={handleSubmit} className="flex gap-2">
@@ -628,7 +607,6 @@ const KubernetesDebugger = () => {
           )}
         </GlassMorphicCard>
         
-        {/* Command History */}
         <GlassMorphicCard className="md:col-span-4">
           <div className="p-4 border-b bg-muted/40">
             <h3 className="font-medium text-sm">Command History</h3>
@@ -659,9 +637,7 @@ const KubernetesDebugger = () => {
         </GlassMorphicCard>
       </div>
 
-      {/* Chat and Debugging Steps */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        {/* Natural Language Assistant */}
         <GlassMorphicCard className="md:col-span-8">
           <div className="p-4 border-b bg-muted/40">
             <h3 className="font-medium text-sm">Kubernetes Assistant</h3>
@@ -704,13 +680,14 @@ const KubernetesDebugger = () => {
             
             <form onSubmit={handleChatSubmit} className="flex gap-2 mt-2">
               <div className="relative flex-1">
-                <input 
-                  type="text"
+                <Textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  className="w-full pl-4 pr-4 py-2 bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
-                  placeholder="Ask about your Kubernetes issues..."
+                  onKeyDown={handleChatKeyDown}
+                  className="w-full resize-none bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none min-h-[40px] py-2"
+                  placeholder="Ask about your Kubernetes issues... (Press Enter to send)"
                   disabled={chatMutation.isPending}
+                  rows={2}
                 />
               </div>
               <button
@@ -724,7 +701,6 @@ const KubernetesDebugger = () => {
           </div>
         </GlassMorphicCard>
         
-        {/* Debugging Steps */}
         <GlassMorphicCard className="md:col-span-4">
           <div className="p-4 border-b bg-muted/40 flex justify-between items-center">
             <h3 className="font-medium text-sm">Debugging Steps</h3>
@@ -758,7 +734,6 @@ const KubernetesDebugger = () => {
         </GlassMorphicCard>
       </div>
       
-      {/* Cluster Health Section */}
       <GlassMorphicCard>
         <div className="p-4 border-b bg-muted/40">
           <h3 className="font-medium text-sm">Cluster Health</h3>
@@ -769,28 +744,28 @@ const KubernetesDebugger = () => {
             <div className="border rounded-md p-3">
               <div className="text-xs text-muted-foreground">Control Plane</div>
               <div className="flex items-center gap-2 mt-2">
-                {clusterHealth && getStatusComponent(clusterHealth.controlPlane)}
+                {clusterHealth.data && getStatusComponent(clusterHealth.data.controlPlane)}
               </div>
             </div>
             
             <div className="border rounded-md p-3">
               <div className="text-xs text-muted-foreground">etcd</div>
               <div className="flex items-center gap-2 mt-2">
-                {clusterHealth && getStatusComponent(clusterHealth.etcd)}
+                {clusterHealth.data && getStatusComponent(clusterHealth.data.etcd)}
               </div>
             </div>
             
             <div className="border rounded-md p-3">
               <div className="text-xs text-muted-foreground">Scheduler</div>
               <div className="flex items-center gap-2 mt-2">
-                {clusterHealth && getStatusComponent(clusterHealth.scheduler)}
+                {clusterHealth.data && getStatusComponent(clusterHealth.data.scheduler)}
               </div>
             </div>
             
             <div className="border rounded-md p-3">
               <div className="text-xs text-muted-foreground">API Gateway</div>
               <div className="flex items-center gap-2 mt-2">
-                {clusterHealth && getStatusComponent(clusterHealth.apiGateway)}
+                {clusterHealth.data && getStatusComponent(clusterHealth.data.apiGateway)}
               </div>
             </div>
           </div>
