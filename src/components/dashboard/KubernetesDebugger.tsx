@@ -1,6 +1,5 @@
-
 import { useState, useEffect, KeyboardEvent } from 'react';
-import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server, Link, ExternalLink, Plus, RotateCcw, History, ChevronDown } from 'lucide-react';
+import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server, Link, ExternalLink, Plus, RotateCcw, History, ChevronDown, X } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
@@ -52,6 +51,7 @@ const KubernetesDebugger = () => {
   const [currentJiraTicket, setCurrentJiraTicket] = useState<JiraTicket | null>(null);
   const [showPastSessions, setShowPastSessions] = useState(false);
   const [debuggingSteps, setDebuggingSteps] = useState<string[]>([]);
+  const [activeClusters, setActiveClusters] = useState<string[]>([]);
 
   const { data: clusters, isLoading: isLoadingClusters } = useQuery({
     queryKey: ['clusters', selectedEnvironment],
@@ -64,6 +64,12 @@ const KubernetesDebugger = () => {
       setSelectedCluster(clusters[0].id);
     }
   }, [clusters, selectedCluster]);
+
+  useEffect(() => {
+    if (selectedCluster && !activeClusters.includes(selectedCluster)) {
+      setActiveClusters(prev => [...prev, selectedCluster]);
+    }
+  }, [selectedCluster, activeClusters]);
 
   const mockPastSessions: DebugSession[] = [
     {
@@ -296,7 +302,24 @@ const KubernetesDebugger = () => {
     }
   };
 
-  // Find the selected cluster name
+  const handleRemoveClusterTab = (clusterId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveClusters(prev => prev.filter(id => id !== clusterId));
+    
+    if (selectedCluster === clusterId) {
+      const remainingClusters = activeClusters.filter(id => id !== clusterId);
+      if (remainingClusters.length > 0) {
+        setSelectedCluster(remainingClusters[0]);
+      } else {
+        setSelectedCluster('');
+      }
+    }
+  };
+
+  const getClusterInfo = (clusterId: string) => {
+    return clusters?.find(c => c.id === clusterId);
+  };
+
   const selectedClusterName = clusters?.find(c => c.id === selectedCluster)?.name || selectedCluster;
 
   return (
@@ -314,6 +337,7 @@ const KubernetesDebugger = () => {
                     onClick={() => {
                       setSelectedEnvironment(env.id as Environment);
                       setSelectedCluster('');
+                      setActiveClusters([]);
                     }}
                     className={cn(
                       "flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
@@ -438,6 +462,39 @@ const KubernetesDebugger = () => {
           )}
         </div>
       </div>
+
+      {activeClusters.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
+          {activeClusters.map(clusterId => {
+            const cluster = getClusterInfo(clusterId);
+            return (
+              <button
+                key={clusterId}
+                onClick={() => setSelectedCluster(clusterId)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors whitespace-nowrap",
+                  selectedCluster === clusterId
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted hover:bg-muted/80"
+                )}
+              >
+                <Server size={14} />
+                <span>{cluster?.name || clusterId}</span>
+                <span className={cn(
+                  "inline-block w-2 h-2 rounded-full",
+                  cluster?.status === 'healthy' ? "bg-green-500" : 
+                  cluster?.status === 'warning' ? "bg-amber-500" : "bg-red-500"
+                )} />
+                <X 
+                  size={14} 
+                  className="ml-1 opacity-70 hover:opacity-100"
+                  onClick={(e) => handleRemoveClusterTab(clusterId, e)}
+                />
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {selectedCluster && (
         <div className="bg-primary/5 border border-primary/20 rounded-md p-3 flex items-center gap-2">
