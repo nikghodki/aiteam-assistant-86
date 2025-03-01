@@ -1,16 +1,36 @@
 
 import { useState } from 'react';
-import { Search, BookOpen, FileText, ExternalLink, ThumbsUp, ThumbsDown, AlertCircle } from 'lucide-react';
+import { Search, BookOpen, FileText, ExternalLink, ThumbsUp, ThumbsDown, AlertCircle, Clock } from 'lucide-react';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { cn } from '@/lib/utils';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { docsApi } from '@/services/api';
 
+interface DocumentResult {
+  id: number;
+  title: string;
+  excerpt: string;
+  content: string;
+  url: string;
+  category: string;
+}
+
+interface QueryHistoryItem {
+  id: number;
+  query: string;
+  timestamp: string;
+}
+
 const DocumentationSearch = () => {
   const { toast } = useToast();
   const [query, setQuery] = useState('');
   const [selectedResult, setSelectedResult] = useState<number | null>(null);
+  const [queryHistory, setQueryHistory] = useState<QueryHistoryItem[]>([
+    { id: 1, query: 'How to debug pod crashes?', timestamp: '2023-05-15 14:30' },
+    { id: 2, query: 'Kubernetes RBAC best practices', timestamp: '2023-05-14 09:45' },
+  ]);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Search documentation query
   const {
@@ -27,7 +47,7 @@ const DocumentationSearch = () => {
       // return docsApi.searchDocumentation(query);
       
       // For demo, return mock data
-      return new Promise((resolve) => {
+      return new Promise<DocumentResult[]>((resolve) => {
         setTimeout(() => {
           resolve([
             {
@@ -162,7 +182,7 @@ Require MFA for all administrative access to critical systems.`,
       // return docsApi.getDocumentById(selectedResult);
       
       // For demo, filter from our mock results
-      return new Promise((resolve) => {
+      return new Promise<DocumentResult | null>((resolve) => {
         setTimeout(() => {
           if (results) {
             const doc = results.find(r => r.id === selectedResult);
@@ -198,6 +218,15 @@ Require MFA for all administrative access to critical systems.`,
     if (!query.trim()) return;
     
     setSelectedResult(null);
+
+    // Add to query history
+    const newHistoryItem = {
+      id: Date.now(),
+      query: query,
+      timestamp: new Date().toLocaleString()
+    };
+    setQueryHistory(prev => [newHistoryItem, ...prev]);
+    
     refetch();
   };
 
@@ -212,6 +241,11 @@ Require MFA for all administrative access to critical systems.`,
       documentId: selectedResult,
       helpful
     });
+  };
+
+  const handleHistoryClick = (historyQuery: string) => {
+    setQuery(historyQuery);
+    setShowHistory(false);
   };
 
   return (
@@ -248,9 +282,20 @@ Require MFA for all administrative access to critical systems.`,
                 </button>
               </div>
               
-              <div className="mt-4">
-                <div className="text-xs font-medium mb-2">Suggested topics:</div>
-                <div className="flex flex-wrap gap-2">
+              <div className="mt-4 flex justify-between items-center">
+                <div className="text-xs font-medium">Suggested topics:</div>
+                <button
+                  type="button"
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="text-xs text-primary flex items-center gap-1 hover:underline"
+                >
+                  <Clock size={14} />
+                  {showHistory ? 'Hide history' : 'View history'}
+                </button>
+              </div>
+              
+              {!showHistory && (
+                <div className="mt-2 flex flex-wrap gap-2">
                   {['Kubernetes', 'Access Control', 'Debugging', 'Monitoring'].map(topic => (
                     <button
                       key={topic}
@@ -262,7 +307,27 @@ Require MFA for all administrative access to critical systems.`,
                     </button>
                   ))}
                 </div>
-              </div>
+              )}
+              
+              {showHistory && (
+                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                  {queryHistory.map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleHistoryClick(item.query)}
+                      className="w-full text-left p-2 text-xs border-b border-muted hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="truncate font-medium">{item.query}</div>
+                      <div className="text-muted-foreground text-[10px] mt-1">{item.timestamp}</div>
+                    </button>
+                  ))}
+                  
+                  {queryHistory.length === 0 && (
+                    <div className="text-muted-foreground text-xs p-2">No search history yet</div>
+                  )}
+                </div>
+              )}
             </form>
           </div>
         </GlassMorphicCard>

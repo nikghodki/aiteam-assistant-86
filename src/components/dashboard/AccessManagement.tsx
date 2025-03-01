@@ -1,27 +1,49 @@
 
 import { useState, useEffect } from 'react';
-import { Users, UserPlus, Lock, Key, Check, X, Link as LinkIcon, ExternalLink, AlertCircle } from 'lucide-react';
+import { Users, UserPlus, Lock, Key, Check, X, Link as LinkIcon, ExternalLink, AlertCircle, Send, UserCheck, Shield, Clock, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { accessApi, UserAccess, AccessRequest, JiraTicket } from '@/services/api';
 
+interface Group {
+  id: number;
+  name: string;
+  description: string;
+  status: 'member' | 'pending' | 'rejected' | 'none';
+  members: number;
+}
+
 const AccessManagement = () => {
   const { toast } = useToast();
-  const [selectedUser, setSelectedUser] = useState<number | null>(null);
+  const [selectedUser, setSelectedUser] = useState<number | null>(1); // Default to first user
+  const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const [showAccessRequestForm, setShowAccessRequestForm] = useState(false);
   const [requestReason, setRequestReason] = useState('');
-  const [selectedService, setSelectedService] = useState('');
   const [loading, setLoading] = useState(false);
-  const [accessRequests, setAccessRequests] = useState<{user: number, service: string, jira: JiraTicket}[]>([]);
+  const [accessRequests, setAccessRequests] = useState<{user: number, group: number, jira: JiraTicket}[]>([]);
+  const [message, setMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([
+    { role: 'assistant', content: 'How can I help you with access management today?' }
+  ]);
 
-  // Mock users data - this would be replaced with API call
+  // Mock users data
   const mockUsers = [
-    { id: 1, name: 'Alex Johnson', role: 'Admin', services: ['Kubernetes', 'Database', 'Monitoring'] },
-    { id: 2, name: 'Jamie Smith', role: 'Developer', services: ['Kubernetes', 'Monitoring'] },
-    { id: 3, name: 'Taylor Wilson', role: 'DevOps', services: ['Kubernetes', 'Database', 'Monitoring', 'CI/CD'] },
-    { id: 4, name: 'Morgan Lee', role: 'SRE', services: ['Kubernetes', 'Database', 'Monitoring', 'CI/CD', 'Logging'] },
+    { id: 1, name: 'Alex Johnson', role: 'Admin', avatar: 'AJ' },
+    { id: 2, name: 'Jamie Smith', role: 'Developer', avatar: 'JS' },
+    { id: 3, name: 'Taylor Wilson', role: 'DevOps', avatar: 'TW' },
+    { id: 4, name: 'Morgan Lee', role: 'SRE', avatar: 'ML' },
+  ];
+
+  // Mock groups data
+  const mockGroups: Group[] = [
+    { id: 1, name: 'Infrastructure Team', description: 'Core infrastructure management and planning', status: 'member', members: 12 },
+    { id: 2, name: 'Database Admins', description: 'Database administration and optimization', status: 'none', members: 8 },
+    { id: 3, name: 'Security Team', description: 'Security operations and compliance', status: 'pending', members: 15 },
+    { id: 4, name: 'Cloud Platform', description: 'Cloud infrastructure and services', status: 'member', members: 20 },
+    { id: 5, name: 'Networking', description: 'Network architecture and operations', status: 'rejected', members: 10 },
+    { id: 6, name: 'Monitoring', description: 'Systems monitoring and alerting', status: 'none', members: 7 },
   ];
 
   // Fetch users data
@@ -40,9 +62,27 @@ const AccessManagement = () => {
     },
   });
 
+  // Fetch groups data for the selected user
+  const { data: groups, isLoading: isLoadingGroups } = useQuery({
+    queryKey: ['user-groups', selectedUser],
+    queryFn: async () => {
+      // In a real app, use the API
+      // return accessApi.getUserGroups(selectedUser);
+      
+      // For now, use mock data
+      return new Promise<Group[]>((resolve) => {
+        setTimeout(() => {
+          resolve(mockGroups);
+        }, 700);
+      });
+    },
+    enabled: selectedUser !== null,
+  });
+
   // Access request mutation
   const accessRequestMutation = useMutation({
-    mutationFn: (request: AccessRequest) => accessApi.requestAccess(request),
+    mutationFn: (request: { userId: number, groupId: number, reason: string }) => 
+      accessApi.requestGroupAccess(request.userId, request.groupId, request.reason),
     onSuccess: (data, variables) => {
       toast({
         title: "Access Request Created",
@@ -54,7 +94,7 @@ const AccessManagement = () => {
         ...prev, 
         {
           user: variables.userId,
-          service: variables.service,
+          group: variables.groupId,
           jira: data
         }
       ]);
@@ -71,28 +111,29 @@ const AccessManagement = () => {
     }
   });
 
-  // Update access mutation
-  const updateAccessMutation = useMutation({
-    mutationFn: ({ userId, services }: { userId: number, services: string[] }) => 
-      accessApi.updateAccess(userId, services),
-    onSuccess: () => {
-      toast({
-        title: "Access Updated",
-        description: "User access permissions have been updated",
-      });
+  // Chat mutation
+  const chatMutation = useMutation({
+    mutationFn: (message: string) => accessApi.chatWithAssistant(message, selectedUser || 1),
+    onSuccess: (data) => {
+      setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
     },
     onError: (error: any) => {
       toast({
-        title: "Update Failed",
-        description: error.message || "Failed to update access",
+        title: "Chat Error",
+        description: error.message || "Failed to get assistant response",
         variant: "destructive",
       });
+      
+      setChatHistory(prev => [...prev, { 
+        role: 'assistant', 
+        content: "Sorry, I encountered an error processing your request. Please try again." 
+      }]);
     }
   });
 
   useEffect(() => {
     if (selectedUser && users) {
-      // Simulate API call to get user services
+      // Simulate API call to get user groups
       setLoading(true);
       setTimeout(() => {
         setLoading(false);
@@ -102,45 +143,78 @@ const AccessManagement = () => {
 
   const handleUserClick = (userId: number) => {
     setSelectedUser(userId);
+    setSelectedGroup(null);
   };
 
-  const handleToggleAccess = (service: string) => {
-    const user = mockUsers.find(u => u.id === selectedUser);
-    if (!user) return;
+  const handleGroupClick = (groupId: number) => {
+    setSelectedGroup(groupId);
+    setShowAccessRequestForm(false);
+  };
+
+  const handleRequestAccess = (groupId: number) => {
+    if (!selectedUser) return;
     
-    const hasAccess = user.services.includes(service);
-    
-    if (hasAccess) {
-      // If they have access and we're removing it, no need for a request
-      const updatedServices = user.services.filter(s => s !== service);
-      
-      // In a real app, call the API
-      // updateAccessMutation.mutate({ userId: user.id, services: updatedServices });
-      
-      // For mock, just update the services
-      user.services = updatedServices;
-      
-      toast({
-        title: "Access Removed",
-        description: `Removed ${service} access for ${user.name}`,
-      });
-    } else {
-      // If they don't have access, show the request form
-      setSelectedService(service);
-      setShowAccessRequestForm(true);
-    }
+    setSelectedGroup(groupId);
+    setShowAccessRequestForm(true);
   };
 
   const handleAccessRequest = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedUser || !selectedService || !requestReason.trim()) return;
+    if (!selectedUser || !selectedGroup || !requestReason.trim()) return;
     
     accessRequestMutation.mutate({
       userId: selectedUser,
-      service: selectedService,
+      groupId: selectedGroup,
       reason: requestReason
     });
+  };
+
+  const handleChatSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim()) return;
+
+    // Add user message to chat
+    const userMessage = { role: 'user' as const, content: message };
+    setChatHistory(prev => [...prev, userMessage]);
+    
+    // Send to API
+    chatMutation.mutate(message);
+    
+    setMessage('');
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'member':
+        return (
+          <div className="flex items-center gap-1 text-xs px-2 py-0.5 bg-green-50 text-green-600 rounded-full">
+            <UserCheck size={12} />
+            <span>Member</span>
+          </div>
+        );
+      case 'pending':
+        return (
+          <div className="flex items-center gap-1 text-xs px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full">
+            <Clock size={12} />
+            <span>Pending</span>
+          </div>
+        );
+      case 'rejected':
+        return (
+          <div className="flex items-center gap-1 text-xs px-2 py-0.5 bg-red-50 text-red-600 rounded-full">
+            <XCircle size={12} />
+            <span>Rejected</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center gap-1 text-xs px-2 py-0.5 bg-gray-50 text-gray-600 rounded-full">
+            <Shield size={12} />
+            <span>No Access</span>
+          </div>
+        );
+    }
   };
 
   return (
@@ -180,135 +254,200 @@ const AccessManagement = () => {
         </button>
       </GlassMorphicCard>
       
-      <GlassMorphicCard className="md:col-span-2 p-5">
+      <GlassMorphicCard className="md:col-span-2 p-0 overflow-hidden">
         {selectedUser ? (
-          <div className="animate-fade-in">
-            <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col h-full">
+            <div className="flex items-center justify-between p-5 border-b">
               <div className="flex items-center">
                 <Lock className="text-primary mr-2" size={20} />
-                <h3 className="font-medium">Access Management</h3>
+                <h3 className="font-medium">Group Access Management</h3>
               </div>
               <div className="text-sm text-muted-foreground">
                 User: <span className="font-medium text-foreground">{mockUsers.find(u => u.id === selectedUser)?.name}</span>
               </div>
             </div>
             
-            <div className="space-y-4">
-              {['Kubernetes', 'Database', 'Monitoring', 'CI/CD', 'Logging'].map(service => {
-                const user = mockUsers.find(u => u.id === selectedUser);
-                const hasAccess = user?.services.includes(service) || false;
+            <div className="flex flex-col md:flex-row flex-1 divide-y md:divide-y-0 md:divide-x">
+              <div className="md:w-3/5 overflow-auto p-5">
+                <h4 className="text-sm font-medium mb-4">Group Membership</h4>
                 
-                // Check if there's a pending request for this service
-                const pendingRequest = accessRequests.find(
-                  r => r.user === selectedUser && r.service === service
-                );
-                
-                return (
-                  <div key={service} className="flex items-center justify-between p-3 border rounded-md">
-                    <div className="flex items-center">
-                      <Key className="text-muted-foreground mr-2" size={16} />
-                      <span>{service}</span>
-                    </div>
+                <div className="space-y-3">
+                  {(groups || mockGroups).map(group => {
+                    const pendingRequest = accessRequests.find(
+                      r => r.user === selectedUser && r.group === group.id
+                    );
                     
-                    <div className="flex items-center gap-2">
-                      {pendingRequest && (
-                        <a 
-                          href={pendingRequest.jira.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                        >
-                          <LinkIcon size={12} />
-                          {pendingRequest.jira.key}
-                          <ExternalLink size={10} />
-                        </a>
-                      )}
-                      
-                      <button 
-                        onClick={() => handleToggleAccess(service)}
+                    return (
+                      <div 
+                        key={group.id}
+                        onClick={() => handleGroupClick(group.id)}
                         className={cn(
-                          "flex items-center justify-center min-w-16 py-1 rounded text-xs font-medium transition-colors",
-                          pendingRequest 
-                            ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
-                            : hasAccess 
-                              ? "bg-green-50 text-green-600 hover:bg-green-100" 
-                              : "bg-red-50 text-red-600 hover:bg-red-100"
+                          "border rounded-md p-4 transition-colors cursor-pointer",
+                          selectedGroup === group.id 
+                            ? "border-primary/50 bg-primary/5" 
+                            : "hover:bg-muted/50"
                         )}
                       >
-                        {pendingRequest ? (
-                          <>
-                            <AlertCircle size={12} className="mr-1" />
-                            <span>Pending</span>
-                          </>
-                        ) : hasAccess ? (
-                          <>
-                            <Check size={12} className="mr-1" />
-                            <span>Access</span>
-                          </>
-                        ) : (
-                          <>
-                            <X size={12} className="mr-1" />
-                            <span>No Access</span>
-                          </>
+                        <div className="flex justify-between">
+                          <h5 className="font-medium">{group.name}</h5>
+                          {getStatusBadge(group.status)}
+                        </div>
+                        
+                        <p className="text-xs text-muted-foreground mt-1 mb-2">{group.description}</p>
+                        
+                        <div className="flex justify-between items-center mt-3">
+                          <div className="text-xs text-muted-foreground">
+                            {group.members} members
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            {pendingRequest && (
+                              <a 
+                                href={pendingRequest.jira.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <LinkIcon size={12} />
+                                {pendingRequest.jira.key}
+                                <ExternalLink size={10} />
+                              </a>
+                            )}
+                            
+                            {group.status === 'none' && !pendingRequest && (
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRequestAccess(group.id);
+                                }}
+                                className="px-3 py-1 text-xs bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+                              >
+                                Request Access
+                              </button>
+                            )}
+                            
+                            {group.status === 'member' && (
+                              <button className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors">
+                                Leave Group
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {showAccessRequestForm && selectedGroup && (
+                  <div className="mt-6 p-4 border border-primary/20 bg-primary/5 rounded-md animate-fade-in">
+                    <h4 className="text-sm font-medium mb-2">
+                      Request Access for {mockGroups.find(g => g.id === selectedGroup)?.name}
+                    </h4>
+                    <form onSubmit={handleAccessRequest} className="space-y-4">
+                      <div>
+                        <label htmlFor="reason" className="block text-xs font-medium mb-1">
+                          Reason for Access
+                        </label>
+                        <textarea
+                          id="reason"
+                          value={requestReason}
+                          onChange={(e) => setRequestReason(e.target.value)}
+                          className="w-full px-3 py-2 text-sm bg-background border rounded-md focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
+                          placeholder="Please provide a business justification..."
+                          rows={3}
+                          required
+                        />
+                      </div>
+                      
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAccessRequestForm(false)}
+                          className="px-3 py-1.5 text-xs border rounded-md hover:bg-muted transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={accessRequestMutation.isPending}
+                          className="px-3 py-1.5 text-xs bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+                        >
+                          {accessRequestMutation.isPending ? (
+                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                          ) : (
+                            "Submit Request"
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+              
+              <div className="md:w-2/5 flex flex-col h-full">
+                <div className="p-4 border-b bg-muted/30">
+                  <h4 className="text-sm font-medium">Access Assistant</h4>
+                </div>
+                
+                <div className="flex-1 p-4 overflow-auto">
+                  <div className="space-y-4 mb-4">
+                    {chatHistory.map((chat, index) => (
+                      <div 
+                        key={index} 
+                        className={cn(
+                          "flex",
+                          chat.role === 'assistant' ? "justify-start" : "justify-end"
                         )}
-                      </button>
-                    </div>
+                      >
+                        <div className={cn(
+                          "max-w-[85%] rounded-lg p-3 text-sm",
+                          chat.role === 'assistant' 
+                            ? "bg-muted text-foreground rounded-tl-none" 
+                            : "bg-primary text-primary-foreground rounded-tr-none"
+                        )}>
+                          {chat.content}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {chatMutation.isPending && (
+                      <div className="flex justify-start">
+                        <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[85%] p-3">
+                          <div className="flex space-x-2">
+                            <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse"></div>
+                            <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                            <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-            
-            {showAccessRequestForm && (
-              <div className="mt-6 p-4 border border-primary/20 bg-primary/5 rounded-md animate-fade-in">
-                <h4 className="text-sm font-medium mb-2">Request Access for {selectedService}</h4>
-                <form onSubmit={handleAccessRequest} className="space-y-4">
-                  <div>
-                    <label htmlFor="reason" className="block text-xs font-medium mb-1">
-                      Reason for Access
-                    </label>
-                    <textarea
-                      id="reason"
-                      value={requestReason}
-                      onChange={(e) => setRequestReason(e.target.value)}
-                      className="w-full px-3 py-2 text-sm bg-background border rounded-md focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
-                      placeholder="Please provide a business justification..."
-                      rows={3}
-                      required
+                </div>
+                
+                <div className="p-4 border-t">
+                  <form onSubmit={handleChatSubmit} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Ask about access management..."
+                      className="flex-1 px-3 py-2 text-sm bg-background border rounded-md focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
                     />
-                  </div>
-                  
-                  <div className="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowAccessRequestForm(false)}
-                      className="px-3 py-1.5 text-xs border rounded-md hover:bg-muted transition-colors"
-                    >
-                      Cancel
-                    </button>
                     <button
                       type="submit"
-                      disabled={accessRequestMutation.isPending}
-                      className="px-3 py-1.5 text-xs bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+                      disabled={chatMutation.isPending || !message.trim()}
+                      className="p-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
                     >
-                      {accessRequestMutation.isPending ? (
-                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
-                      ) : (
-                        "Submit Request"
-                      )}
+                      <Send size={16} />
                     </button>
-                  </div>
-                </form>
+                  </form>
+                </div>
               </div>
-            )}
-            
-            <div className="mt-6 flex justify-end">
-              <button className="px-4 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary/90 transition-colors">
-                Save Changes
-              </button>
             </div>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center text-muted-foreground text-sm p-10">
+          <div className="h-96 flex items-center justify-center text-muted-foreground text-sm p-10">
             {loading || isLoadingUsers ? (
               <div className="flex flex-col items-center">
                 <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>

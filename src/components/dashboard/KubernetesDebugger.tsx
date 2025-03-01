@@ -1,10 +1,19 @@
+
 import { useState, useEffect } from 'react';
-import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server, Link, ExternalLink, Plus } from 'lucide-react';
+import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server, Link, ExternalLink, Plus, RotateCcw, History } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { cn } from '@/lib/utils';
 import { kubernetesApi, JiraTicket } from '@/services/api';
+
+interface DebugSession {
+  id: string;
+  description: string;
+  createdAt: string;
+  jiraTicket: JiraTicket;
+  status: 'active' | 'resolved' | 'pending';
+}
 
 const KubernetesDebugger = () => {
   const { toast } = useToast();
@@ -23,6 +32,33 @@ const KubernetesDebugger = () => {
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [sessionDescription, setSessionDescription] = useState('');
   const [currentJiraTicket, setCurrentJiraTicket] = useState<JiraTicket | null>(null);
+  const [showPastSessions, setShowPastSessions] = useState(false);
+  const [debuggingSteps, setDebuggingSteps] = useState<string[]>([]);
+
+  // Mock past debug sessions
+  const mockPastSessions: DebugSession[] = [
+    {
+      id: 'session-123',
+      description: 'Investigate pod crash loops in monitoring namespace',
+      createdAt: '2023-05-18 14:30',
+      jiraTicket: { key: 'OPS-123', url: '#' },
+      status: 'resolved'
+    },
+    {
+      id: 'session-124',
+      description: 'Debug networking issues between services',
+      createdAt: '2023-05-15 09:15',
+      jiraTicket: { key: 'OPS-124', url: '#' },
+      status: 'active'
+    },
+    {
+      id: 'session-125',
+      description: 'Investigate high CPU usage on worker nodes',
+      createdAt: '2023-05-10 16:45',
+      jiraTicket: { key: 'OPS-125', url: '#' },
+      status: 'pending'
+    }
+  ];
 
   // Available clusters
   const clusters = [
@@ -32,6 +68,23 @@ const KubernetesDebugger = () => {
     { id: 'test', name: 'Test Environment', status: 'error' }
   ];
 
+  // Query past debug sessions
+  const { data: pastSessions } = useQuery({
+    queryKey: ['debug-sessions'],
+    queryFn: async () => {
+      // This would be a real API call in production
+      // return kubernetesApi.getDebugSessions();
+      
+      // For demo, use mock data
+      return new Promise<DebugSession[]>((resolve) => {
+        setTimeout(() => {
+          resolve(mockPastSessions);
+        }, 800);
+      });
+    },
+    staleTime: 60000,
+  });
+
   // Create Jira ticket for debugging session
   const createSessionMutation = useMutation({
     mutationFn: ({ cluster, description }: { cluster: string; description: string }) => 
@@ -39,6 +92,12 @@ const KubernetesDebugger = () => {
     onSuccess: (data) => {
       setCurrentJiraTicket(data);
       setShowCreateSession(false);
+      // Clear previous chat and commands when starting a new session
+      setChatHistory([{ role: 'assistant', content: 'New debugging session started. How can I help you?' }]);
+      setOutput('');
+      setHistory([]);
+      setDebuggingSteps([]);
+      
       toast({
         title: "Debug Session Created",
         description: `Jira ticket ${data.key} created successfully`,
@@ -64,6 +123,9 @@ const KubernetesDebugger = () => {
         setHistory(prev => [command, ...prev].slice(0, 10));
       }
       
+      // Add to debugging steps
+      setDebuggingSteps(prev => [...prev, `Executed: ${command}\nResult: ${data.exitCode === 0 ? 'Success' : 'Error'}`]);
+      
       if (data.exitCode !== 0) {
         toast({
           title: "Command Error",
@@ -87,6 +149,16 @@ const KubernetesDebugger = () => {
       kubernetesApi.chatWithAssistant(cluster, message, jiraTicketKey),
     onSuccess: (data) => {
       setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
+      
+      // Add to debugging steps
+      setDebuggingSteps(prev => [...prev, `AI Assistant: ${data.response.substring(0, 50)}${data.response.length > 50 ? '...' : ''}`]);
+      
+      // If the response contains a recommended command, extract it
+      const commandMatch = data.response.match(/```(?:bash|sh)?\s*(kubectl .+?)```/);
+      if (commandMatch && commandMatch[1]) {
+        const suggestedCommand = commandMatch[1].trim();
+        setCommand(suggestedCommand);
+      }
     },
     onError: (error: any) => {
       toast({
@@ -174,6 +246,9 @@ const KubernetesDebugger = () => {
     const userMessage = { role: 'user' as const, content: message };
     setChatHistory(prev => [...prev, userMessage]);
     
+    // Add to debugging steps
+    setDebuggingSteps(prev => [...prev, `User query: ${message}`]);
+    
     // Send to API
     chatMutation.mutate({ 
       cluster: selectedCluster, 
@@ -209,6 +284,13 @@ const KubernetesDebugger = () => {
     }
   };
 
+  const handleSessionSelect = (session: DebugSession) => {
+    // In a real app, this would load the session data from the backend
+    setCurrentJiraTicket(session.jiraTicket);
+    setChatHistory([{ role: 'assistant', content: `Loaded previous session: ${session.description}. How can I help continue debugging?` }]);
+    setShowPastSessions(false);
+  };
+
   return (
     <div className="space-y-6">
       {/* Session and Cluster Management */}
@@ -241,27 +323,94 @@ const KubernetesDebugger = () => {
         
         <div className="flex items-center gap-2">
           {currentJiraTicket ? (
-            <a 
-              href={currentJiraTicket.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
-            >
-              <Link size={14} />
-              <span>Jira: {currentJiraTicket.key}</span>
-              <ExternalLink size={12} />
-            </a>
+            <div className="flex items-center gap-2">
+              <a 
+                href={currentJiraTicket.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
+              >
+                <Link size={14} />
+                <span>Jira: {currentJiraTicket.key}</span>
+                <ExternalLink size={12} />
+              </a>
+              
+              <button
+                onClick={() => setShowPastSessions(!showPastSessions)}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-muted hover:bg-muted/80 transition-colors rounded-full"
+              >
+                <History size={14} />
+                <span>Past Sessions</span>
+              </button>
+            </div>
           ) : (
-            <button
-              onClick={() => setShowCreateSession(true)}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors"
-            >
-              <Plus size={14} />
-              <span>Create Debug Session</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowCreateSession(true)}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors"
+              >
+                <Plus size={14} />
+                <span>Create Debug Session</span>
+              </button>
+              
+              <button
+                onClick={() => setShowPastSessions(!showPastSessions)}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-muted hover:bg-muted/80 transition-colors rounded-full"
+              >
+                <History size={14} />
+                <span>Past Sessions</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Past Debug Sessions */}
+      {showPastSessions && (
+        <GlassMorphicCard className="animate-fade-in">
+          <div className="p-4 border-b bg-muted/40">
+            <h3 className="text-sm font-medium">Past Debugging Sessions</h3>
+          </div>
+          <div className="p-4">
+            <div className="space-y-3">
+              {(pastSessions || mockPastSessions).map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => handleSessionSelect(session)}
+                  className="w-full flex items-center justify-between border rounded-md p-3 hover:bg-muted/50 transition-colors text-left"
+                >
+                  <div>
+                    <div className="font-medium text-sm">{session.description}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-muted-foreground">{session.createdAt}</span>
+                      <a 
+                        href={session.jiraTicket.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 flex items-center gap-1 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Link size={12} />
+                        {session.jiraTicket.key}
+                      </a>
+                    </div>
+                  </div>
+                  <div className={cn(
+                    "text-xs px-2 py-0.5 rounded-full",
+                    session.status === 'resolved' 
+                      ? "bg-green-50 text-green-600" 
+                      : session.status === 'active' 
+                        ? "bg-blue-50 text-blue-600" 
+                        : "bg-amber-50 text-amber-600"
+                  )}>
+                    {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </GlassMorphicCard>
+      )}
 
       {/* Create Debug Session Form */}
       {showCreateSession && (
@@ -313,8 +462,9 @@ const KubernetesDebugger = () => {
         </GlassMorphicCard>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <GlassMorphicCard className="md:col-span-3">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* Terminal Section */}
+        <GlassMorphicCard className="md:col-span-8">
           <div className="p-4 border-b bg-muted/40">
             <form onSubmit={handleSubmit} className="flex gap-2">
               <div className="flex-1 relative">
@@ -389,7 +539,8 @@ const KubernetesDebugger = () => {
           )}
         </GlassMorphicCard>
         
-        <GlassMorphicCard className="md:col-span-1">
+        {/* Command History */}
+        <GlassMorphicCard className="md:col-span-4">
           <div className="p-4 border-b bg-muted/40">
             <h3 className="font-medium text-sm">Command History</h3>
           </div>
@@ -419,151 +570,143 @@ const KubernetesDebugger = () => {
         </GlassMorphicCard>
       </div>
 
-      {/* Natural Language Assistant */}
-      <GlassMorphicCard>
-        <div className="p-4 border-b bg-muted/40">
-          <h3 className="font-medium text-sm">Kubernetes Assistant</h3>
-          <p className="text-xs text-muted-foreground mt-1">Ask questions in natural language to debug your Kubernetes issues</p>
-        </div>
-        
-        <div className="p-4 max-h-[400px] overflow-auto flex flex-col">
-          <div className="flex-1 space-y-4 mb-4">
-            {chatHistory.map((chat, index) => (
-              <div 
-                key={index} 
-                className={cn(
-                  "flex",
-                  chat.role === 'assistant' ? "justify-start" : "justify-end"
-                )}
-              >
-                <div className={cn(
-                  "max-w-[80%] rounded-lg p-3 text-sm",
-                  chat.role === 'assistant' 
-                    ? "bg-muted text-foreground rounded-tl-none" 
-                    : "bg-primary text-primary-foreground rounded-tr-none"
-                )}>
-                  {chat.content}
-                </div>
-              </div>
-            ))}
-            
-            {chatMutation.isPending && (
-              <div className="flex justify-start">
-                <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[80%] p-3">
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse"></div>
-                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+      {/* Chat and Debugging Steps */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* Natural Language Assistant */}
+        <GlassMorphicCard className="md:col-span-8">
+          <div className="p-4 border-b bg-muted/40">
+            <h3 className="font-medium text-sm">Kubernetes Assistant</h3>
+            <p className="text-xs text-muted-foreground mt-1">Ask questions in natural language to debug your Kubernetes issues</p>
+          </div>
+          
+          <div className="p-4 max-h-[400px] overflow-auto flex flex-col">
+            <div className="flex-1 space-y-4 mb-4">
+              {chatHistory.map((chat, index) => (
+                <div 
+                  key={index} 
+                  className={cn(
+                    "flex",
+                    chat.role === 'assistant' ? "justify-start" : "justify-end"
+                  )}
+                >
+                  <div className={cn(
+                    "max-w-[80%] rounded-lg p-3 text-sm",
+                    chat.role === 'assistant' 
+                      ? "bg-muted text-foreground rounded-tl-none" 
+                      : "bg-primary text-primary-foreground rounded-tr-none"
+                  )}>
+                    {chat.content}
                   </div>
                 </div>
+              ))}
+              
+              {chatMutation.isPending && (
+                <div className="flex justify-start">
+                  <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[80%] p-3">
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse"></div>
+                      <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <form onSubmit={handleChatSubmit} className="flex gap-2 mt-2">
+              <div className="relative flex-1">
+                <input 
+                  type="text"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="w-full pl-4 pr-4 py-2 bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
+                  placeholder="Ask about your Kubernetes issues..."
+                  disabled={chatMutation.isPending}
+                />
+              </div>
+              <button
+                type="submit"
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={chatMutation.isPending || !message.trim()}
+              >
+                <Send size={16} />
+              </button>
+            </form>
+          </div>
+        </GlassMorphicCard>
+        
+        {/* Debugging Steps */}
+        <GlassMorphicCard className="md:col-span-4">
+          <div className="p-4 border-b bg-muted/40 flex justify-between items-center">
+            <h3 className="font-medium text-sm">Debugging Steps</h3>
+            
+            <button 
+              onClick={() => setDebuggingSteps([])}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              disabled={debuggingSteps.length === 0}
+            >
+              <RotateCcw size={14} />
+              Clear
+            </button>
+          </div>
+          
+          <div className="p-3 max-h-[400px] overflow-auto">
+            {debuggingSteps.length > 0 ? (
+              <ol className="space-y-3 list-decimal list-inside">
+                {debuggingSteps.map((step, index) => (
+                  <li key={index} className="text-xs border-b pb-2 whitespace-pre-wrap">
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <div className="text-center text-muted-foreground text-xs p-8">
+                <Terminal size={30} className="mx-auto mb-2 opacity-30" />
+                <p>Debugging steps will appear here as you run commands and chat with the assistant</p>
               </div>
             )}
           </div>
-          
-          <form onSubmit={handleChatSubmit} className="flex gap-2 mt-2">
-            <div className="relative flex-1">
-              <input 
-                type="text"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="w-full pl-4 pr-4 py-2 bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
-                placeholder="Ask about your Kubernetes issues..."
-                disabled={chatMutation.isPending}
-              />
-            </div>
-            <button
-              type="submit"
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={chatMutation.isPending || !message.trim()}
-            >
-              <Send size={16} />
-            </button>
-          </form>
-        </div>
-      </GlassMorphicCard>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <GlassMorphicCard>
-          <div className="p-4 border-b bg-muted/40">
-            <h3 className="font-medium text-sm">Cluster Health</h3>
-          </div>
-          
-          <div className="p-4">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {clusterHealth && getStatusComponent(clusterHealth.controlPlane)}
-                  <span className="text-sm">Control Plane</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {clusterHealth && getStatusComponent(clusterHealth.etcd)}
-                  <span className="text-sm">etcd</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {clusterHealth && getStatusComponent(clusterHealth.scheduler)}
-                  <span className="text-sm">Scheduler</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {clusterHealth && getStatusComponent(clusterHealth.apiGateway)}
-                  <span className="text-sm">API Gateway</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </GlassMorphicCard>
-        
-        <GlassMorphicCard>
-          <div className="p-4 border-b bg-muted/40">
-            <h3 className="font-medium text-sm">Quick Actions</h3>
-          </div>
-          
-          <div className="p-4 grid grid-cols-2 gap-3">
-            <button 
-              className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm"
-              onClick={() => setCommand('kubectl get pods --all-namespaces')}
-            >
-              <CheckCircle size={18} className="mb-1 text-primary" />
-              <span>Health Check</span>
-            </button>
-            
-            <button 
-              className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm"
-              onClick={() => setCommand('kubectl get events --sort-by=.metadata.creationTimestamp')}
-            >
-              <AlertCircle size={18} className="mb-1 text-primary" />
-              <span>View Events</span>
-            </button>
-            
-            <button 
-              className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm"
-              onClick={() => setMessage('What pods are in error state?')}
-            >
-              <Terminal size={18} className="mb-1 text-primary" />
-              <span>Debug Issues</span>
-            </button>
-            
-            <button 
-              className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm"
-              onClick={() => toast({
-                title: "Feature Coming Soon",
-                description: "Save configuration feature will be available in the next update",
-              })}
-            >
-              <Save size={18} className="mb-1 text-primary" />
-              <span>Save Config</span>
-            </button>
-          </div>
         </GlassMorphicCard>
       </div>
+      
+      {/* Cluster Health Section */}
+      <GlassMorphicCard>
+        <div className="p-4 border-b bg-muted/40">
+          <h3 className="font-medium text-sm">Cluster Health</h3>
+        </div>
+        
+        <div className="p-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="border rounded-md p-3">
+              <div className="text-xs text-muted-foreground">Control Plane</div>
+              <div className="flex items-center gap-2 mt-2">
+                {clusterHealth && getStatusComponent(clusterHealth.controlPlane)}
+              </div>
+            </div>
+            
+            <div className="border rounded-md p-3">
+              <div className="text-xs text-muted-foreground">etcd</div>
+              <div className="flex items-center gap-2 mt-2">
+                {clusterHealth && getStatusComponent(clusterHealth.etcd)}
+              </div>
+            </div>
+            
+            <div className="border rounded-md p-3">
+              <div className="text-xs text-muted-foreground">Scheduler</div>
+              <div className="flex items-center gap-2 mt-2">
+                {clusterHealth && getStatusComponent(clusterHealth.scheduler)}
+              </div>
+            </div>
+            
+            <div className="border rounded-md p-3">
+              <div className="text-xs text-muted-foreground">API Gateway</div>
+              <div className="flex items-center gap-2 mt-2">
+                {clusterHealth && getStatusComponent(clusterHealth.apiGateway)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </GlassMorphicCard>
     </div>
   );
 };
