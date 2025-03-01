@@ -179,7 +179,7 @@ const AccessManagement = () => {
           <h3 className="font-medium">My Group Memberships</h3>
         </div>
         
-        <div className="space-y-2">
+        <div className="space-y-2 max-h-[calc(100vh-240px)] overflow-y-auto pr-1">
           {(groups || []).map(group => (
             <div 
               key={group.id}
@@ -226,8 +226,6 @@ const AccessManagement = () => {
             
           <div className="flex flex-col md:flex-row flex-1 divide-y md:divide-y-0 md:divide-x">
             <div className="md:w-3/5 overflow-auto p-5">
-              <h4 className="text-sm font-medium mb-4">Group Membership</h4>
-              
               <div className="space-y-3">
                 {(groups || []).map(group => {
                   const pendingRequest = accessRequests.find(
@@ -252,44 +250,38 @@ const AccessManagement = () => {
                       
                       <p className="text-xs text-muted-foreground mt-1 mb-2">{group.description}</p>
                       
-                      <div className="flex justify-between items-center mt-3">
-                        <div className="text-xs text-muted-foreground">
-                          {group.members} members
-                        </div>
+                      <div className="flex justify-end items-center mt-3">
+                        {pendingRequest && (
+                          <a 
+                            href={pendingRequest.jira.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <LinkIcon size={12} />
+                            {pendingRequest.jira.key}
+                            <ExternalLink size={10} />
+                          </a>
+                        )}
                         
-                        <div className="flex items-center gap-2">
-                          {pendingRequest && (
-                            <a 
-                              href={pendingRequest.jira.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <LinkIcon size={12} />
-                              {pendingRequest.jira.key}
-                              <ExternalLink size={10} />
-                            </a>
-                          )}
-                          
-                          {group.status === 'none' && !pendingRequest && (
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRequestAccess(group.id);
-                              }}
-                              className="px-3 py-1 text-xs bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
-                            >
-                              Request Access
-                            </button>
-                          )}
-                          
-                          {group.status === 'member' && (
-                            <button className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors">
-                              Leave Group
-                            </button>
-                          )}
-                        </div>
+                        {group.status === 'none' && !pendingRequest && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRequestAccess(group.id);
+                            }}
+                            className="px-3 py-1 text-xs bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+                          >
+                            Request Access
+                          </button>
+                        )}
+                        
+                        {group.status === 'member' && (
+                          <button className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors">
+                            Leave Group
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
