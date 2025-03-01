@@ -1,13 +1,15 @@
-
 import { useState } from 'react';
 import { Terminal, AlertCircle, CheckCircle, Play, Trash, Save, Send, Server } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from '@tanstack/react-query';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { cn } from '@/lib/utils';
+import { kubernetesApi } from '@/services/api';
 
 const KubernetesDebugger = () => {
+  const { toast } = useToast();
   const [command, setCommand] = useState('kubectl get pods -n default');
   const [output, setOutput] = useState('');
-  const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<string[]>([
     'kubectl get pods -n monitoring',
     'kubectl describe pod prometheus-0 -n monitoring',
@@ -18,7 +20,6 @@ const KubernetesDebugger = () => {
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([
     { role: 'assistant', content: 'How can I help you debug your Kubernetes cluster today?' }
   ]);
-  const [chatLoading, setChatLoading] = useState(false);
 
   // Available clusters
   const clusters = [
@@ -28,32 +29,90 @@ const KubernetesDebugger = () => {
     { id: 'test', name: 'Test Environment', status: 'error' }
   ];
 
-  const runCommand = () => {
-    if (!command.trim()) return;
-    
-    setLoading(true);
-    
-    // In a real app, this would call your Python backend
-    setTimeout(() => {
-      setOutput(`
-# Running: ${command} on cluster: ${selectedCluster}
-
-NAME                                      READY   STATUS    RESTARTS   AGE
-nginx-deployment-66b6c48dd5-7lck2         1/1     Running   0          3d
-nginx-deployment-66b6c48dd5-k2hrn         1/1     Running   0          3d
-api-gateway-deployment-5f7b9d8c67-abcd1   1/1     Running   0          1d
-api-gateway-deployment-5f7b9d8c67-wxyz2   0/1     Error     3          1d
-redis-master-0                            1/1     Running   0          12h
-redis-replica-0                           1/1     Running   0          12h
-redis-replica-1                           1/1     Running   0          12h
-      `.trim());
+  // Command execution mutation
+  const commandMutation = useMutation({
+    mutationFn: ({ cluster, command }: { cluster: string; command: string }) => 
+      kubernetesApi.runCommand(cluster, command),
+    onSuccess: (data) => {
+      setOutput(data.output);
       
       if (!history.includes(command)) {
         setHistory(prev => [command, ...prev].slice(0, 10));
       }
       
-      setLoading(false);
-    }, 1500);
+      if (data.exitCode !== 0) {
+        toast({
+          title: "Command Error",
+          description: data.error || "Command execution failed",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "API Error",
+        description: error.message || "Failed to execute command",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Chat mutation
+  const chatMutation = useMutation({
+    mutationFn: ({ cluster, message }: { cluster: string; message: string }) => 
+      kubernetesApi.chatWithAssistant(cluster, message),
+    onSuccess: (data) => {
+      setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Chat Error",
+        description: error.message || "Failed to get assistant response",
+        variant: "destructive",
+      });
+      setChatHistory(prev => [...prev, { 
+        role: 'assistant', 
+        content: "Sorry, I encountered an error processing your request. Please try again." 
+      }]);
+    }
+  });
+
+  // Cluster health query
+  const { data: clusterHealth } = useQuery({
+    queryKey: ['cluster-health', selectedCluster],
+    queryFn: () => {
+      // This would be a real API call in production
+      // For now, we'll return mock data based on the cluster status
+      const cluster = clusters.find(c => c.id === selectedCluster);
+      if (cluster?.status === 'error') {
+        return { 
+          controlPlane: 'warning',
+          etcd: 'error',
+          scheduler: 'healthy',
+          apiGateway: 'error'
+        };
+      } else if (cluster?.status === 'warning') {
+        return { 
+          controlPlane: 'healthy',
+          etcd: 'healthy',
+          scheduler: 'healthy',
+          apiGateway: 'warning'
+        };
+      }
+      return { 
+        controlPlane: 'healthy',
+        etcd: 'healthy',
+        scheduler: 'healthy',
+        apiGateway: 'healthy'
+      };
+    },
+    // Keep last successful result when refetching
+    staleTime: 30000,
+  });
+  
+  const runCommand = () => {
+    if (!command.trim()) return;
+    commandMutation.mutate({ cluster: selectedCluster, command });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -76,26 +135,39 @@ redis-replica-1                           1/1     Running   0          12h
     // Add user message to chat
     const userMessage = { role: 'user' as const, content: message };
     setChatHistory(prev => [...prev, userMessage]);
-    setChatLoading(true);
+    
+    // Send to API
+    chatMutation.mutate({ 
+      cluster: selectedCluster, 
+      message 
+    });
+    
     setMessage('');
+  };
 
-    // In a real app, this would call your Python backend
-    setTimeout(() => {
-      // Simulate assistant response
-      let response = "";
-      if (message.toLowerCase().includes('pod') && message.toLowerCase().includes('error')) {
-        response = "I see there's an issue with one of your pods. Let me help diagnose that. The api-gateway-deployment-5f7b9d8c67-wxyz2 pod is showing an Error status. We should check the logs for this pod first. Try running: `kubectl logs api-gateway-deployment-5f7b9d8c67-wxyz2 -n default`";
-      } else if (message.toLowerCase().includes('restart')) {
-        response = "If you want to restart a deployment, you can use: `kubectl rollout restart deployment/api-gateway-deployment -n default`";
-      } else if (message.toLowerCase().includes('health') || message.toLowerCase().includes('status')) {
-        response = "The cluster overall health is good, but there's one pod in an error state. Would you like me to show you some troubleshooting steps for that pod?";
-      } else {
-        response = "I understand you're looking for help with Kubernetes. Could you provide more specific details about what you're trying to debug or which resources you're concerned about?";
-      }
-
-      setChatHistory(prev => [...prev, { role: 'assistant', content: response }]);
-      setChatLoading(false);
-    }, 1500);
+  const getStatusComponent = (status: string) => {
+    if (status === 'healthy') {
+      return (
+        <>
+          <CheckCircle size={16} className="text-green-500" />
+          <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded">Healthy</span>
+        </>
+      );
+    } else if (status === 'warning') {
+      return (
+        <>
+          <AlertCircle size={16} className="text-amber-500" />
+          <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded">Warning</span>
+        </>
+      );
+    } else {
+      return (
+        <>
+          <AlertCircle size={16} className="text-red-500" />
+          <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded">Error</span>
+        </>
+      );
+    }
   };
 
   return (
@@ -146,15 +218,20 @@ redis-replica-1                           1/1     Running   0          12h
               <button 
                 type="submit"
                 className="flex items-center gap-1 bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
+                disabled={commandMutation.isPending}
               >
-                <Play size={14} />
+                {commandMutation.isPending ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Play size={14} />
+                )}
                 Run
               </button>
             </form>
           </div>
           
           <div className="relative min-h-[350px] max-h-[450px] overflow-auto bg-gray-900 text-gray-100 p-4 font-mono text-sm">
-            {loading ? (
+            {commandMutation.isPending ? (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
                 <div className="flex flex-col items-center">
                   <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
@@ -256,7 +333,7 @@ redis-replica-1                           1/1     Running   0          12h
               </div>
             ))}
             
-            {chatLoading && (
+            {chatMutation.isPending && (
               <div className="flex justify-start">
                 <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[80%] p-3">
                   <div className="flex space-x-2">
@@ -277,13 +354,13 @@ redis-replica-1                           1/1     Running   0          12h
                 onChange={(e) => setMessage(e.target.value)}
                 className="w-full pl-4 pr-4 py-2 bg-background border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none"
                 placeholder="Ask about your Kubernetes issues..."
-                disabled={chatLoading}
+                disabled={chatMutation.isPending}
               />
             </div>
             <button
               type="submit"
               className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={chatLoading || !message.trim()}
+              disabled={chatMutation.isPending || !message.trim()}
             >
               <Send size={16} />
             </button>
@@ -301,34 +378,30 @@ redis-replica-1                           1/1     Running   0          12h
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <CheckCircle size={16} className="text-green-500" />
+                  {clusterHealth && getStatusComponent(clusterHealth.controlPlane)}
                   <span className="text-sm">Control Plane</span>
                 </div>
-                <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded">Healthy</span>
               </div>
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <CheckCircle size={16} className="text-green-500" />
+                  {clusterHealth && getStatusComponent(clusterHealth.etcd)}
                   <span className="text-sm">etcd</span>
                 </div>
-                <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded">Healthy</span>
               </div>
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <CheckCircle size={16} className="text-green-500" />
+                  {clusterHealth && getStatusComponent(clusterHealth.scheduler)}
                   <span className="text-sm">Scheduler</span>
                 </div>
-                <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded">Healthy</span>
               </div>
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <AlertCircle size={16} className="text-amber-500" />
+                  {clusterHealth && getStatusComponent(clusterHealth.apiGateway)}
                   <span className="text-sm">API Gateway</span>
                 </div>
-                <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded">Warning</span>
               </div>
             </div>
           </div>
@@ -340,22 +413,37 @@ redis-replica-1                           1/1     Running   0          12h
           </div>
           
           <div className="p-4 grid grid-cols-2 gap-3">
-            <button className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm">
+            <button 
+              className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm"
+              onClick={() => setCommand('kubectl get pods --all-namespaces')}
+            >
               <CheckCircle size={18} className="mb-1 text-primary" />
               <span>Health Check</span>
             </button>
             
-            <button className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm">
+            <button 
+              className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm"
+              onClick={() => setCommand('kubectl get events --sort-by=.metadata.creationTimestamp')}
+            >
               <AlertCircle size={18} className="mb-1 text-primary" />
-              <span>View Alerts</span>
+              <span>View Events</span>
             </button>
             
-            <button className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm">
+            <button 
+              className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm"
+              onClick={() => setMessage('What pods are in error state?')}
+            >
               <Terminal size={18} className="mb-1 text-primary" />
-              <span>Debug Pod</span>
+              <span>Debug Issues</span>
             </button>
             
-            <button className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm">
+            <button 
+              className="flex flex-col items-center justify-center p-3 border rounded-md hover:bg-muted transition-colors text-sm"
+              onClick={() => toast({
+                title: "Feature Coming Soon",
+                description: "Save configuration feature will be available in the next update",
+              })}
+            >
               <Save size={18} className="mb-1 text-primary" />
               <span>Save Config</span>
             </button>
