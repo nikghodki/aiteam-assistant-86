@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Server, Database, Terminal, Search, Menu, X, User } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Server, Database, Terminal, Search, Menu, X, User, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -16,6 +16,7 @@ export const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const navigation = [
@@ -81,9 +82,13 @@ export const Header = () => {
             <DropdownMenuContent align="end">
               <div className="px-3 py-2 text-sm text-muted-foreground">{user.email}</div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/profile')}>
                 <User className="mr-2 h-4 w-4" />
                 <span>Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/settings')}>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -121,12 +126,21 @@ export const Header = () => {
             ))}
             
             <Link
-              to="/dashboard"
-              className="flex items-center gap-2 py-2 text-sm font-medium text-professional-purple hover:text-professional-purple/90 transition-colors"
+              to="/profile"
+              className="flex items-center gap-2 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               <User size={18} />
               Profile
+            </Link>
+            
+            <Link
+              to="/settings"
+              className="flex items-center gap-2 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <Settings size={18} />
+              Settings
             </Link>
           </div>
         </div>
