@@ -244,7 +244,7 @@ const KubernetesDebugger = () => {
   const handleChatKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleChatSubmit(e as any);
+      handleChatSubmit(e as unknown as React.FormEvent);
     }
   };
 
@@ -437,6 +437,28 @@ const KubernetesDebugger = () => {
           )}
         </div>
       </div>
+
+      {selectedCluster && (
+        <div className="bg-primary/5 border border-primary/20 rounded-md p-3 flex items-center gap-2">
+          <Server size={18} className="text-primary" />
+          <div>
+            <div className="text-sm font-medium">Selected Cluster</div>
+            <div className="text-lg font-semibold">{selectedClusterName}</div>
+          </div>
+          <div className="ml-auto">
+            <div className={cn(
+              "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
+              (clusters?.find(c => c.id === selectedCluster)?.status === 'healthy') 
+                ? "bg-green-50 text-green-600" 
+                : (clusters?.find(c => c.id === selectedCluster)?.status === 'warning')
+                  ? "bg-amber-50 text-amber-600" 
+                  : "bg-red-50 text-red-600"
+            )}>
+              {(clusters?.find(c => c.id === selectedCluster)?.status || 'unknown').toUpperCase()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showPastSessions && (
         <GlassMorphicCard className="animate-fade-in">
@@ -765,17 +787,4 @@ const KubernetesDebugger = () => {
               </div>
             </div>
             
-            <div className="border rounded-md p-3">
-              <div className="text-xs text-muted-foreground">API Gateway</div>
-              <div className="flex items-center gap-2 mt-2">
-                {clusterHealth.data && getStatusComponent(clusterHealth.data.apiGateway)}
-              </div>
-            </div>
-          </div>
-        </div>
-      </GlassMorphicCard>
-    </div>
-  );
-};
-
-export default KubernetesDebugger;
+            <div className="border rounded-md p-3
