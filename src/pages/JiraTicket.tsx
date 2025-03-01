@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
-import { GlassMorphicCard } from "@/components/ui/GlassMorphicCard";
+import GlassMorphicCard from "@/components/ui/GlassMorphicCard";
 import { Separator } from "@/components/ui/separator";
 import JiraTicketChat from "@/components/jira/JiraTicketChat";
 import JiraTicketList from "@/components/jira/JiraTicketList";
