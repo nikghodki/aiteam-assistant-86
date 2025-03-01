@@ -1,4 +1,3 @@
-
 # AI Team Assistant - API Integration Guide
 
 This document provides step-by-step instructions for integrating the frontend application with your backend API services. It covers the configuration and implementation for each feature of the application: Access Management, Kubernetes Debugging, and Documentation Search.
@@ -259,7 +258,7 @@ export interface JiraTicketCreationResult {
 
 ## Sample Backend Implementation
 
-Below is a sample Python implementation using Flask for the required API endpoints:
+Below is an updated Python implementation using Flask for the required API endpoints, including the userName parameter in the access management APIs:
 
 ```python
 from flask import Flask, request, jsonify
@@ -294,9 +293,26 @@ def create_jira_ticket(summary, description, ticket_type="Task"):
     }
 
 # Access Management API
-@app.route('/api/access/groups', methods=['GET'])
+@app.route('/api/access/groups', methods=['POST'])
 def get_user_groups():
-    return jsonify(groups)
+    data = request.json
+    user_name = data.get('userName', 'Anonymous User')
+    
+    # In a real implementation, you would filter groups based on the user
+    # For demo purposes, we'll return all groups with some conditional logic based on username
+    
+    # You could customize group access based on the username
+    if user_name == "Admin User":
+        # An admin might see all groups with different statuses
+        return jsonify(groups)
+    elif user_name == "New User":
+        # A new user might have no memberships yet
+        for group in groups:
+            group['status'] = 'none'
+        return jsonify(groups)
+    else:
+        # Default user (Demo User) gets the predefined statuses
+        return jsonify(groups)
 
 @app.route('/api/access/groups/request', methods=['POST'])
 def request_group_access():

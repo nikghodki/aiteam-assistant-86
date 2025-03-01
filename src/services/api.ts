@@ -65,7 +65,11 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
 // Access Management API
 export const accessApi = {
   // Get user groups
-  getUserGroups: () => apiCall<any[]>('/access/groups'),
+  getUserGroups: (userName: string) => 
+    apiCall<any[]>('/access/groups', {
+      method: 'POST',
+      body: JSON.stringify({ userName }),
+    }),
 
   // Request access to a group
   requestGroupAccess: (groupId: number, reason: string, userName: string) => 

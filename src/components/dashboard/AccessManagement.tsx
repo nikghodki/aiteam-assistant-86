@@ -31,10 +31,10 @@ const AccessManagement = () => {
 
   // Fetch groups data for the current user
   const { data: groups, isLoading: isLoadingGroups } = useQuery({
-    queryKey: ['user-groups'],
+    queryKey: ['user-groups', user.name],
     queryFn: async () => {
       // In a real app, use the API
-      // return accessApi.getUserGroups();
+      // return accessApi.getUserGroups(user.name);
       
       // For now, use mock data
       return new Promise<Group[]>((resolve) => {
