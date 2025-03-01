@@ -17,7 +17,7 @@ const KubernetesDebug = () => {
             </p>
           </div>
           
-          <div className="rounded-lg p-6">
+          <div className="rounded-lg">
             <KubernetesDebugger />
           </div>
         </div>

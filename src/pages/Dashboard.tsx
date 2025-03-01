@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Server, Database, Terminal, Search, RefreshCcw, Users, FileText, AlertCircle, Link } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -61,37 +62,27 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-white to-professional-gray-light/50">
       <Header />
       
       <main className="flex-grow pt-24 pb-16 px-6">
         <div className="max-w-7xl mx-auto space-y-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold">Dashboard</h1>
-              <p className="text-muted-foreground mt-1">
-                Monitor and manage your infrastructure
-              </p>
-            </div>
-            
-            <button 
-              className="flex items-center gap-2 text-sm bg-muted px-4 py-2 rounded-md hover:bg-muted/80 transition-colors self-start"
-              onClick={() => refetchStats()}
-            >
-              <RefreshCcw size={16} />
-              <span>Refresh Data</span>
-            </button>
+          <div className="bg-gradient-professional p-8 rounded-lg shadow-sm border border-border/30">
+            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground mt-2 max-w-3xl">
+              Monitor and manage your infrastructure resources, access controls, and documentation.
+            </p>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
             {stats.map((stat, index) => (
-              <GlassMorphicCard key={index} className="p-5">
+              <GlassMorphicCard key={index} className="p-5 hover-scale transition-all">
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-muted-foreground text-sm">{stat.label}</p>
                     <h3 className="text-2xl font-bold mt-1">{stat.value}</h3>
                   </div>
-                  <div className={cn("p-2 rounded-md bg-muted", stat.color)}>
+                  <div className={cn("p-2 rounded-md bg-muted/80", stat.color)}>
                     <stat.icon size={20} />
                   </div>
                 </div>
@@ -101,13 +92,13 @@ const Dashboard = () => {
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <GlassMorphicCard className="lg:col-span-2">
-              <div className="p-5 border-b">
+              <div className="p-5 border-b bg-muted/20">
                 <h3 className="text-lg font-medium">Platform Features</h3>
               </div>
               
               <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div 
-                  className="border rounded-md p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer flex flex-col"
+                  className="border rounded-md p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer flex flex-col hover-scale"
                   onClick={() => navigateTo('/access')}
                 >
                   <div className="w-10 h-10 rounded-md bg-green-50 flex items-center justify-center mb-3">
@@ -122,7 +113,7 @@ const Dashboard = () => {
                 </div>
                 
                 <div 
-                  className="border rounded-md p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer flex flex-col"
+                  className="border rounded-md p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer flex flex-col hover-scale"
                   onClick={() => navigateTo('/kubernetes')}
                 >
                   <div className="w-10 h-10 rounded-md bg-amber-50 flex items-center justify-center mb-3">
@@ -137,7 +128,7 @@ const Dashboard = () => {
                 </div>
                 
                 <div 
-                  className="border rounded-md p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer flex flex-col"
+                  className="border rounded-md p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer flex flex-col hover-scale"
                   onClick={() => navigateTo('/docs')}
                 >
                   <div className="w-10 h-10 rounded-md bg-purple-50 flex items-center justify-center mb-3">
@@ -154,7 +145,7 @@ const Dashboard = () => {
             </GlassMorphicCard>
             
             <GlassMorphicCard className="h-full">
-              <div className="p-5 border-b">
+              <div className="p-5 border-b bg-muted/20">
                 <h3 className="text-lg font-medium">Recent Activities</h3>
               </div>
               
@@ -188,13 +179,13 @@ const Dashboard = () => {
           </div>
           
           <GlassMorphicCard>
-            <div className="p-5 border-b">
+            <div className="p-5 border-b bg-muted/20">
               <h3 className="text-lg font-medium">System Status</h3>
             </div>
             
             <div className="p-5">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="border rounded-md p-3">
+                <div className="border rounded-md p-3 hover-scale">
                   <div className="flex justify-between items-center mb-2">
                     <h4 className="text-sm font-medium">Access System</h4>
                     <span className="w-2 h-2 rounded-full bg-green-500"></span>
@@ -202,7 +193,7 @@ const Dashboard = () => {
                   <p className="text-xs text-muted-foreground">All systems operational</p>
                 </div>
                 
-                <div className="border rounded-md p-3">
+                <div className="border rounded-md p-3 hover-scale">
                   <div className="flex justify-between items-center mb-2">
                     <h4 className="text-sm font-medium">Kubernetes API</h4>
                     <span className="w-2 h-2 rounded-full bg-green-500"></span>
@@ -210,7 +201,7 @@ const Dashboard = () => {
                   <p className="text-xs text-muted-foreground">All clusters connected</p>
                 </div>
                 
-                <div className="border rounded-md p-3">
+                <div className="border rounded-md p-3 hover-scale">
                   <div className="flex justify-between items-center mb-2">
                     <h4 className="text-sm font-medium">Documentation</h4>
                     <span className="w-2 h-2 rounded-full bg-green-500"></span>
@@ -218,7 +209,7 @@ const Dashboard = () => {
                   <p className="text-xs text-muted-foreground">Indexed and up-to-date</p>
                 </div>
                 
-                <div className="border rounded-md p-3">
+                <div className="border rounded-md p-3 hover-scale">
                   <div className="flex justify-between items-center mb-2">
                     <h4 className="text-sm font-medium">Jira Integration</h4>
                     <span className="w-2 h-2 rounded-full bg-amber-500"></span>

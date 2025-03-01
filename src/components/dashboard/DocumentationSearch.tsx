@@ -80,8 +80,8 @@ const DocumentationSearch = () => {
   };
 
   return (
-    <GlassMorphicCard>
-      <div className="p-4 border-b bg-muted/40">
+    <GlassMorphicCard className="overflow-hidden">
+      <div className="p-4 border-b bg-muted/20">
         <h3 className="font-medium text-sm flex items-center gap-2">
           <Search size={16} className="text-primary" />
           <span>Documentation Search</span>
@@ -130,7 +130,7 @@ const DocumentationSearch = () => {
                   key={topic}
                   type="button"
                   onClick={() => setQuery(topic)}
-                  className="px-2 py-1 bg-muted rounded-md text-xs hover:bg-muted/80 transition-colors"
+                  className="px-2 py-1 bg-muted/80 rounded-md text-xs hover:bg-muted transition-colors shadow-sm"
                 >
                   {topic}
                 </button>
@@ -145,7 +145,7 @@ const DocumentationSearch = () => {
                   key={item.id}
                   type="button"
                   onClick={() => handleHistoryClick(item.query)}
-                  className="w-full text-left p-2 text-xs border-b border-muted hover:bg-muted/50 transition-colors"
+                  className="w-full text-left p-2 text-xs border-b border-muted hover:bg-muted/50 transition-colors rounded-sm"
                 >
                   <div className="truncate font-medium">{item.query}</div>
                   <div className="text-muted-foreground text-[10px] mt-1">{item.timestamp}</div>
@@ -162,7 +162,7 @@ const DocumentationSearch = () => {
       
       {results && (
         <div className="divide-y">
-          <div className="p-3 border-b bg-muted/40">
+          <div className="p-3 border-b bg-muted/20">
             <h3 className="font-medium text-xs flex items-center gap-2">
               <FileText size={14} className="text-primary" />
               <span>Search Results</span>
@@ -173,8 +173,8 @@ const DocumentationSearch = () => {
               key={result.id}
               onClick={() => handleResultClick(result.id)}
               className={cn(
-                "w-full text-left p-3 transition-colors hover:bg-muted/50",
-                selectedResult === result.id && "bg-primary/5 hover:bg-primary/10"
+                "w-full text-left p-3 transition-colors hover:bg-muted/40",
+                selectedResult === result.id && "bg-primary/5 hover:bg-primary/10 border-l-2 border-l-primary"
               )}
             >
               <div className="flex items-start justify-between">

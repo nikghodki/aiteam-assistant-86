@@ -134,9 +134,9 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
   // If showing inline, render a different layout
   if (showInline) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full border border-border/30 rounded-lg shadow-sm overflow-hidden bg-card/50 backdrop-blur-sm">
         {/* Chat header */}
-        <div className="flex items-center justify-between p-3 border-b bg-muted/50 rounded-t-lg">
+        <div className="flex items-center justify-between p-3 border-b bg-muted/20 rounded-t-lg">
           <div className="flex items-center space-x-2">
             <Bot size={18} className="text-primary" />
             <h3 className="font-medium text-sm">Documentation Assistant</h3>
@@ -151,7 +151,7 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
         </div>
         
         {/* Chat messages */}
-        <div className="flex-1 p-3 overflow-y-auto min-h-[350px] max-h-[400px]">
+        <div className="flex-1 p-3 overflow-y-auto min-h-[350px] max-h-[400px] bg-background/50">
           <div className="space-y-4">
             {messages.map((message) => (
               <div 
@@ -168,10 +168,10 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
                 )}
                 
                 <div className={cn(
-                  "p-3 rounded-lg text-sm",
+                  "p-3 rounded-lg text-sm shadow-sm",
                   message.sender === 'user' 
                     ? "bg-primary text-primary-foreground rounded-tr-none" 
-                    : "bg-muted rounded-tl-none"
+                    : "bg-muted rounded-tl-none border border-border/20"
                 )}>
                   {message.sender === 'assistant' ? (
                     <div dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }} />
@@ -193,7 +193,7 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
                 <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mt-1">
                   <Bot size={14} className="text-primary" />
                 </div>
-                <div className="p-3 rounded-lg text-sm bg-muted rounded-tl-none">
+                <div className="p-3 rounded-lg text-sm bg-muted rounded-tl-none border border-border/20 shadow-sm">
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-muted-foreground/30 rounded-full animate-bounce delay-100"></div>
                     <div className="w-2 h-2 bg-muted-foreground/30 rounded-full animate-bounce delay-200"></div>
@@ -210,7 +210,7 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
         {/* Chat input */}
         <form 
           onSubmit={handleSendMessage} 
-          className="border-t p-3 flex items-end space-x-2"
+          className="border-t p-3 flex items-end space-x-2 bg-card/50"
         >
           <Textarea
             value={inputMessage}
@@ -244,11 +244,11 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
   // Original floating chat UI for non-inline mode
   return (
     <div className={cn(
-      "fixed bottom-20 right-8 w-80 md:w-96 bg-card/90 backdrop-blur-sm rounded-lg shadow-lg border transition-all duration-200 ease-in-out z-50",
+      "fixed bottom-20 right-8 w-80 md:w-96 bg-card/90 backdrop-blur-sm rounded-lg shadow-lg border border-border/30 transition-all duration-200 ease-in-out z-50",
       minimized ? "h-14" : "h-[450px]"
     )}>
       {/* Chat header */}
-      <div className="flex items-center justify-between p-3 border-b bg-muted/50 rounded-t-lg">
+      <div className="flex items-center justify-between p-3 border-b bg-muted/20 rounded-t-lg">
         <div className="flex items-center space-x-2">
           <Bot size={18} className="text-primary" />
           <h3 className="font-medium text-sm">Documentation Assistant</h3>
@@ -278,7 +278,7 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
       {/* Chat messages */}
       {!minimized && (
         <>
-          <div className="flex-1 p-3 overflow-y-auto h-[350px]">
+          <div className="flex-1 p-3 overflow-y-auto h-[350px] bg-background/50">
             <div className="space-y-4">
               {messages.map((message) => (
                 <div 
@@ -295,10 +295,10 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
                   )}
                   
                   <div className={cn(
-                    "p-3 rounded-lg text-sm",
+                    "p-3 rounded-lg text-sm shadow-sm",
                     message.sender === 'user' 
                       ? "bg-primary text-primary-foreground rounded-tr-none" 
-                      : "bg-muted rounded-tl-none"
+                      : "bg-muted rounded-tl-none border border-border/20"
                   )}>
                     {message.sender === 'assistant' ? (
                       <div dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }} />
@@ -320,7 +320,7 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mt-1">
                     <Bot size={14} className="text-primary" />
                   </div>
-                  <div className="p-3 rounded-lg text-sm bg-muted rounded-tl-none">
+                  <div className="p-3 rounded-lg text-sm bg-muted rounded-tl-none border border-border/20 shadow-sm">
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-muted-foreground/30 rounded-full animate-bounce delay-100"></div>
                       <div className="w-2 h-2 bg-muted-foreground/30 rounded-full animate-bounce delay-200"></div>
@@ -337,7 +337,7 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
           {/* Chat input */}
           <form 
             onSubmit={handleSendMessage} 
-            className="border-t p-3 flex items-end space-x-2"
+            className="border-t p-3 flex items-end space-x-2 bg-card/50"
           >
             <Textarea
               value={inputMessage}

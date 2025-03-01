@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Users, Lock, Key, Check, X, Link as LinkIcon, ExternalLink, AlertCircle, Send, UserCheck, Shield, Clock, XCircle, Search, RefreshCw, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -170,107 +169,111 @@ const AccessManagement = () => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* My Group Memberships */}
-      <GlassMorphicCard className="md:col-span-1 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <Users className="text-primary mr-2" size={20} />
-            <h3 className="font-medium">My Group Memberships</h3>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={toggleAutoRefresh}
-              className={cn(
-                "text-xs p-1 rounded flex items-center gap-1",
-                autoRefresh ? "text-green-600" : "text-gray-400"
-              )}
-              title={autoRefresh ? "Auto-refresh enabled (30s)" : "Auto-refresh disabled"}
-            >
-              <RefreshCw size={14} className={autoRefresh ? "animate-spin-slow" : ""} />
-              <span className="sr-only md:not-sr-only md:inline">Auto</span>
-            </button>
+      <GlassMorphicCard className="md:col-span-1 overflow-hidden">
+        <div className="p-4 border-b bg-muted/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Users className="text-primary mr-2" size={20} />
+              <h3 className="font-medium">My Group Memberships</h3>
+            </div>
             
-            <button 
-              onClick={handleManualRefresh}
-              disabled={isRefreshing}
-              className="text-xs p-1 rounded text-primary flex items-center gap-1"
-              title="Refresh now"
-            >
-              <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
-              <span className="sr-only md:not-sr-only md:inline">Refresh</span>
-            </button>
-          </div>
-        </div>
-        
-        {/* Search bar */}
-        <div className="relative mb-4">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search size={16} className="text-gray-400" />
-          </div>
-          <Input 
-            type="text"
-            placeholder="Search groups..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        
-        <div className="space-y-2 max-h-[calc(100vh-240px)] overflow-y-auto pr-1">
-          {filteredGroups.map(group => (
-            <div 
-              key={group.id}
-              className="flex flex-col p-3 rounded-md transition-colors cursor-pointer hover:bg-secondary"
-            >
-              <div className="flex justify-between items-center mb-1">
-                <div className="font-medium text-sm">{group.name}</div>
-                {getStatusBadge(group.status)}
-              </div>
-              <div className="text-xs text-muted-foreground">{group.description}</div>
-              <div className="flex justify-between items-center mt-2">
-                <div className="text-xs text-muted-foreground">{group.members} members</div>
-                
-                {group.status === 'member' && (
-                  <button
-                    onClick={() => handleLeaveGroup(group.id, group.name)}
-                    className="text-xs flex items-center gap-1 text-red-500 hover:text-red-700 transition-colors"
-                    title="Leave this group"
-                  >
-                    <LogOut size={12} />
-                    <span>Leave</span>
-                  </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={toggleAutoRefresh}
+                className={cn(
+                  "text-xs p-1 rounded flex items-center gap-1",
+                  autoRefresh ? "text-green-600" : "text-gray-400"
                 )}
+                title={autoRefresh ? "Auto-refresh enabled (30s)" : "Auto-refresh disabled"}
+              >
+                <RefreshCw size={14} className={autoRefresh ? "animate-spin-slow" : ""} />
+                <span className="sr-only md:not-sr-only md:inline">Auto</span>
+              </button>
+              
+              <button 
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                className="text-xs p-1 rounded text-primary flex items-center gap-1"
+                title="Refresh now"
+              >
+                <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+                <span className="sr-only md:not-sr-only md:inline">Refresh</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div className="p-4">
+          {/* Search bar */}
+          <div className="relative mb-4">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search size={16} className="text-gray-400" />
+            </div>
+            <Input 
+              type="text"
+              placeholder="Search groups..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <div className="space-y-2 max-h-[calc(100vh-240px)] overflow-y-auto pr-1">
+            {filteredGroups.map(group => (
+              <div 
+                key={group.id}
+                className="flex flex-col p-3 rounded-md transition-colors cursor-pointer hover:bg-secondary border border-border/30"
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <div className="font-medium text-sm">{group.name}</div>
+                  {getStatusBadge(group.status)}
+                </div>
+                <div className="text-xs text-muted-foreground">{group.description}</div>
+                <div className="flex justify-between items-center mt-2">
+                  <div className="text-xs text-muted-foreground">{group.members} members</div>
+                  
+                  {group.status === 'member' && (
+                    <button
+                      onClick={() => handleLeaveGroup(group.id, group.name)}
+                      className="text-xs flex items-center gap-1 text-red-500 hover:text-red-700 transition-colors"
+                      title="Leave this group"
+                    >
+                      <LogOut size={12} />
+                      <span>Leave</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-          
-          {filteredGroups.length === 0 && !isLoadingGroups && (
-            <div className="text-center py-8">
-              <AlertCircle size={24} className="mx-auto text-muted-foreground/50 mb-2" />
-              <p className="text-muted-foreground text-sm">
-                {searchQuery ? "No matching groups found" : "No groups found"}
-              </p>
-            </div>
-          )}
-          
-          {isLoadingGroups && (
-            <div className="flex justify-center items-center py-8">
-              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
+            ))}
+            
+            {filteredGroups.length === 0 && !isLoadingGroups && (
+              <div className="text-center py-8">
+                <AlertCircle size={24} className="mx-auto text-muted-foreground/50 mb-2" />
+                <p className="text-muted-foreground text-sm">
+                  {searchQuery ? "No matching groups found" : "No groups found"}
+                </p>
+              </div>
+            )}
+            
+            {isLoadingGroups && (
+              <div className="flex justify-center items-center py-8">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
+          </div>
         </div>
       </GlassMorphicCard>
       
       {/* Access Management Assistant */}
       <GlassMorphicCard className="md:col-span-2 p-0 overflow-hidden flex flex-col h-full" style={{ maxHeight: "500px" }}>
-        <div className="flex items-center justify-between p-5 border-b">
+        <div className="flex items-center justify-between p-5 border-b bg-muted/20">
           <div className="flex items-center">
             <Lock className="text-primary mr-2" size={20} />
             <h3 className="font-medium">Access Assistant</h3>
           </div>
         </div>
         
-        <div className="flex-1 p-4 overflow-y-auto">
+        <div className="flex-1 p-4 overflow-y-auto bg-background/50">
           <div className="space-y-4">
             {chatHistory.map((chat, index) => (
               <div 
@@ -281,9 +284,9 @@ const AccessManagement = () => {
                 )}
               >
                 <div className={cn(
-                  "max-w-[85%] rounded-lg p-3 text-sm",
+                  "max-w-[85%] rounded-lg p-3 text-sm shadow-sm",
                   chat.role === 'assistant' 
-                    ? "bg-muted text-foreground rounded-tl-none" 
+                    ? "bg-muted text-foreground rounded-tl-none border border-border/20" 
                     : "bg-primary text-primary-foreground rounded-tr-none"
                 )}>
                   {chat.content}
@@ -293,7 +296,7 @@ const AccessManagement = () => {
             
             {chatMutation.isPending && (
               <div className="flex justify-start">
-                <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[85%] p-3">
+                <div className="bg-muted text-foreground rounded-lg rounded-tl-none max-w-[85%] p-3 shadow-sm border border-border/20">
                   <div className="flex space-x-2">
                     <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse"></div>
                     <div className="w-2 h-2 rounded-full bg-primary/50 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
@@ -305,7 +308,7 @@ const AccessManagement = () => {
           </div>
         </div>
         
-        <div className="p-4 border-t mt-auto">
+        <div className="p-4 border-t mt-auto bg-card/50">
           <form onSubmit={handleChatSubmit} className="flex gap-2">
             <Input
               type="text"

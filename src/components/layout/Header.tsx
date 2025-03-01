@@ -38,7 +38,7 @@ export const Header = () => {
     <header 
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out px-6 py-4",
-        isScrolled ? "bg-white/80 dark:bg-gray-900/80 backdrop-blur-md shadow-sm" : "bg-transparent"
+        isScrolled ? "bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-sm" : "bg-transparent"
       )}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -58,12 +58,12 @@ export const Header = () => {
               to={item.href}
               className={cn(
                 "flex items-center gap-1.5 text-sm font-medium nav-item transition-colors",
-                location.pathname === item.href 
-                  ? "text-primary" 
+                location.pathname === item.href || location.pathname.startsWith(item.href + '/') 
+                  ? "text-professional-purple" 
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <item.icon size={16} />
+              <item.icon size={16} className={location.pathname === item.href || location.pathname.startsWith(item.href + '/') ? "text-professional-purple" : ""} />
               {item.name}
             </Link>
           ))}
@@ -73,7 +73,7 @@ export const Header = () => {
         <div className="hidden md:block">
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+              <div className="w-8 h-8 rounded-full bg-professional-purple/10 flex items-center justify-center text-professional-purple">
                 {user.name ? user.name.charAt(0) : <User size={14} />}
               </div>
               <span className="font-medium">{user.name?.split(' ')[0]}</span>
@@ -101,7 +101,7 @@ export const Header = () => {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-background border-b border-border animate-fade-in">
+        <div className="md:hidden absolute top-full left-0 right-0 bg-background/95 backdrop-blur-md border-b border-border animate-fade-in">
           <div className="max-w-7xl mx-auto py-4 px-6 space-y-3">
             {navigation.map((item) => (
               <Link
@@ -109,20 +109,20 @@ export const Header = () => {
                 to={item.href}
                 className={cn(
                   "flex items-center gap-2 py-2 text-sm font-medium transition-colors",
-                  location.pathname === item.href 
-                    ? "text-primary" 
+                  location.pathname === item.href || location.pathname.startsWith(item.href + '/') 
+                    ? "text-professional-purple" 
                     : "text-muted-foreground hover:text-foreground"
                 )}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <item.icon size={18} />
+                <item.icon size={18} className={location.pathname === item.href || location.pathname.startsWith(item.href + '/') ? "text-professional-purple" : ""} />
                 {item.name}
               </Link>
             ))}
             
             <Link
               to="/dashboard"
-              className="flex items-center gap-2 py-2 text-sm font-medium text-primary hover:text-primary/90 transition-colors"
+              className="flex items-center gap-2 py-2 text-sm font-medium text-professional-purple hover:text-professional-purple/90 transition-colors"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               <User size={18} />
