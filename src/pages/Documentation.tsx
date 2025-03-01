@@ -26,7 +26,7 @@ const Documentation = () => {
             </div>
             
             <div className="md:col-span-2">
-              <div className="bg-muted/30 rounded-lg p-6">
+              <div className="bg-muted/30 rounded-lg p-6 h-full">
                 <DocumentationChat showInline={true} />
               </div>
             </div>
