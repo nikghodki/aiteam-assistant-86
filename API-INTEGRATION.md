@@ -1,3 +1,4 @@
+
 # AI Team Assistant - API Integration Guide
 
 This document provides step-by-step instructions for integrating the frontend application with your backend API services. It covers the configuration and implementation for each feature of the application: Access Management, Kubernetes Debugging, and Documentation Search.
@@ -76,12 +77,14 @@ The Access Management feature requires the following API endpoints:
    - Method: POST
    - Request Body: `{ groupId: number, reason: string, userName: string }`
    - Response: Jira ticket information
+   - Note: `userName` is the name of the currently logged-in user
 
 3. **Chat with Assistant**
    - Endpoint: `/access/chat`
    - Method: POST
    - Request Body: `{ message: string, userName: string }`
    - Response: Assistant's response
+   - Note: `userName` is the name of the currently logged-in user
 
 ### Data Models
 

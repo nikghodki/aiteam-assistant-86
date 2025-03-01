@@ -25,7 +25,7 @@ export interface JiraTicket {
 export interface AccessRequest {
   groupId: number;
   reason: string;
-  userName?: string;
+  userName: string;
 }
 
 export interface CommandResult {
