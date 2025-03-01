@@ -1,0 +1,798 @@
+
+# AI Team Assistant - API Integration Guide
+
+This document provides step-by-step instructions for integrating the frontend application with your backend API services. It covers the configuration and implementation for each feature of the application: Access Management, Kubernetes Debugging, and Documentation Search.
+
+## Table of Contents
+
+1. [API Configuration](#api-configuration)
+2. [Access Management Integration](#access-management-integration)
+3. [Kubernetes Debugger Integration](#kubernetes-debugger-integration)
+4. [Documentation Search Integration](#documentation-search-integration)
+5. [Dashboard Integration](#dashboard-integration)
+6. [Jira Ticket Integration](#jira-ticket-integration)
+7. [Sample Backend Implementation](#sample-backend-implementation)
+
+## API Configuration
+
+### Base URL Configuration
+
+The application uses a centralized API configuration file located at `src/services/api.ts`. This file is set up to read the API base URL from an environment variable:
+
+```typescript
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+```
+
+To configure the API base URL:
+
+1. Create a `.env` file in the root of your project
+2. Add the following line, replacing with your actual API base URL:
+   ```
+   VITE_API_BASE_URL=https://your-api-domain.com/api
+   ```
+
+### API Request Helper
+
+The application uses a helper function for making API requests:
+
+```typescript
+const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const defaultHeaders = {
+    'Content-Type': 'application/json',
+  };
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `API error: ${response.status}`);
+  }
+
+  return response.json();
+};
+```
+
+This function handles adding default headers, error handling, and JSON parsing for all API requests.
+
+## Access Management Integration
+
+### Required API Endpoints
+
+The Access Management feature requires the following API endpoints:
+
+1. **Get Users**
+   - Endpoint: `/access/users`
+   - Method: GET
+   - Response: Array of users with their access information
+   
+2. **Get User Groups**
+   - Endpoint: `/access/users/{userId}/groups`
+   - Method: GET
+   - Response: Array of groups the user is a member of
+   
+3. **Request Access**
+   - Endpoint: `/access/request`
+   - Method: POST
+   - Request Body: `{ userId: number, service: string, reason: string }`
+   - Response: Jira ticket information
+   
+4. **Request Group Access**
+   - Endpoint: `/access/groups/request`
+   - Method: POST
+   - Request Body: `{ userId: number, groupId: number, reason: string }`
+   - Response: Jira ticket information
+   
+5. **Update Access**
+   - Endpoint: `/access/users/{userId}`
+   - Method: PUT
+   - Request Body: `{ services: string[] }`
+   - Response: Success confirmation
+   
+6. **Chat with Assistant**
+   - Endpoint: `/access/chat`
+   - Method: POST
+   - Request Body: `{ message: string, userId: number }`
+   - Response: Assistant's response
+
+### Data Models
+
+```typescript
+export interface UserAccess {
+  id: number;
+  name: string;
+  role: string;
+  avatar?: string;
+}
+
+export interface GroupAccess {
+  id: number;
+  name: string;
+  description: string;
+  status: 'active' | 'pending' | 'rejected';
+}
+
+export interface AccessRequest {
+  userId: number;
+  service: string;
+  reason: string;
+}
+
+export interface ChatResponse {
+  response: string;
+}
+```
+
+## Kubernetes Debugger Integration
+
+### Required API Endpoints
+
+1. **Create Session**
+   - Endpoint: `/kubernetes/session`
+   - Method: POST
+   - Request Body: `{ cluster: string, description: string }`
+   - Response: Jira ticket information
+   
+2. **Run Command**
+   - Endpoint: `/kubernetes/command`
+   - Method: POST
+   - Request Body: `{ cluster: string, command: string, jiraTicketKey?: string }`
+   - Response: Command execution result
+   
+3. **Chat with Assistant**
+   - Endpoint: `/kubernetes/chat`
+   - Method: POST
+   - Request Body: `{ cluster: string, message: string, jiraTicketKey?: string }`
+   - Response: Assistant's response
+   
+4. **Get Debug Sessions**
+   - Endpoint: `/kubernetes/sessions`
+   - Method: GET
+   - Response: Array of debugging sessions
+   
+5. **Get Session Details**
+   - Endpoint: `/kubernetes/sessions/{sessionId}`
+   - Method: GET
+   - Response: Session details including commands and chat history
+   
+6. **Get Cluster Health**
+   - Endpoint: `/kubernetes/health/{cluster}`
+   - Method: GET
+   - Response: Cluster health information
+
+### Data Models
+
+```typescript
+export interface JiraTicket {
+  key: string;
+  url: string;
+}
+
+export interface CommandResult {
+  output: string;
+  error?: string;
+  exitCode: number;
+}
+
+export interface DebugSession {
+  id: string;
+  cluster: string;
+  description: string;
+  createdAt: string;
+  jiraTicket: JiraTicket;
+  status: 'active' | 'resolved';
+}
+```
+
+## Documentation Search Integration
+
+### Required API Endpoints
+
+1. **Search Documentation**
+   - Endpoint: `/docs/search`
+   - Method: POST
+   - Request Body: `{ query: string }`
+   - Response: Search results
+   
+2. **Get Document By ID**
+   - Endpoint: `/docs/${id}`
+   - Method: GET
+   - Response: Document details
+   
+3. **Submit Feedback**
+   - Endpoint: `/docs/feedback`
+   - Method: POST
+   - Request Body: `{ documentId: number, helpful: boolean }`
+   - Response: Success confirmation
+   
+4. **Chat with Assistant**
+   - Endpoint: `/docs/chat`
+   - Method: POST
+   - Request Body: `{ message: string }`
+   - Response: Assistant's response
+   
+5. **Get Query History**
+   - Endpoint: `/docs/history`
+   - Method: GET
+   - Response: Query history
+
+### Data Models
+
+```typescript
+export interface DocumentSearchResult {
+  id: number;
+  title: string;
+  snippet: string;
+  url: string;
+  relevance: number;
+}
+
+export interface QueryHistoryItem {
+  id: number;
+  query: string;
+  timestamp: string;
+}
+```
+
+## Dashboard Integration
+
+### Required API Endpoints
+
+1. **Get Dashboard Stats**
+   - Endpoint: `/dashboard/stats`
+   - Method: GET
+   - Response: Dashboard statistics
+
+### Data Models
+
+```typescript
+export interface DashboardStats {
+  clusters: number;
+  groups: number;
+  resolvedIssues: number;
+  docQueries: number;
+  jiraTickets: number;
+}
+```
+
+## Jira Ticket Integration
+
+Jira ticket integration is used across multiple features for tracking access requests and debugging sessions.
+
+### Data Models
+
+```typescript
+export interface JiraTicket {
+  key: string;
+  url: string;
+}
+
+export interface JiraTicketCreationResult {
+  success: boolean;
+  ticket: JiraTicket;
+}
+```
+
+## Sample Backend Implementation
+
+Below is a sample Python implementation using Flask for the required API endpoints:
+
+```python
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import time
+import random
+import string
+import subprocess
+import json
+
+app = Flask(__name__)
+CORS(app)
+
+# In-memory storage for demo purposes
+users = [
+    {"id": 1, "name": "John Doe", "role": "Developer", "avatar": None},
+    {"id": 2, "name": "Jane Smith", "role": "DevOps", "avatar": None},
+    {"id": 3, "name": "Alex Johnson", "role": "Admin", "avatar": None},
+]
+
+groups = [
+    {"id": 1, "name": "Database Admins", "description": "Database administration team"},
+    {"id": 2, "name": "Security Team", "description": "Security operations team"},
+    {"id": 3, "name": "DevOps", "description": "DevOps engineering team"},
+    {"id": 4, "name": "Frontend", "description": "Frontend development team"},
+    {"id": 5, "name": "Backend", "description": "Backend development team"},
+]
+
+user_groups = {
+    1: [{"id": 4, "name": "Frontend", "status": "active"}, 
+        {"id": 3, "name": "DevOps", "status": "pending"}],
+    2: [{"id": 3, "name": "DevOps", "status": "active"}, 
+        {"id": 5, "name": "Backend", "status": "active"}],
+    3: [{"id": 1, "name": "Database Admins", "status": "active"}, 
+        {"id": 2, "name": "Security Team", "status": "active"}],
+}
+
+debug_sessions = []
+doc_queries = []
+
+# Helper to generate a mock Jira ticket
+def create_jira_ticket(summary, description, ticket_type="Task"):
+    key = f"JIRA-{random.randint(1000, 9999)}"
+    return {
+        "key": key,
+        "url": f"https://jira.example.com/browse/{key}"
+    }
+
+# Access Management API
+@app.route('/api/access/users', methods=['GET'])
+def get_users():
+    return jsonify(users)
+
+@app.route('/api/access/users/<int:user_id>/groups', methods=['GET'])
+def get_user_groups(user_id):
+    if user_id in user_groups:
+        return jsonify(user_groups[user_id])
+    return jsonify([])
+
+@app.route('/api/access/request', methods=['POST'])
+def request_access():
+    data = request.json
+    user_id = data.get('userId')
+    service = data.get('service')
+    reason = data.get('reason')
+    
+    # Create a Jira ticket for the access request
+    ticket = create_jira_ticket(
+        f"Access Request: {service}", 
+        f"User {user_id} requested access to {service}. Reason: {reason}"
+    )
+    
+    return jsonify(ticket)
+
+@app.route('/api/access/groups/request', methods=['POST'])
+def request_group_access():
+    data = request.json
+    user_id = data.get('userId')
+    group_id = data.get('groupId')
+    reason = data.get('reason')
+    
+    # Find group name
+    group_name = next((g['name'] for g in groups if g['id'] == group_id), f"Group {group_id}")
+    
+    # Create a Jira ticket for the group access request
+    ticket = create_jira_ticket(
+        f"Group Access Request: {group_name}", 
+        f"User {user_id} requested access to group {group_name}. Reason: {reason}"
+    )
+    
+    # Update user_groups data
+    if user_id in user_groups:
+        if not any(g['id'] == group_id for g in user_groups[user_id]):
+            user_groups[user_id].append({
+                "id": group_id,
+                "name": group_name,
+                "status": "pending"
+            })
+    else:
+        user_groups[user_id] = [{
+            "id": group_id,
+            "name": group_name,
+            "status": "pending"
+        }]
+    
+    return jsonify(ticket)
+
+@app.route('/api/access/users/<int:user_id>', methods=['PUT'])
+def update_access(user_id):
+    data = request.json
+    services = data.get('services', [])
+    
+    # In a real implementation, you would update the user's access here
+    
+    return jsonify({"success": True})
+
+@app.route('/api/access/chat', methods=['POST'])
+def access_chat():
+    data = request.json
+    message = data.get('message')
+    user_id = data.get('userId')
+    
+    # In a real implementation, you would process the message and 
+    # generate a response based on user access requirements
+    
+    if "add me to" in message.lower():
+        group_name = message.lower().split("add me to")[1].strip()
+        response = f"I've created a request to add you to the {group_name} group. A ticket has been created for approval."
+    elif "access" in message.lower():
+        response = "I can help you request access to groups. Please specify which group you need access to."
+    else:
+        response = "I'm your access management assistant. How can I help you today?"
+    
+    return jsonify({"response": response})
+
+# Kubernetes Debugger API
+@app.route('/api/kubernetes/session', methods=['POST'])
+def create_session():
+    data = request.json
+    cluster = data.get('cluster')
+    description = data.get('description')
+    
+    # Create a Jira ticket for the debugging session
+    ticket = create_jira_ticket(
+        f"Kubernetes Debug: {cluster}", 
+        f"Debugging session for cluster {cluster}. Description: {description}",
+        "Bug"
+    )
+    
+    session_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+    
+    session = {
+        "id": session_id,
+        "cluster": cluster,
+        "description": description,
+        "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "jiraTicket": ticket,
+        "status": "active",
+        "commands": [],
+        "messages": []
+    }
+    
+    debug_sessions.append(session)
+    
+    return jsonify(ticket)
+
+@app.route('/api/kubernetes/command', methods=['POST'])
+def run_command():
+    data = request.json
+    cluster = data.get('cluster')
+    command = data.get('command')
+    jira_ticket_key = data.get('jiraTicketKey')
+    
+    # In a real implementation, you would execute the kubectl command here
+    # For demo purposes, we'll simulate command execution
+    
+    if "get pods" in command:
+        output = """NAME                     READY   STATUS    RESTARTS   AGE
+api-gateway-78fd9c8495-r6v89   1/1     Running   0          7d
+db-backup-58694c456-d8j7m      1/1     Running   0          3d
+ui-frontend-7b9d65c89-fk3j8    1/1     Running   2          10d"""
+        exit_code = 0
+    elif "describe pod" in command:
+        output = """Name:         api-gateway-78fd9c8495-r6v89
+Namespace:    default
+Priority:     0
+Node:         worker-node-1/10.0.0.5
+Start Time:   Wed, 19 Apr 2023 12:00:00 +0000
+Labels:       app=api-gateway
+              pod-template-hash=78fd9c8495
+Status:       Running
+IP:           172.16.0.45
+Containers:
+  api-gateway:
+    Container ID:   containerd://a9b8c7d6e5f4g3h2i1j0
+    Image:          company/api-gateway:v1.2.3
+    Image ID:       docker-pullable://company/api-gateway@sha256:a1b2c3d4e5f6
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Wed, 19 Apr 2023 12:00:05 +0000
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      LOG_LEVEL:     info
+      DB_HOST:       postgres-service
+    Mounts:
+      /var/run/secrets from api-secret (ro)
+      /var/run/configmaps from api-config (rw)"""
+        exit_code = 0
+    elif "logs" in command:
+        output = """2023-04-26T08:12:43.456Z INFO  Starting API server
+2023-04-26T08:12:43.789Z INFO  Connected to database
+2023-04-26T08:12:44.123Z INFO  Loaded configuration
+2023-04-26T08:12:44.456Z INFO  Server listening on port 8080
+2023-04-26T08:15:23.789Z ERROR Failed to process request: Invalid token
+2023-04-26T08:15:24.012Z WARN  Authentication failure from IP 192.168.1.105"""
+        exit_code = 0
+    else:
+        output = f"Simulated output for command: {command}"
+        exit_code = 0
+    
+    result = {
+        "output": output,
+        "exitCode": exit_code
+    }
+    
+    # Store the command in the session
+    for session in debug_sessions:
+        if session.get("jiraTicket", {}).get("key") == jira_ticket_key:
+            session["commands"].append({
+                "command": command,
+                "result": result,
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            })
+    
+    return jsonify(result)
+
+@app.route('/api/kubernetes/chat', methods=['POST'])
+def kubernetes_chat():
+    data = request.json
+    cluster = data.get('cluster')
+    message = data.get('message')
+    jira_ticket_key = data.get('jiraTicketKey')
+    
+    # In a real implementation, you would process the message and generate an appropriate response
+    # For demo purposes, we'll provide simulated responses
+    
+    if "pod" in message.lower() and "not starting" in message.lower():
+        response = "The pod might be failing to start due to resource constraints. Let me check the events:\n\n```\nkubectl get events --field-selector involvedObject.name=api-gateway-78fd9c8495-r6v89\n```\n\nIf you see OOMKilled or resource-related events, consider increasing the resource limits."
+    elif "connection" in message.lower() and "database" in message.lower():
+        response = "Let's check the database connectivity. First, verify the service is running:\n\n```\nkubectl get svc postgres-service\n```\n\nThen check if the pod can reach the database:\n\n```\nkubectl exec api-gateway-78fd9c8495-r6v89 -- nc -zv postgres-service 5432\n```"
+    else:
+        response = f"I'll help you debug issues in the {cluster} cluster. Can you provide more details about the problem you're experiencing?"
+    
+    # Store the message in the session
+    for session in debug_sessions:
+        if session.get("jiraTicket", {}).get("key") == jira_ticket_key:
+            session["messages"].append({
+                "message": message,
+                "response": response,
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            })
+    
+    return jsonify({"response": response})
+
+@app.route('/api/kubernetes/sessions', methods=['GET'])
+def get_debug_sessions():
+    # Return a simplified list for the overview
+    simplified_sessions = [
+        {
+            "id": session["id"],
+            "cluster": session["cluster"],
+            "description": session["description"],
+            "createdAt": session["createdAt"],
+            "jiraTicket": session["jiraTicket"],
+            "status": session["status"]
+        }
+        for session in debug_sessions
+    ]
+    return jsonify(simplified_sessions)
+
+@app.route('/api/kubernetes/sessions/<string:session_id>', methods=['GET'])
+def get_session_details(session_id):
+    for session in debug_sessions:
+        if session["id"] == session_id:
+            return jsonify(session)
+    return jsonify({"error": "Session not found"}), 404
+
+@app.route('/api/kubernetes/health/<string:cluster>', methods=['GET'])
+def get_cluster_health(cluster):
+    # In a real implementation, you would query the actual cluster health
+    # For demo purposes, we'll return simulated health data
+    
+    health_data = {
+        "cluster": cluster,
+        "overall_status": "Healthy",
+        "node_count": 3,
+        "pod_count": 28,
+        "memory_usage": "68%",
+        "cpu_usage": "42%",
+        "issues": [
+            {
+                "severity": "Warning",
+                "message": "High memory usage in namespace: monitoring",
+                "affected": "prometheus-server-5b9f6fdb4-xj7k2"
+            }
+        ],
+        "components": [
+            {"name": "API Server", "status": "Healthy"},
+            {"name": "Scheduler", "status": "Healthy"},
+            {"name": "Controller Manager", "status": "Healthy"},
+            {"name": "etcd", "status": "Healthy"}
+        ]
+    }
+    
+    return jsonify(health_data)
+
+# Documentation API
+@app.route('/api/docs/search', methods=['POST'])
+def search_docs():
+    data = request.json
+    query = data.get('query')
+    
+    # In a real implementation, you would search a documentation database
+    # For demo purposes, we'll return simulated search results
+    
+    # Save query to history
+    doc_queries.append({
+        "id": len(doc_queries) + 1,
+        "query": query,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    })
+    
+    results = [
+        {
+            "id": 1,
+            "title": "Kubernetes Pod Troubleshooting",
+            "snippet": "This guide covers common issues with Kubernetes pods and how to troubleshoot them...",
+            "url": "/docs/kubernetes/pod-troubleshooting",
+            "relevance": 0.95
+        },
+        {
+            "id": 2,
+            "title": "Access Control Management",
+            "snippet": "Learn how to manage user access control in the platform...",
+            "url": "/docs/access-control",
+            "relevance": 0.85
+        },
+        {
+            "id": 3,
+            "title": "API Integration Guide",
+            "snippet": "Step by step guide to integrate with our APIs...",
+            "url": "/docs/api-integration",
+            "relevance": 0.75
+        }
+    ]
+    
+    # Filter based on the query (very basic simulation)
+    if "kubernetes" in query.lower():
+        results = [r for r in results if "kubernetes" in r["title"].lower()]
+    elif "access" in query.lower():
+        results = [r for r in results if "access" in r["title"].lower()]
+    
+    return jsonify(results)
+
+@app.route('/api/docs/<int:doc_id>', methods=['GET'])
+def get_document(doc_id):
+    # In a real implementation, you would fetch the document from a database
+    # For demo purposes, we'll return a simulated document
+    
+    documents = {
+        1: {
+            "id": 1,
+            "title": "Kubernetes Pod Troubleshooting",
+            "content": """# Kubernetes Pod Troubleshooting
+            
+## Common Issues
+
+### Pods in Pending State
+Pods might be pending due to insufficient resources. Use `kubectl describe pod` to see events.
+
+### Pods in CrashLoopBackOff
+This happens when a pod repeatedly crashes. Check logs with `kubectl logs`.
+
+### Image Pull Errors
+Verify that the image exists and credentials are correct.
+
+## Debugging Commands
+
+```
+kubectl get pods
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
+kubectl exec -it <pod-name> -- /bin/bash
+```
+""",
+            "url": "/docs/kubernetes/pod-troubleshooting",
+        },
+        2: {
+            "id": 2,
+            "title": "Access Control Management",
+            "content": """# Access Control Management
+
+## Overview
+The Access Control system allows managing user permissions across various groups and services.
+
+## Requesting Access
+Users can request access to specific groups through the UI or API.
+
+## Approval Process
+Access requests generate Jira tickets for approval by group managers.
+
+## API Integration
+See the API documentation for programmatic access management.
+""",
+            "url": "/docs/access-control",
+        }
+    }
+    
+    if doc_id in documents:
+        return jsonify(documents[doc_id])
+    
+    return jsonify({"error": "Document not found"}), 404
+
+@app.route('/api/docs/feedback', methods=['POST'])
+def submit_feedback():
+    data = request.json
+    document_id = data.get('documentId')
+    helpful = data.get('helpful')
+    
+    # In a real implementation, you would store this feedback
+    
+    return jsonify({"success": True})
+
+@app.route('/api/docs/chat', methods=['POST'])
+def docs_chat():
+    data = request.json
+    message = data.get('message')
+    
+    # In a real implementation, you would process the message and generate a response
+    # based on documentation content
+    
+    if "kubernetes" in message.lower():
+        response = "For Kubernetes issues, you might want to check our Kubernetes troubleshooting guide. It covers common problems with pods, deployments, and services."
+    elif "access" in message.lower():
+        response = "Our Access Control documentation explains how to request access to groups and services. Each request creates a Jira ticket for approval."
+    else:
+        response = "I can help you find information in our documentation. What topic are you interested in?"
+    
+    return jsonify({"response": response})
+
+@app.route('/api/docs/history', methods=['GET'])
+def get_query_history():
+    return jsonify(doc_queries)
+
+# Dashboard API
+@app.route('/api/dashboard/stats', methods=['GET'])
+def get_dashboard_stats():
+    stats = {
+        "clusters": 4,
+        "groups": len(groups),
+        "resolvedIssues": 128,
+        "docQueries": len(doc_queries),
+        "jiraTickets": 42
+    }
+    return jsonify(stats)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000, debug=True)
+```
+
+### Running the Backend
+
+1. Save the code above to a file named `app.py`
+2. Install the required packages:
+   ```
+   pip install flask flask-cors
+   ```
+3. Run the Flask application:
+   ```
+   python app.py
+   ```
+4. The API will be available at `http://localhost:8000/api/`
+
+## Frontend Integration
+
+To connect the frontend to your backend API:
+
+1. Set the environment variable in your `.env` file:
+   ```
+   VITE_API_BASE_URL=http://localhost:8000/api
+   ```
+
+2. Start your frontend application:
+   ```
+   npm run dev
+   ```
+
+3. The frontend will now communicate with your backend API.
+
+## Troubleshooting
+
+If you encounter issues with the API integration:
+
+1. **CORS Errors**: Ensure your backend has proper CORS headers. The sample implementation includes CORS handling with Flask-CORS.
+
+2. **API Endpoint Mismatch**: Verify that the API endpoints in your backend match those expected by the frontend. Check the `src/services/api.ts` file for the expected endpoints.
+
+3. **Authentication**: The current implementation doesn't include authentication. For a production environment, you should implement proper authentication and authorization.
+
+4. **Environment Variables**: Make sure your environment variables are properly loaded. Vite uses the `import.meta.env` syntax to access environment variables.
+
+For further assistance, refer to the API documentation or contact the development team.

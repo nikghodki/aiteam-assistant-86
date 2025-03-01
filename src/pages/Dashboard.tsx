@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Server, Database, Terminal, Search, RefreshCcw, Users, FileText, AlertCircle, Link } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -11,16 +10,22 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
+interface DashboardStats {
+  clusters: number;
+  groups: number;
+  resolvedIssues: number;
+  docQueries: number;
+  jiraTickets: number;
+}
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   
-  // Stats data from API
-  const { data: dashboardStats, isLoading: isLoadingStats, refetch: refetchStats } = useQuery({
+  const { data: dashboardStats, isLoading: isLoadingStats, refetch: refetchStats } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      // This would be a real API call in production
-      return new Promise((resolve) => {
+      return new Promise<DashboardStats>((resolve) => {
         setTimeout(() => {
           resolve({
             clusters: 4,
@@ -35,7 +40,6 @@ const Dashboard = () => {
     staleTime: 60000,
   });
   
-  // Format the stats for display
   const stats = [
     { label: 'Active Clusters', value: dashboardStats?.clusters || '—', icon: Server, color: 'text-primary' },
     { label: 'Groups Memberships', value: dashboardStats?.groups || '—', icon: Users, color: 'text-green-500' },
@@ -44,7 +48,6 @@ const Dashboard = () => {
     { label: 'Jira Tickets', value: dashboardStats?.jiraTickets || '—', icon: Link, color: 'text-blue-500' },
   ];
 
-  // Recent activities
   const recentActivities = [
     { type: 'access', message: 'Your access request to Security Team was approved', time: '2 hours ago' },
     { type: 'kubernetes', message: 'Debugging session OPS-127 was created', time: '1 day ago' },
@@ -53,7 +56,6 @@ const Dashboard = () => {
     { type: 'kubernetes', message: 'Issue with prod-api-gateway-78fd9 was resolved', time: '5 days ago' },
   ];
 
-  // Navigate to feature pages
   const navigateTo = (path: string) => {
     navigate(path);
   };
@@ -64,7 +66,6 @@ const Dashboard = () => {
       
       <main className="flex-grow pt-24 pb-16 px-6">
         <div className="max-w-7xl mx-auto space-y-8">
-          {/* Dashboard Header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -82,7 +83,6 @@ const Dashboard = () => {
             </button>
           </div>
           
-          {/* Stats Overview */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
             {stats.map((stat, index) => (
               <GlassMorphicCard key={index} className="p-5">
@@ -99,9 +99,7 @@ const Dashboard = () => {
             ))}
           </div>
           
-          {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Feature Cards */}
             <GlassMorphicCard className="lg:col-span-2">
               <div className="p-5 border-b">
                 <h3 className="text-lg font-medium">Platform Features</h3>
@@ -155,7 +153,6 @@ const Dashboard = () => {
               </div>
             </GlassMorphicCard>
             
-            {/* Recent Activities */}
             <GlassMorphicCard className="h-full">
               <div className="p-5 border-b">
                 <h3 className="text-lg font-medium">Recent Activities</h3>
@@ -190,7 +187,6 @@ const Dashboard = () => {
             </GlassMorphicCard>
           </div>
           
-          {/* System Status */}
           <GlassMorphicCard>
             <div className="p-5 border-b">
               <h3 className="text-lg font-medium">System Status</h3>
