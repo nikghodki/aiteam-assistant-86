@@ -6,12 +6,14 @@ interface GlassMorphicCardProps {
   children: React.ReactNode;
   className?: string;
   hoverEffect?: boolean;
+  style?: React.CSSProperties;
 }
 
 const GlassMorphicCard = ({ 
   children, 
   className, 
-  hoverEffect = true 
+  hoverEffect = true,
+  style
 }: GlassMorphicCardProps) => {
   return (
     <div 
@@ -20,6 +22,7 @@ const GlassMorphicCard = ({
         hoverEffect && "hover-scale",
         className
       )}
+      style={style}
     >
       {children}
     </div>
