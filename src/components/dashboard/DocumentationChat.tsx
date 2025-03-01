@@ -18,6 +18,31 @@ interface DocumentationChatProps {
   showInline?: boolean;
 }
 
+// Helper function to format message content
+const formatMessageContent = (content: string) => {
+  // Format numbered lists (e.g., 1. Item, 2. Item)
+  content = content.replace(/(\d+)\.\s(.*?)(?=\n\d+\.|\n\n|$)/gs, '<li>$1. $2</li>');
+  if (content.includes('<li>')) {
+    content = '<ol>' + content + '</ol>';
+    // Clean up any newlines between list items
+    content = content.replace(/<\/li>\n+<li>/g, '</li><li>');
+  }
+  
+  // Format code/commands (text between backticks)
+  content = content.replace(/`([^`]+)`/g, '<code class="bg-muted p-1 rounded text-xs font-mono">$1</code>');
+  
+  // Format code blocks (text between triple backticks)
+  content = content.replace(/```([\s\S]*?)```/g, '<pre class="bg-muted p-3 rounded text-xs font-mono overflow-x-auto my-2">$1</pre>');
+  
+  // Format links
+  content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary underline" target="_blank" rel="noopener noreferrer">$1</a>');
+  
+  // Convert newlines to <br>
+  content = content.replace(/\n/g, '<br>');
+  
+  return content;
+};
+
 const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -148,7 +173,11 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
                     ? "bg-primary text-primary-foreground rounded-tr-none" 
                     : "bg-muted rounded-tl-none"
                 )}>
-                  {message.content}
+                  {message.sender === 'assistant' ? (
+                    <div dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }} />
+                  ) : (
+                    message.content
+                  )}
                 </div>
                 
                 {message.sender === 'user' && (
@@ -271,7 +300,11 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
                       ? "bg-primary text-primary-foreground rounded-tr-none" 
                       : "bg-muted rounded-tl-none"
                   )}>
-                    {message.content}
+                    {message.sender === 'assistant' ? (
+                      <div dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }} />
+                    ) : (
+                      message.content
+                    )}
                   </div>
                   
                   {message.sender === 'user' && (
