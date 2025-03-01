@@ -2,6 +2,7 @@
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import DocumentationSearch from '@/components/dashboard/DocumentationSearch';
+import DocumentationChat from '@/components/dashboard/DocumentationChat';
 
 const Documentation = () => {
   return (
@@ -24,6 +25,9 @@ const Documentation = () => {
       </main>
       
       <Footer />
+      
+      {/* Chat interface */}
+      <DocumentationChat />
     </div>
   );
 };
