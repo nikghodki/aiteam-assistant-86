@@ -6,7 +6,7 @@ import { toast } from '@/components/ui/use-toast';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, getOIDCConfig } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,6 +37,13 @@ const AuthCallback = () => {
           return;
         }
         
+        // Get the provider config
+        const config = getOIDCConfig(provider);
+        
+        if (!config) {
+          throw new Error(`Provider ${provider} configuration not found`);
+        }
+        
         // In a real implementation, you would:
         // 1. Send the code to your backend
         // 2. Backend would exchange it for tokens
@@ -65,7 +72,7 @@ const AuthCallback = () => {
     };
     
     handleCallback();
-  }, [navigate, login]);
+  }, [navigate, login, getOIDCConfig]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-white to-professional-gray-light/50">

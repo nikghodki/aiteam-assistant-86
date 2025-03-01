@@ -10,6 +10,15 @@ export interface User {
   authenticated: boolean;
 }
 
+export interface OIDCConfig {
+  clientId: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  redirectUri: string;
+  scope: string;
+  responseType: string;
+}
+
 // Mock user for demonstration
 const mockUser: User = {
   id: '1',
@@ -24,6 +33,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   loginWithOIDC: (provider: string) => void;
+  saveOIDCConfig: (provider: string, config: OIDCConfig) => void;
+  getOIDCConfig: (provider: string) => OIDCConfig | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,30 +83,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const saveOIDCConfig = (provider: string, config: OIDCConfig) => {
+    localStorage.setItem(`oidc_config_${provider}`, JSON.stringify(config));
+  };
+
+  const getOIDCConfig = (provider: string): OIDCConfig | null => {
+    const config = localStorage.getItem(`oidc_config_${provider}`);
+    return config ? JSON.parse(config) : null;
+  };
+
   const loginWithOIDC = (provider: string) => {
     setIsLoading(true);
     
-    // Construct the OIDC authorization URL
-    // In a real implementation, these would come from configuration
-    const oidcConfig = {
-      google: {
-        clientId: 'your-google-client-id',
-        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-        redirectUri: `${window.location.origin}/auth/callback`,
-        scope: 'openid profile email',
-      },
-      azure: {
-        clientId: 'your-azure-client-id',
-        authorizationEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
-        redirectUri: `${window.location.origin}/auth/callback`,
-        scope: 'openid profile email',
-      }
-    };
+    // Get the stored configuration for this provider
+    const config = getOIDCConfig(provider);
     
-    const config = oidcConfig[provider as keyof typeof oidcConfig];
-    
-    if (!config) {
-      console.error(`Provider ${provider} not supported`);
+    if (!config || !config.clientId) {
+      console.error(`Provider ${provider} not configured properly`);
       setIsLoading(false);
       return;
     }
@@ -107,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const authUrl = new URL(config.authorizationEndpoint);
     authUrl.searchParams.append('client_id', config.clientId);
     authUrl.searchParams.append('redirect_uri', config.redirectUri);
-    authUrl.searchParams.append('response_type', 'code');
+    authUrl.searchParams.append('response_type', config.responseType);
     authUrl.searchParams.append('scope', config.scope);
     authUrl.searchParams.append('state', crypto.randomUUID());
     
@@ -122,7 +126,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, loginWithOIDC }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      isLoading, 
+      login, 
+      logout, 
+      loginWithOIDC,
+      saveOIDCConfig,
+      getOIDCConfig
+    }}>
       {children}
     </AuthContext.Provider>
   );
