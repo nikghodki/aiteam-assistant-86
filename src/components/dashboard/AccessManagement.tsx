@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Users, Lock, Key, Check, X, Link as LinkIcon, ExternalLink, AlertCircle, Send, UserCheck, Shield, Clock, XCircle } from 'lucide-react';
+import { Users, Lock, Key, Check, X, Link as LinkIcon, ExternalLink, AlertCircle, Send, UserCheck, Shield, Clock, XCircle, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +22,7 @@ const AccessManagement = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [message, setMessage] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([
     { role: 'assistant', content: 'How can I help you with access management today?' }
   ]);
@@ -83,6 +84,12 @@ const AccessManagement = () => {
     setMessage('');
   };
 
+  // Filter groups based on search query
+  const filteredGroups = groups?.filter(group => 
+    group.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    group.description.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'member':
@@ -125,8 +132,22 @@ const AccessManagement = () => {
           <h3 className="font-medium">My Group Memberships</h3>
         </div>
         
+        {/* Search bar */}
+        <div className="relative mb-4">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search size={16} className="text-gray-400" />
+          </div>
+          <Input 
+            type="text"
+            placeholder="Search groups..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        
         <div className="space-y-2 max-h-[calc(100vh-240px)] overflow-y-auto pr-1">
-          {(groups || []).map(group => (
+          {filteredGroups.map(group => (
             <div 
               key={group.id}
               className="flex flex-col p-3 rounded-md transition-colors cursor-pointer hover:bg-secondary"
@@ -140,10 +161,12 @@ const AccessManagement = () => {
             </div>
           ))}
           
-          {(groups || []).length === 0 && !isLoadingGroups && (
+          {filteredGroups.length === 0 && !isLoadingGroups && (
             <div className="text-center py-8">
               <AlertCircle size={24} className="mx-auto text-muted-foreground/50 mb-2" />
-              <p className="text-muted-foreground text-sm">No groups found</p>
+              <p className="text-muted-foreground text-sm">
+                {searchQuery ? "No matching groups found" : "No groups found"}
+              </p>
             </div>
           )}
           
