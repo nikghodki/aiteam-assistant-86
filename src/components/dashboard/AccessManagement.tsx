@@ -33,24 +33,7 @@ const AccessManagement = () => {
   // Fetch groups data for the current user
   const { data: groups, isLoading: isLoadingGroups, refetch } = useQuery({
     queryKey: ['user-groups', user.name],
-    queryFn: async () => {
-      // In a real app, use the API
-      // return accessApi.getUserGroups(user.name);
-      
-      // For now, use mock data
-      return new Promise<Group[]>((resolve) => {
-        setTimeout(() => {
-          resolve([
-            { id: 1, name: 'Infrastructure Team', description: 'Core infrastructure management and planning', status: 'member', members: 12 },
-            { id: 2, name: 'Database Admins', description: 'Database administration and optimization', status: 'none', members: 8 },
-            { id: 3, name: 'Security Team', description: 'Security operations and compliance', status: 'pending', members: 15 },
-            { id: 4, name: 'Cloud Platform', description: 'Cloud infrastructure and services', status: 'member', members: 20 },
-            { id: 5, name: 'Networking', description: 'Network architecture and operations', status: 'rejected', members: 10 },
-            { id: 6, name: 'Monitoring', description: 'Systems monitoring and alerting', status: 'none', members: 7 },
-          ]);
-        }, 700);
-      });
-    },
+    queryFn: () => accessApi.getUserGroups(user.name),
   });
 
   // Chat mutation
@@ -76,15 +59,7 @@ const AccessManagement = () => {
   // Leave group mutation
   const leaveGroupMutation = useMutation({
     mutationFn: (groupId: number) => {
-      // In a real app, call the API 
-      // return accessApi.leaveGroup(groupId, user.name);
-      
-      // For now, simulate API call
-      return new Promise<{ success: boolean }>((resolve) => {
-        setTimeout(() => {
-          resolve({ success: true });
-        }, 500);
-      });
+      return accessApi.leaveGroup(groupId, user.name);
     },
     onSuccess: () => {
       toast({

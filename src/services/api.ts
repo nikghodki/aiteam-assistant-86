@@ -78,6 +78,13 @@ export const accessApi = {
       body: JSON.stringify({ groupId, reason, userName }),
     }),
 
+  // Leave a group
+  leaveGroup: (groupId: number, userName: string) => 
+    apiCall<{ success: boolean }>('/access/groups/leave', {
+      method: 'POST',
+      body: JSON.stringify({ groupId, userName }),
+    }),
+
   // Chat with the assistant
   chatWithAssistant: (message: string, userName: string) => 
     apiCall<ChatResponse>('/access/chat', {
@@ -158,7 +165,7 @@ export const kubernetesApi = {
 export const getUserInfo = (): User => {
   return {
     id: '1',
-    name: 'Demo User',
-    email: 'demo@example.com',
+    name: 'nghodki',
+    email: 'nghodki@cisco.com',
   };
 };

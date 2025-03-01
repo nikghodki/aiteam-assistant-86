@@ -12,8 +12,8 @@ export interface User {
 // Mock user for demonstration
 const mockUser: User = {
   id: '1',
-  name: 'Demo User',
-  email: 'demo@example.com',
+  name: 'nghodki',
+  email: 'nghodki@cisco.com',
 };
 
 interface AuthContextType {
