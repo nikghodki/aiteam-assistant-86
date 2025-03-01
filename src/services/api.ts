@@ -23,8 +23,7 @@ export interface JiraTicket {
 }
 
 export interface AccessRequest {
-  userId: number;
-  service: string;
+  groupId: number;
   reason: string;
 }
 
@@ -66,13 +65,6 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
 export const accessApi = {
   // Get user groups
   getUserGroups: () => apiCall<any[]>('/access/groups'),
-
-  // Request access to a service
-  requestAccess: (service: string, reason: string) => 
-    apiCall<JiraTicket>('/access/request', {
-      method: 'POST',
-      body: JSON.stringify({ service, reason }),
-    }),
 
   // Request access to a group
   requestGroupAccess: (groupId: number, reason: string) => 

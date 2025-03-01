@@ -67,61 +67,37 @@ This function handles adding default headers, error handling, and JSON parsing f
 
 The Access Management feature requires the following API endpoints:
 
-1. **Get Users**
-   - Endpoint: `/access/users`
+1. **Get User Groups**
+   - Endpoint: `/access/groups`
    - Method: GET
-   - Response: Array of users with their access information
-   
-2. **Get User Groups**
-   - Endpoint: `/access/users/{userId}/groups`
-   - Method: GET
-   - Response: Array of groups the user is a member of
-   
-3. **Request Access**
-   - Endpoint: `/access/request`
-   - Method: POST
-   - Request Body: `{ userId: number, service: string, reason: string }`
-   - Response: Jira ticket information
-   
-4. **Request Group Access**
+   - Response: Array of groups with their access information
+
+2. **Request Group Access**
    - Endpoint: `/access/groups/request`
    - Method: POST
-   - Request Body: `{ userId: number, groupId: number, reason: string }`
+   - Request Body: `{ groupId: number, reason: string }`
    - Response: Jira ticket information
-   
-5. **Update Access**
-   - Endpoint: `/access/users/{userId}`
-   - Method: PUT
-   - Request Body: `{ services: string[] }`
-   - Response: Success confirmation
-   
-6. **Chat with Assistant**
+
+3. **Chat with Assistant**
    - Endpoint: `/access/chat`
    - Method: POST
-   - Request Body: `{ message: string, userId: number }`
+   - Request Body: `{ message: string }`
    - Response: Assistant's response
 
 ### Data Models
 
 ```typescript
-export interface UserAccess {
-  id: number;
-  name: string;
-  role: string;
-  avatar?: string;
-}
-
-export interface GroupAccess {
+export interface Group {
   id: number;
   name: string;
   description: string;
-  status: 'active' | 'pending' | 'rejected';
+  status: 'member' | 'pending' | 'rejected' | 'none';
+  members: number;
 }
 
-export interface AccessRequest {
-  userId: number;
-  service: string;
-  reason: string;
+export interface JiraTicket {
+  key: string;
+  url: string;
 }
 
 export interface ChatResponse {
@@ -296,28 +272,13 @@ app = Flask(__name__)
 CORS(app)
 
 # In-memory storage for demo purposes
-users = [
-    {"id": 1, "name": "John Doe", "role": "Developer", "avatar": None},
-    {"id": 2, "name": "Jane Smith", "role": "DevOps", "avatar": None},
-    {"id": 3, "name": "Alex Johnson", "role": "Admin", "avatar": None},
-]
-
 groups = [
-    {"id": 1, "name": "Database Admins", "description": "Database administration team"},
-    {"id": 2, "name": "Security Team", "description": "Security operations team"},
-    {"id": 3, "name": "DevOps", "description": "DevOps engineering team"},
-    {"id": 4, "name": "Frontend", "description": "Frontend development team"},
-    {"id": 5, "name": "Backend", "description": "Backend development team"},
+    {"id": 1, "name": "Database Admins", "description": "Database administration team", "status": "none", "members": 8},
+    {"id": 2, "name": "Security Team", "description": "Security operations team", "status": "pending", "members": 15},
+    {"id": 3, "name": "DevOps", "description": "DevOps engineering team", "status": "member", "members": 20},
+    {"id": 4, "name": "Frontend", "description": "Frontend development team", "status": "member", "members": 12},
+    {"id": 5, "name": "Backend", "description": "Backend development team", "status": "none", "members": 7},
 ]
-
-user_groups = {
-    1: [{"id": 4, "name": "Frontend", "status": "active"}, 
-        {"id": 3, "name": "DevOps", "status": "pending"}],
-    2: [{"id": 3, "name": "DevOps", "status": "active"}, 
-        {"id": 5, "name": "Backend", "status": "active"}],
-    3: [{"id": 1, "name": "Database Admins", "status": "active"}, 
-        {"id": 2, "name": "Security Team", "status": "active"}],
-}
 
 debug_sessions = []
 doc_queries = []
@@ -331,35 +292,13 @@ def create_jira_ticket(summary, description, ticket_type="Task"):
     }
 
 # Access Management API
-@app.route('/api/access/users', methods=['GET'])
-def get_users():
-    return jsonify(users)
-
-@app.route('/api/access/users/<int:user_id>/groups', methods=['GET'])
-def get_user_groups(user_id):
-    if user_id in user_groups:
-        return jsonify(user_groups[user_id])
-    return jsonify([])
-
-@app.route('/api/access/request', methods=['POST'])
-def request_access():
-    data = request.json
-    user_id = data.get('userId')
-    service = data.get('service')
-    reason = data.get('reason')
-    
-    # Create a Jira ticket for the access request
-    ticket = create_jira_ticket(
-        f"Access Request: {service}", 
-        f"User {user_id} requested access to {service}. Reason: {reason}"
-    )
-    
-    return jsonify(ticket)
+@app.route('/api/access/groups', methods=['GET'])
+def get_user_groups():
+    return jsonify(groups)
 
 @app.route('/api/access/groups/request', methods=['POST'])
 def request_group_access():
     data = request.json
-    user_id = data.get('userId')
     group_id = data.get('groupId')
     reason = data.get('reason')
     
@@ -369,40 +308,21 @@ def request_group_access():
     # Create a Jira ticket for the group access request
     ticket = create_jira_ticket(
         f"Group Access Request: {group_name}", 
-        f"User {user_id} requested access to group {group_name}. Reason: {reason}"
+        f"User requested access to group {group_name}. Reason: {reason}"
     )
     
-    # Update user_groups data
-    if user_id in user_groups:
-        if not any(g['id'] == group_id for g in user_groups[user_id]):
-            user_groups[user_id].append({
-                "id": group_id,
-                "name": group_name,
-                "status": "pending"
-            })
-    else:
-        user_groups[user_id] = [{
-            "id": group_id,
-            "name": group_name,
-            "status": "pending"
-        }]
+    # Update group status to pending
+    for group in groups:
+        if group['id'] == group_id:
+            group['status'] = 'pending'
+            break
     
     return jsonify(ticket)
-
-@app.route('/api/access/users/<int:user_id>', methods=['PUT'])
-def update_access(user_id):
-    data = request.json
-    services = data.get('services', [])
-    
-    # In a real implementation, you would update the user's access here
-    
-    return jsonify({"success": True})
 
 @app.route('/api/access/chat', methods=['POST'])
 def access_chat():
     data = request.json
     message = data.get('message')
-    user_id = data.get('userId')
     
     # In a real implementation, you would process the message and 
     # generate a response based on user access requirements
@@ -791,8 +711,6 @@ If you encounter issues with the API integration:
 
 2. **API Endpoint Mismatch**: Verify that the API endpoints in your backend match those expected by the frontend. Check the `src/services/api.ts` file for the expected endpoints.
 
-3. **Authentication**: The current implementation doesn't include authentication. For a production environment, you should implement proper authentication and authorization.
-
-4. **Environment Variables**: Make sure your environment variables are properly loaded. Vite uses the `import.meta.env` syntax to access environment variables.
+3. **Environment Variables**: Make sure your environment variables are properly loaded. Vite uses the `import.meta.env` syntax to access environment variables.
 
 For further assistance, refer to the API documentation or contact the development team.
