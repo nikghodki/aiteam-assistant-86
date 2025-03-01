@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Server, Database, Terminal, Search, RefreshCcw, Users, FileText, AlertCircle, Link } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -138,6 +137,21 @@ const Dashboard = () => {
                   <p className="text-xs text-muted-foreground mb-3">Search documentation and get instant answers</p>
                   <div className="mt-auto flex justify-between text-xs text-muted-foreground">
                     <span>{dashboardStats?.docQueries || '—'} queries</span>
+                    <span className="text-primary">View →</span>
+                  </div>
+                </div>
+                
+                <div 
+                  className="border rounded-md p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer flex flex-col hover-scale"
+                  onClick={() => navigateTo('/jira')}
+                >
+                  <div className="w-10 h-10 rounded-md bg-blue-50 flex items-center justify-center mb-3">
+                    <Link size={20} className="text-blue-600" />
+                  </div>
+                  <h4 className="font-medium mb-1">Jira Ticket Creation</h4>
+                  <p className="text-xs text-muted-foreground mb-3">Create and manage Jira tickets with AI assistance</p>
+                  <div className="mt-auto flex justify-between text-xs text-muted-foreground">
+                    <span>{dashboardStats?.jiraTickets || '—'} tickets</span>
                     <span className="text-primary">View →</span>
                   </div>
                 </div>
