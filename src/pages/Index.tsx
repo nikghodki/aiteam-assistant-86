@@ -1,11 +1,9 @@
-
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Terminal, Database, Server, Search, ArrowRight } from 'lucide-react';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
 import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import GlassMorphicCard from '@/components/ui/GlassMorphicCard';
+import { Layout } from '@/components/layout/Layout';
 
 const features = [
   {
@@ -47,11 +45,9 @@ const Index = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      
+    <Layout>
       {/* Hero Section */}
-      <section className="pt-28 pb-16 md:pt-36 md:pb-24 px-6 relative overflow-hidden">
+      <section className="pt-8 pb-16 md:pt-12 md:pb-24 relative overflow-hidden">
         <div 
           id="hero-bg" 
           className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent -z-10"
@@ -186,9 +182,7 @@ const Index = () => {
           </GlassMorphicCard>
         </div>
       </section>
-      
-      <Footer />
-    </div>
+    </Layout>
   );
 };
 
