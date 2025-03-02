@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { oidcApi } from '@/services/api';
 
 // Simplified user model with authentication support
 export interface User {
@@ -83,11 +84,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const saveOIDCConfig = (provider: string, config: OIDCConfig) => {
+  const saveOIDCConfig = async (provider: string, config: OIDCConfig) => {
+    // Save to localStorage for backward compatibility
     localStorage.setItem(`oidc_config_${provider}`, JSON.stringify(config));
+    
+    // Also save to our API
+    try {
+      await oidcApi.saveConfig(provider, config);
+    } catch (error) {
+      console.error('Error saving OIDC config to API:', error);
+      // Continue with local storage anyway
+    }
   };
 
   const getOIDCConfig = (provider: string): OIDCConfig | null => {
+    // Try to get from API first (not implemented here since it would be async)
+    // For simplicity, we'll stick with localStorage for now
     const config = localStorage.getItem(`oidc_config_${provider}`);
     return config ? JSON.parse(config) : null;
   };

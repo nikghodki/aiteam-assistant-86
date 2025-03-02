@@ -1,6 +1,6 @@
 # AI Team Assistant - API Integration Guide
 
-This document provides step-by-step instructions for integrating the frontend application with your backend API services. It covers the configuration and implementation for each feature of the application: Access Management, Kubernetes Debugging, Documentation Search, and Jira Ticket Management.
+This document provides step-by-step instructions for integrating the frontend application with your backend API services. It covers the configuration and implementation for each feature of the application: Access Management, Kubernetes Debugging, Documentation Search, Jira Ticket Management, OIDC Authentication, and Sample Backend Implementation.
 
 ## Table of Contents
 
@@ -10,7 +10,8 @@ This document provides step-by-step instructions for integrating the frontend ap
 4. [Documentation Search Integration](#documentation-search-integration)
 5. [Dashboard Integration](#dashboard-integration)
 6. [Jira Ticket Integration](#jira-ticket-integration)
-7. [Sample Backend Implementation](#sample-backend-implementation)
+7. [OIDC Authentication Integration](#oidc-authentication-integration)
+8. [Sample Backend Implementation](#sample-backend-implementation)
 
 ## API Configuration
 
@@ -333,6 +334,128 @@ const sendChatMessage = async (message: string) => {
     addMessage('assistant', response.response);
   } catch (error) {
     console.error('Failed to get response:', error);
+  }
+};
+```
+
+## OIDC Authentication Integration
+
+The OIDC (OpenID Connect) authentication integration allows users to configure and authenticate with various identity providers using the OpenID Connect protocol.
+
+### Required API Endpoints
+
+1. **Save OIDC Configuration**
+   - Endpoint: `/oidc/config`
+   - Method: POST
+   - Request Body: `{ provider: string, config: OIDCConfig }`
+   - Response: `{ success: boolean }`
+
+2. **Get OIDC Configuration**
+   - Endpoint: `/oidc/config/{provider}`
+   - Method: GET
+   - Response: OIDC configuration for the specified provider
+
+3. **Process OIDC Callback**
+   - Endpoint: `/oidc/callback`
+   - Method: POST
+   - Request Body: `{ provider: string, code: string, state: string }`
+   - Response: Authentication result including user information
+
+4. **List Available Providers**
+   - Endpoint: `/oidc/providers`
+   - Method: GET
+   - Response: List of configured OIDC provider names
+
+### Data Models
+
+```typescript
+export interface OIDCConfig {
+  clientId: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  redirectUri: string;
+  scope: string;
+  responseType: string;
+}
+
+export interface OIDCAuthResult {
+  success: boolean;
+  user?: User;
+  error?: string;
+}
+```
+
+### Implementation Example
+
+```typescript
+// Example of configuring an OIDC provider
+const handleSaveConfig = async () => {
+  try {
+    const config: OIDCConfig = {
+      clientId: 'your-client-id',
+      authorizationEndpoint: 'https://provider.com/authorize',
+      tokenEndpoint: 'https://provider.com/token',
+      redirectUri: `${window.location.origin}/auth/callback`,
+      scope: 'openid profile email',
+      responseType: 'code'
+    };
+    
+    await oidcApi.saveConfig('provider-name', config);
+    console.log('OIDC configuration saved successfully');
+  } catch (error) {
+    console.error('Failed to save OIDC configuration:', error);
+  }
+};
+
+// Example of initiating OIDC authentication
+const handleLogin = () => {
+  const provider = 'google'; // or 'azure', 'custom', etc.
+  
+  // Store the provider for use in the callback
+  sessionStorage.setItem('oidc_provider', provider);
+  
+  // Get the provider configuration
+  const config = await oidcApi.getConfig(provider);
+  
+  if (!config) {
+    console.error('Provider not configured');
+    return;
+  }
+  
+  // Construct and redirect to authorization URL
+  const authUrl = new URL(config.authorizationEndpoint);
+  authUrl.searchParams.append('client_id', config.clientId);
+  authUrl.searchParams.append('redirect_uri', config.redirectUri);
+  authUrl.searchParams.append('response_type', config.responseType);
+  authUrl.searchParams.append('scope', config.scope);
+  authUrl.searchParams.append('state', crypto.randomUUID());
+  
+  window.location.href = authUrl.toString();
+};
+
+// Example of processing the OIDC callback
+const handleCallback = async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+  const state = urlParams.get('state');
+  const provider = sessionStorage.getItem('oidc_provider');
+  
+  if (!code || !state || !provider) {
+    console.error('Missing required parameters');
+    return;
+  }
+  
+  try {
+    const result = await oidcApi.processCallback(provider, code, state);
+    
+    if (result.success && result.user) {
+      console.log('Authentication successful:', result.user);
+      // Update application state with authenticated user
+    } else {
+      console.error('Authentication failed:', result.error);
+    }
+  } catch (error) {
+    console.error('Error processing callback:', error);
   }
 };
 ```
@@ -865,6 +988,80 @@ def jira_chat():
         response = "I'm your Jira ticket assistant. I can help you create tickets, check their status, assign them to team members, and more. How can I assist you today?"
     
     return jsonify({"response": response})
+
+# OIDC API configurations
+oidc_configs = {}
+
+# OIDC API endpoints
+@app.route('/api/oidc/config', methods=['POST'])
+def save_oidc_config():
+    data = request.json
+    provider = data.get('provider')
+    config = data.get('config')
+    
+    if not provider or not config:
+        return jsonify({"error": "Missing provider or configuration"}), 400
+    
+    # Validate the configuration (basic validation)
+    required_fields = ['clientId', 'authorizationEndpoint', 'tokenEndpoint', 'redirectUri', 'scope', 'responseType']
+    for field in required_fields:
+        if field not in config:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
+    
+    # Save the configuration
+    oidc_configs[provider] = config
+    
+    return jsonify({"success": True})
+
+@app.route('/api/oidc/config/<string:provider>', methods=['GET'])
+def get_oidc_config(provider):
+    if provider not in oidc_configs:
+        return jsonify({"error": "Provider configuration not found"}), 404
+    
+    return jsonify(oidc_configs[provider])
+
+@app.route('/api/oidc/providers', methods=['GET'])
+def list_oidc_providers():
+    return jsonify(list(oidc_configs.keys()))
+
+@app.route('/api/oidc/callback', methods=['POST'])
+def process_oidc_callback():
+    data = request.json
+    provider = data.get('provider')
+    code = data.get('code')
+    state = data.get('state')
+    
+    if not provider or not code or not state:
+        return jsonify({
+            "success": False,
+            "error": "Missing required parameters"
+        }), 400
+    
+    if provider not in oidc_configs:
+        return jsonify({
+            "success": False,
+            "error": f"Provider {provider} not configured"
+        }), 400
+    
+    # In a real implementation, you would:
+    # 1. Exchange the authorization code for tokens using the token endpoint
+    # 2. Validate the tokens (signature, expiration, etc.)
+    # 3. Extract user information from the tokens or userinfo endpoint
+    # 4. Create or update the user in your system
+    
+    # For this demo, we'll simulate a successful authentication
+    mock_user = {
+        "id": f"{provider}-user-123",
+        "name": f"Test User ({provider})",
+        "email": f"user@{provider}.example.com",
+        "photoUrl": "https://i.pravatar.cc/150?u=test",
+        "authenticated": True
+    }
+    
+    return jsonify({
+        "success": True,
+        "user": mock_user
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Card, 
@@ -16,15 +16,8 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/use-toast';
-
-interface OIDCConfig {
-  clientId: string;
-  authorizationEndpoint: string;
-  tokenEndpoint: string;
-  redirectUri: string;
-  scope: string;
-  responseType: string;
-}
+import { oidcApi, OIDCConfig } from '@/services/api';
+import { Loader2 } from 'lucide-react';
 
 const defaultConfig: Record<string, OIDCConfig> = {
   google: {
@@ -54,19 +47,46 @@ const defaultConfig: Record<string, OIDCConfig> = {
 };
 
 const Settings = () => {
-  const { saveOIDCConfig, getOIDCConfig } = useAuth();
+  const { saveOIDCConfig } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('google');
-  const [configs, setConfigs] = useState<Record<string, OIDCConfig>>(() => {
-    // Initialize configs from stored values or defaults
-    const storedConfigs = {
-      google: getOIDCConfig('google') || defaultConfig.google,
-      azure: getOIDCConfig('azure') || defaultConfig.azure,
-      custom: getOIDCConfig('custom') || defaultConfig.custom
+  const [configs, setConfigs] = useState<Record<string, OIDCConfig>>(defaultConfig);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchConfigs = async () => {
+      setLoading(true);
+      try {
+        const providers = ['google', 'azure', 'custom'];
+        const fetchedConfigs: Record<string, OIDCConfig> = { ...defaultConfig };
+        
+        for (const provider of providers) {
+          try {
+            const config = await oidcApi.getConfig(provider);
+            if (config) {
+              fetchedConfigs[provider] = config;
+            }
+          } catch (error) {
+            console.log(`No saved configuration for ${provider}`);
+          }
+        }
+        
+        setConfigs(fetchedConfigs);
+      } catch (error) {
+        console.error('Error fetching OIDC configurations:', error);
+        toast({
+          title: "Error loading configurations",
+          description: "Failed to load saved OIDC configurations.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
     };
     
-    return storedConfigs;
-  });
+    fetchConfigs();
+  }, []);
 
   const handleInputChange = (provider: string, field: keyof OIDCConfig, value: string) => {
     setConfigs(prev => ({
@@ -78,13 +98,39 @@ const Settings = () => {
     }));
   };
 
-  const handleSave = (provider: string) => {
-    saveOIDCConfig(provider, configs[provider]);
-    toast({
-      title: "Settings saved",
-      description: `OIDC configuration for ${provider} has been saved.`,
-    });
+  const handleSave = async (provider: string) => {
+    setSaving(true);
+    try {
+      // Save to API
+      await oidcApi.saveConfig(provider, configs[provider]);
+      
+      // Also save to local storage for backward compatibility
+      saveOIDCConfig(provider, configs[provider]);
+      
+      toast({
+        title: "Settings saved",
+        description: `OIDC configuration for ${provider} has been saved.`,
+      });
+    } catch (error) {
+      console.error(`Error saving ${provider} configuration:`, error);
+      toast({
+        title: "Save failed",
+        description: `Failed to save OIDC configuration for ${provider}.`,
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading configurations...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-professional-gray-light/30 to-professional-purple-light/10 p-6">
@@ -182,8 +228,18 @@ const Settings = () => {
                     </div>
                     
                     <div className="pt-4">
-                      <Button onClick={() => handleSave(provider)}>
-                        Save {provider.charAt(0).toUpperCase() + provider.slice(1)} Settings
+                      <Button 
+                        onClick={() => handleSave(provider)}
+                        disabled={saving}
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          `Save ${provider.charAt(0).toUpperCase() + provider.slice(1)} Settings`
+                        )}
                       </Button>
                     </div>
                   </TabsContent>

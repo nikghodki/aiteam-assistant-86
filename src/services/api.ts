@@ -102,6 +102,22 @@ export interface UserPermission {
   permission: Permission;
 }
 
+// OIDC interfaces
+export interface OIDCConfig {
+  clientId: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  redirectUri: string;
+  scope: string;
+  responseType: string;
+}
+
+export interface OIDCAuthResult {
+  success: boolean;
+  user?: User;
+  error?: string;
+}
+
 // Helper function for API calls
 const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -327,6 +343,31 @@ export const rbacApi = {
     apiCall<{ success: boolean }>(`/rbac/users/${userId}/permissions/${permissionId}`, {
       method: 'DELETE',
     }),
+};
+
+// OIDC Authentication API
+export const oidcApi = {
+  // Save OIDC configuration
+  saveConfig: (provider: string, config: OIDCConfig) => 
+    apiCall<{ success: boolean }>('/oidc/config', {
+      method: 'POST',
+      body: JSON.stringify({ provider, config }),
+    }),
+
+  // Get OIDC configuration
+  getConfig: (provider: string) => 
+    apiCall<OIDCConfig>(`/oidc/config/${provider}`),
+
+  // Process OIDC callback
+  processCallback: (provider: string, code: string, state: string) => 
+    apiCall<OIDCAuthResult>('/oidc/callback', {
+      method: 'POST',
+      body: JSON.stringify({ provider, code, state }),
+    }),
+
+  // List available providers
+  listProviders: () => 
+    apiCall<string[]>('/oidc/providers'),
 };
 
 // Getting the mock user for demo purposes

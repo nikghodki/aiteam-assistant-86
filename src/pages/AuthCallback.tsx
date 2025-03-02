@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/use-toast';
+import { oidcApi } from '@/services/api';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
-  const { login, getOIDCConfig } = useAuth();
+  const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,20 +38,20 @@ const AuthCallback = () => {
           return;
         }
         
-        // Get the provider config
-        const config = getOIDCConfig(provider);
+        // Process the callback with the backend
+        const result = await oidcApi.processCallback(provider, code, state);
         
-        if (!config) {
-          throw new Error(`Provider ${provider} configuration not found`);
+        if (!result.success) {
+          throw new Error(result.error || `Authentication with ${provider} failed`);
         }
         
-        // In a real implementation, you would:
-        // 1. Send the code to your backend
-        // 2. Backend would exchange it for tokens
-        // 3. Validate tokens and create a session
-        
-        // For this demo, we'll simulate a successful authentication
-        await login(`user@${provider}.com`, 'password-not-used');
+        // Handle successful authentication
+        if (result.user) {
+          // Update auth context with the user information
+          await login(result.user.email, 'password-not-used');
+        } else {
+          await login(`user@${provider}.com`, 'password-not-used');
+        }
         
         toast({
           title: "Authentication successful",
@@ -59,12 +60,12 @@ const AuthCallback = () => {
         
         // Redirect to dashboard
         navigate('/dashboard');
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error processing authentication callback:', err);
-        setError('An unexpected error occurred');
+        setError(err?.message || 'An unexpected error occurred');
         toast({
           title: "Authentication failed",
-          description: "An unexpected error occurred during authentication.",
+          description: err?.message || "An unexpected error occurred during authentication.",
           variant: "destructive",
         });
         setTimeout(() => navigate('/login'), 3000);
@@ -72,7 +73,7 @@ const AuthCallback = () => {
     };
     
     handleCallback();
-  }, [navigate, login, getOIDCConfig]);
+  }, [navigate, login]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-white to-professional-gray-light/50">
