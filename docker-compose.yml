@@ -1,0 +1,16 @@
+
+version: '3.8'
+
+services:
+  ai-assistant-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    # If you need to override any environment variables at runtime:
+    # env_file:
+    #   - .env.production
