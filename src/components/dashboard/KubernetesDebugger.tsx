@@ -1,4 +1,3 @@
-
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { 
   Terminal, 
@@ -11,7 +10,8 @@ import {
   Server, 
   Download,
   X, 
-  ChevronDown
+  ChevronDown,
+  LayoutGrid
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -34,6 +34,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ClusterInfo {
   arn: string;
@@ -60,6 +67,7 @@ const KubernetesDebugger = () => {
   const [selectedEnvironment, setSelectedEnvironment] = useState<Environment>('qa');
   const [selectedCluster, setSelectedCluster] = useState<string>('');
   const [selectedClusterArn, setSelectedClusterArn] = useState<string>('');
+  const [selectedNamespace, setSelectedNamespace] = useState<string>('default');
   
   // Chat state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
@@ -85,6 +93,14 @@ const KubernetesDebugger = () => {
     staleTime: 30000,
   });
 
+  // Get namespaces for selected cluster
+  const { data: namespaces, isLoading: isLoadingNamespaces } = useQuery({
+    queryKey: ['namespaces', selectedClusterArn],
+    queryFn: () => kubernetesApi.getNamespaces(selectedClusterArn),
+    staleTime: 30000,
+    enabled: !!selectedClusterArn,
+  });
+
   // Set first cluster as selected when clusters load
   useEffect(() => {
     if (clusters && clusters.length > 0 && !selectedCluster) {
@@ -92,6 +108,17 @@ const KubernetesDebugger = () => {
       setSelectedClusterArn(clusters[0].arn);
     }
   }, [clusters]);
+
+  // Update command when namespace changes
+  useEffect(() => {
+    if (selectedNamespace && command.includes('-n ')) {
+      // Replace the namespace in the existing command
+      setCommand(command.replace(/-n\s+([^\s]+)/, `-n ${selectedNamespace}`));
+    } else if (selectedNamespace && !command.includes('-n ')) {
+      // Add namespace flag if not present
+      setCommand(`${command} -n ${selectedNamespace}`);
+    }
+  }, [selectedNamespace]);
 
   const handleCommandSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,11 +225,17 @@ const KubernetesDebugger = () => {
     setSelectedEnvironment(env);
     setSelectedCluster('');
     setSelectedClusterArn('');
+    setSelectedNamespace('default');
   };
 
   const handleClusterSelect = (name: string, arn: string) => {
     setSelectedCluster(name);
     setSelectedClusterArn(arn);
+    setSelectedNamespace('default'); // Reset namespace when cluster changes
+  };
+
+  const handleNamespaceChange = (value: string) => {
+    setSelectedNamespace(value);
   };
 
   const clearOutput = () => {
@@ -246,7 +279,7 @@ const KubernetesDebugger = () => {
 
   return (
     <div className="space-y-6">
-      {/* Environment and Cluster Selection */}
+      {/* Environment, Cluster and Namespace Selection */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pb-4">
         <div className="md:col-span-8 space-y-4 bg-gradient-professional rounded-lg p-4 border border-border/50 shadow-sm">
           {/* Environment Selection */}
@@ -323,6 +356,45 @@ const KubernetesDebugger = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {/* Namespace Selection */}
+          <div className="flex items-center space-x-4">
+            <div className="text-sm font-medium">Namespace:</div>
+            <Select
+              value={selectedNamespace}
+              onValueChange={handleNamespaceChange}
+              disabled={!selectedClusterArn || isLoadingNamespaces}
+            >
+              <SelectTrigger className="flex items-center gap-2 text-sm border rounded-md bg-background hover:bg-muted transition-colors min-w-[200px] w-full">
+                {isLoadingNamespaces ? (
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
+                ) : (
+                  <>
+                    <LayoutGrid size={14} className="text-professional-purple-DEFAULT" />
+                    <SelectValue placeholder="Select namespace" />
+                  </>
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                {isLoadingNamespaces ? (
+                  <div className="flex items-center justify-center py-2">
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <span className="text-sm">Loading namespaces...</span>
+                  </div>
+                ) : namespaces && namespaces.length > 0 ? (
+                  namespaces.map((namespace) => (
+                    <SelectItem key={namespace} value={namespace}>
+                      {namespace}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="text-center py-2 text-sm text-muted-foreground">
+                    No namespaces found
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         
         {/* Selected Cluster Information & Download button */}
@@ -338,6 +410,14 @@ const KubernetesDebugger = () => {
                 <div className="text-xs bg-black/20 backdrop-blur-sm px-2 py-1 rounded-full mt-2 truncate">
                   {selectedClusterArn}
                 </div>
+                {selectedNamespace && (
+                  <div className="mt-2">
+                    <div className="text-sm font-medium">Namespace</div>
+                    <div className="text-md font-medium bg-white/10 px-2 py-1 rounded mt-1 inline-block">
+                      {selectedNamespace}
+                    </div>
+                  </div>
+                )}
               </div>
               
               {debugSession && (
@@ -577,3 +657,4 @@ const KubernetesDebugger = () => {
 };
 
 export default KubernetesDebugger;
+
