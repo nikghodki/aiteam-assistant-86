@@ -1,7 +1,6 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check, Copy, X } from 'lucide-react';
-import { useState } from 'react';
 import { Button } from '../ui/button';
 import {
   Sheet,
@@ -29,6 +28,7 @@ interface KubernetesDebugDrawerProps {
     severity: string;
     namespace: string;
   };
+  debugFilePath?: string;
 }
 
 const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
@@ -36,9 +36,43 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   onClose,
   debugSession,
   issue,
+  debugFilePath,
 }) => {
   const { toast } = useToast();
   const [copying, setCopying] = useState<string | null>(null);
+  const [debugFileContent, setDebugFileContent] = useState<string>('');
+  const [isLoadingFile, setIsLoadingFile] = useState<boolean>(false);
+
+  // Load debug file content when the path is provided
+  useEffect(() => {
+    if (debugFilePath && isOpen) {
+      setIsLoadingFile(true);
+      
+      // In a real implementation, this would be an API call to fetch the file content
+      // For demo purposes, we'll simulate fetching the file after a brief delay
+      const timer = setTimeout(() => {
+        // This is a placeholder for actual file loading logic
+        // In a real app, you would make an API call to fetch the file content
+        fetch(debugFilePath)
+          .then(response => response.text())
+          .then(content => {
+            setDebugFileContent(content);
+            setIsLoadingFile(false);
+          })
+          .catch(error => {
+            console.error('Error loading debug file:', error);
+            setIsLoadingFile(false);
+            toast({
+              title: "Error",
+              description: "Failed to load debugging information",
+              variant: "destructive"
+            });
+          });
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [debugFilePath, isOpen, toast]);
 
   const copyToClipboard = (text: string, identifier: string) => {
     navigator.clipboard.writeText(text);
@@ -91,7 +125,10 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     return { request, response: responseRaw, sections };
   };
 
-  const { request, sections } = debugSession ? formatDebugLog(debugSession.debugLog) : { request: '', sections: [] };
+  // Determine which log to use - either from the debug session or the file
+  const logToUse = debugFileContent || (debugSession ? debugSession.debugLog : '');
+  
+  const { request, sections } = formatDebugLog(logToUse);
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -132,7 +169,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                   </div>
                   
                   <div className="font-medium">Issue:</div>
-                  <div className="col-span-2">{issue.message}</div>
+                  <div className="col-span-2">{Array.isArray(issue.message) ? issue.message.join(', ') : issue.message}</div>
                 </div>
               </div>
             </SheetDescription>
@@ -140,54 +177,69 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
         </SheetHeader>
         
         <div className="py-4 space-y-6">
-          {request && (
-            <div>
-              <h3 className="text-md font-semibold mb-2">Request</h3>
-              <div className="bg-muted/40 rounded-md p-4 text-sm whitespace-pre-wrap">
-                {request}
+          {isLoadingFile ? (
+            <div className="flex items-center justify-center h-40">
+              <div className="flex flex-col items-center">
+                <div className="flex space-x-2 mb-2">
+                  <div className="w-3 h-3 bg-primary/70 rounded-full animate-bounce delay-100"></div>
+                  <div className="w-3 h-3 bg-primary/70 rounded-full animate-bounce delay-200"></div>
+                  <div className="w-3 h-3 bg-primary/70 rounded-full animate-bounce delay-300"></div>
+                </div>
+                <p className="text-sm text-muted-foreground">Loading debugging information...</p>
               </div>
             </div>
-          )}
-          
-          {sections.length > 0 && (
-            <div>
-              <h3 className="text-md font-semibold mb-2">Debugging Steps</h3>
-              <div className="space-y-4">
-                {sections.map((section, index) => (
-                  <div key={index} className="space-y-2">
-                    {section.type === 'text' ? (
-                      <div className="text-sm">{section.content}</div>
-                    ) : section.type === 'command' ? (
-                      <div className="relative">
-                        <div className="bg-gradient-terminal text-white p-3 rounded-md font-mono text-sm overflow-auto">
-                          <pre className="whitespace-pre-wrap">{section.content}</pre>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="absolute top-2 right-2 bg-black/20 hover:bg-black/40 text-white"
-                          onClick={() => copyToClipboard(section.content, `cmd-${index}`)}
-                        >
-                          {copying === `cmd-${index}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="bg-muted/30 p-3 rounded-md text-sm overflow-auto border border-border/40">
-                        <pre className="whitespace-pre-wrap">{section.content}</pre>
-                      </div>
-                    )}
+          ) : (
+            <>
+              {request && (
+                <div>
+                  <h3 className="text-md font-semibold mb-2">Request</h3>
+                  <div className="bg-muted/40 rounded-md p-4 text-sm whitespace-pre-wrap">
+                    {request}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {!request && sections.length === 0 && (
-            <Alert>
-              <AlertDescription>
-                No debugging information is available. Please start a debugging session by selecting an issue or asking a question in the Kubernetes Assistant.
-              </AlertDescription>
-            </Alert>
+                </div>
+              )}
+              
+              {sections.length > 0 && (
+                <div>
+                  <h3 className="text-md font-semibold mb-2">Debugging Steps</h3>
+                  <div className="space-y-4">
+                    {sections.map((section, index) => (
+                      <div key={index} className="space-y-2">
+                        {section.type === 'text' ? (
+                          <div className="text-sm">{section.content}</div>
+                        ) : section.type === 'command' ? (
+                          <div className="relative">
+                            <div className="bg-gradient-terminal text-white p-3 rounded-md font-mono text-sm overflow-auto">
+                              <pre className="whitespace-pre-wrap">{section.content}</pre>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="absolute top-2 right-2 bg-black/20 hover:bg-black/40 text-white"
+                              onClick={() => copyToClipboard(section.content, `cmd-${index}`)}
+                            >
+                              {copying === `cmd-${index}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="bg-muted/30 p-3 rounded-md text-sm overflow-auto border border-border/40">
+                            <pre className="whitespace-pre-wrap">{section.content}</pre>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {!request && sections.length === 0 && (
+                <Alert>
+                  <AlertDescription>
+                    No debugging information is available. Please start a debugging session by selecting an issue or asking a question in the Kubernetes Assistant.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </>
           )}
         </div>
       </SheetContent>

@@ -12,10 +12,12 @@ interface ChatMessage {
   content: string;
   sender: 'user' | 'assistant';
   timestamp: Date;
+  debugFilePath?: string;
 }
 
 interface DocumentationChatProps {
   showInline?: boolean;
+  onDebugFilePath?: (path: string) => void;
 }
 
 // Helper function to format message content
@@ -43,7 +45,24 @@ const formatMessageContent = (content: string) => {
   return content;
 };
 
-const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
+// Helper function to extract file path from message
+const extractDebugFilePath = (content: string): string | undefined => {
+  // Look for patterns like "file path: /path/to/file" or "debug file: /path/to/file"
+  const filePathMatch = content.match(/(?:file\s+path|debug\s+file):\s+([^\s]+)/i);
+  if (filePathMatch && filePathMatch[1]) {
+    return filePathMatch[1];
+  }
+  
+  // Look for patterns that mention Jira tickets with attached files
+  const jiraMatch = content.match(/Jira ticket created with ID:\s+([^\s,\.]+)/i);
+  if (jiraMatch && jiraMatch[1]) {
+    return `/api/kubernetes/debug-files/${jiraMatch[1]}`;
+  }
+  
+  return undefined;
+};
+
+const DocumentationChat = ({ showInline = false, onDebugFilePath }: DocumentationChatProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -91,14 +110,23 @@ const DocumentationChat = ({ showInline = false }: DocumentationChatProps) => {
     try {
       const response = await docsApi.chatWithAssistant(inputMessage);
       
+      // Extract file path from response if present
+      const debugFilePath = extractDebugFilePath(response.response);
+      
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: response.response,
         sender: 'assistant',
-        timestamp: new Date()
+        timestamp: new Date(),
+        debugFilePath
       };
       
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // If a debug file path was found and onDebugFilePath callback exists, call it
+      if (debugFilePath && onDebugFilePath) {
+        onDebugFilePath(debugFilePath);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
