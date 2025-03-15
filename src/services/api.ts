@@ -142,6 +142,15 @@ export interface OIDCAuthResult {
   error?: string;
 }
 
+// New interface for namespace issues
+export interface NamespaceIssue {
+  id: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  component: string;
+  message: string;
+  timestamp: string;
+}
+
 // Helper function for API calls
 const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -268,11 +277,11 @@ export const kubernetesApi = {
       }),
     }),
 
-  // Chat with the assistant
-  chatWithAssistant: (clusterArn: string, message: string, jiraTicketKey?: string) => 
+  // Chat with the assistant - updated to include namespace and removed jiraTicketKey
+  chatWithAssistant: (clusterArn: string, message: string, namespace: string) => 
     apiCall<ChatResponse>('/kubernetes/chat', {
       method: 'POST',
-      body: JSON.stringify({ clusterArn, message, jiraTicketKey }),
+      body: JSON.stringify({ clusterArn, message, namespace }),
     }),
 
   // Get debugging sessions
@@ -307,6 +316,26 @@ export const kubernetesApi = {
       body: JSON.stringify({ clusterArn }),
     });
   },
+
+  /**
+   * Get issues in a namespace
+   * @param clusterArn The ARN of the cluster
+   * @param namespace The namespace to check for issues
+   * @returns An array of issues found in the namespace
+   */
+  getNamespaceIssues: (clusterArn: string, namespace: string): Promise<NamespaceIssue[]> => {
+    if (!clusterArn) {
+      return Promise.reject(new Error('Cluster ARN is required'));
+    }
+    if (!namespace) {
+      return Promise.reject(new Error('Namespace is required'));
+    }
+    
+    return apiCall<NamespaceIssue[]>(`/kubernetes/namespace-issues`, {
+      method: 'POST',
+      body: JSON.stringify({ clusterArn, namespace }),
+    });
+  }
 };
 
 // Enhanced Jira Ticket API

@@ -13,7 +13,7 @@ const Kubernetes = () => {
           </p>
         </div>
         
-        <div className="bg-muted/30 backdrop-blur-sm rounded-lg p-6 border border-border/50 shadow-sm">
+        <div className="rounded-lg">
           <KubernetesDebugger />
         </div>
       </div>

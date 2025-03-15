@@ -1,3 +1,4 @@
+
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { 
   Terminal, 
@@ -11,7 +12,8 @@ import {
   Download,
   X, 
   ChevronDown,
-  LayoutGrid
+  LayoutGrid,
+  Bug
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -55,6 +57,14 @@ interface ChatMessage {
   timestamp?: string;
 }
 
+interface NamespaceIssue {
+  id: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  component: string;
+  message: string;
+  timestamp: string;
+}
+
 const environments = [
   { id: 'production', name: 'Production', color: 'green' },
   { id: 'qa', name: 'QA', color: 'amber' },
@@ -83,7 +93,6 @@ const KubernetesDebugger = () => {
   const [commandError, setCommandError] = useState<string | null>(null);
   
   const [debugSession, setDebugSession] = useState<{id: string; debugLog: string} | null>(null);
-  const [debugSteps, setDebugSteps] = useState<string[]>([]);
 
   const { data: clusters, isLoading: isLoadingClusters } = useQuery({
     queryKey: ['clusters', selectedEnvironment],
@@ -99,6 +108,16 @@ const KubernetesDebugger = () => {
     },
     staleTime: 30000,
     enabled: !!selectedClusterArn,
+  });
+
+  const { data: namespaceIssues, isLoading: isLoadingIssues } = useQuery({
+    queryKey: ['namespace-issues', selectedClusterArn, selectedNamespace],
+    queryFn: () => {
+      if (!selectedClusterArn || !selectedNamespace) return Promise.resolve([]);
+      return kubernetesApi.getNamespaceIssues(selectedClusterArn, selectedNamespace);
+    },
+    staleTime: 30000,
+    enabled: !!selectedClusterArn && !!selectedNamespace,
   });
 
   useEffect(() => {
@@ -145,8 +164,6 @@ const KubernetesDebugger = () => {
         setCommandHistory(prev => [command, ...prev].slice(0, 10));
       }
       
-      setDebugSteps(prev => [...prev, `Executed: ${command}\nResult: ${result.exitCode === 0 ? 'Success' : 'Error'}`]);
-      
       if (result.exitCode !== 0) {
         toast({
           title: "Command Error",
@@ -164,8 +181,6 @@ const KubernetesDebugger = () => {
         description: error.message || "Failed to execute command",
         variant: "destructive",
       });
-      
-      setDebugSteps(prev => [...prev, `Error: Failed to execute command "${command}"`]);
     } finally {
       setCommandLoading(false);
     }
@@ -173,28 +188,30 @@ const KubernetesDebugger = () => {
 
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || !selectedClusterArn) return;
+    if (!message.trim() || !selectedClusterArn || !selectedNamespace) return;
 
     const userMessage = { role: 'user' as const, content: message };
     setChatHistory(prev => [...prev, userMessage]);
     
-    setDebugSteps(prev => [...prev, `User query: ${message}`]);
     setChatLoading(true);
     setMessage('');
     
     try {
-      const response = await kubernetesApi.chatWithAssistant(selectedClusterArn, message);
+      // Update to pass both cluster and namespace but not jiraTicketKey
+      const response = await kubernetesApi.chatWithAssistant(
+        selectedClusterArn, 
+        message,
+        selectedNamespace
+      );
       
       setChatHistory(prev => [...prev, { 
         role: 'assistant', 
         content: response.response 
       }]);
       
-      setDebugSteps(prev => [...prev, `AI Assistant: ${response.response.substring(0, 50)}${response.response.length > 50 ? '...' : ''}`]);
-      
       const commandMatch = response.response.match(/```(?:bash|sh)?\s*(kubectl .+?)```/);
       if (commandMatch && commandMatch[1]) {
-        setCommand("kubectl get pod");
+        setCommand(commandMatch[1]);
       }
       
       if (debugSession) {
@@ -205,7 +222,7 @@ const KubernetesDebugger = () => {
       } else {
         setDebugSession({
           id: `debug-${Date.now()}`,
-          debugLog: `Debug Session - ${new Date().toLocaleString()}\n\nCluster: ${selectedCluster}\n\nUser: ${message}\n\nAssistant: ${response.response}`
+          debugLog: `Debug Session - ${new Date().toLocaleString()}\n\nCluster: ${selectedCluster}\n\nNamespace: ${selectedNamespace}\n\nUser: ${message}\n\nAssistant: ${response.response}`
         });
       }
     } catch (error: any) {
@@ -272,6 +289,21 @@ const KubernetesDebugger = () => {
       title: "Debug Log Downloaded",
       description: "The debug session log has been downloaded successfully",
     });
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch(severity) {
+      case 'critical':
+        return 'text-red-600 bg-red-100';
+      case 'high':
+        return 'text-orange-600 bg-orange-100';
+      case 'medium':
+        return 'text-amber-600 bg-amber-100';
+      case 'low':
+        return 'text-green-600 bg-green-100';
+      default:
+        return 'text-gray-600 bg-gray-100';
+    }
   };
 
   const getEnvironmentStyle = (envId: string) => {
@@ -624,31 +656,37 @@ const KubernetesDebugger = () => {
         
         <GlassMorphicCard className="md:col-span-4">
           <div className="p-4 border-b bg-gradient-professional flex justify-between items-center">
-            <h3 className="font-medium text-sm">Debugging Steps</h3>
-            
-            <button 
-              onClick={() => setDebugSteps([])}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-              disabled={debugSteps.length === 0}
-            >
-              <Trash size={14} />
-              Clear
-            </button>
+            <h3 className="font-medium text-sm">Namespace Issues</h3>
           </div>
           
           <div className="p-3 h-[350px] overflow-auto bg-gradient-to-b from-muted/10 to-muted/30">
-            {debugSteps.length > 0 ? (
-              <ol className="space-y-3 list-decimal list-inside">
-                {debugSteps.map((step, index) => (
-                  <li key={index} className="text-xs border-b border-border/20 pb-2 whitespace-pre-wrap">
-                    {step}
+            {isLoadingIssues ? (
+              <div className="flex justify-center items-center h-full">
+                <div className="w-6 h-6 border-2 border-professional-purple-DEFAULT border-t-transparent rounded-full animate-spin mr-2"></div>
+                <span className="text-sm">Loading issues...</span>
+              </div>
+            ) : namespaceIssues && namespaceIssues.length > 0 ? (
+              <ul className="space-y-3">
+                {namespaceIssues.map((issue) => (
+                  <li key={issue.id} className="p-3 bg-background rounded-lg border border-border/30 shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getSeverityColor(issue.severity)}`}>
+                        {issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{new Date(issue.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                    <p className="text-sm font-medium mb-1">{issue.component}</p>
+                    <p className="text-xs text-muted-foreground">{issue.message}</p>
                   </li>
                 ))}
-              </ol>
+              </ul>
             ) : (
-              <div className="text-center text-muted-foreground text-xs p-8">
-                <Terminal size={30} className="mx-auto mb-2 opacity-30" />
-                <p>Debugging steps will appear here as you run commands and chat with the assistant</p>
+              <div className="text-center text-muted-foreground text-xs p-8 h-full flex flex-col items-center justify-center">
+                <Bug size={30} className="mx-auto mb-2 opacity-30" />
+                <p>No issues found in this namespace</p>
+                {selectedClusterArn && selectedNamespace && (
+                  <p className="mt-2">The namespace appears to be healthy</p>
+                )}
               </div>
             )}
           </div>
