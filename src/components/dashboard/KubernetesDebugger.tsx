@@ -374,7 +374,7 @@ const KubernetesDebugger = () => {
               onValueChange={handleNamespaceChange}
               disabled={!selectedClusterArn || isLoadingNamespaces}
             >
-              <SelectTrigger className="flex items-center gap-2 text-sm border rounded-md bg-background hover:bg-muted transition-colors min-w-[200px] w-full">
+              <SelectTrigger className="flex items-center text-left gap-2 text-sm border rounded-md bg-background hover:bg-muted transition-colors min-w-[200px] w-full">
                 {isLoadingNamespaces ? (
                   <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
                 ) : (
