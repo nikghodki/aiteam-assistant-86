@@ -136,6 +136,14 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Darker background colors for namespace section
+  const getNamespaceBackgroundColor = () => {
+    return issue?.severity === 'critical' ? 'bg-red-950 text-red-50' :
+           issue?.severity === 'high' ? 'bg-orange-950 text-orange-50' :
+           issue?.severity === 'medium' ? 'bg-amber-950 text-amber-50' :
+           'bg-professional-gray-dark text-green-50';
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl overflow-auto">
@@ -151,18 +159,18 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
           {issue && (
             <SheetDescription>
               <div className="mt-2 space-y-2">
-                <div className="grid grid-cols-3 gap-2 text-sm">
-                  <div className="font-medium">Kind:</div>
-                  <div className="col-span-2">{issue.kind}</div>
+                <div className="grid grid-cols-3 gap-2 text-sm rounded-lg overflow-hidden border border-border/30">
+                  <div className="font-medium p-2 bg-muted/70">Kind:</div>
+                  <div className="col-span-2 p-2 bg-muted/40">{issue.kind}</div>
                   
-                  <div className="font-medium">Name:</div>
-                  <div className="col-span-2">{issue.name}</div>
+                  <div className="font-medium p-2 bg-muted/70">Name:</div>
+                  <div className="col-span-2 p-2 bg-muted/40">{issue.name}</div>
                   
-                  <div className="font-medium">Namespace:</div>
-                  <div className="col-span-2">{issue.namespace}</div>
+                  <div className="font-medium p-2 bg-muted/70">Namespace:</div>
+                  <div className={cn("col-span-2 p-2", getNamespaceBackgroundColor())}>{issue.namespace}</div>
                   
-                  <div className="font-medium">Severity:</div>
-                  <div className="col-span-2">
+                  <div className="font-medium p-2 bg-muted/70">Severity:</div>
+                  <div className="col-span-2 p-2 bg-muted/40">
                     <span className={cn(
                       "px-2 py-0.5 rounded-full text-xs",
                       issue.severity === 'critical' && "bg-red-100 text-red-800",
@@ -174,8 +182,8 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                     </span>
                   </div>
                   
-                  <div className="font-medium">Issue:</div>
-                  <div className="col-span-2">{Array.isArray(issue.message) ? issue.message.join(', ') : issue.message}</div>
+                  <div className="font-medium p-2 bg-muted/70">Issue:</div>
+                  <div className="col-span-2 p-2 bg-muted/40">{Array.isArray(issue.message) ? issue.message.join(', ') : issue.message}</div>
                 </div>
               </div>
             </SheetDescription>
