@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
-import { Check, Copy, X } from 'lucide-react';
+import { Check, Copy, Download, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
   Sheet,
@@ -13,6 +12,7 @@ import {
 import { Alert, AlertDescription } from '../ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { kubernetesApi } from '@/services/api';
 
 interface KubernetesDebugDrawerProps {
   isOpen: boolean;
@@ -44,17 +44,13 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   const [copying, setCopying] = useState<string | null>(null);
   const [debugFileContent, setDebugFileContent] = useState<string>('');
   const [isLoadingFile, setIsLoadingFile] = useState<boolean>(false);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
-  // Load debug file content when the path is provided
   useEffect(() => {
     if (debugFilePath && isOpen) {
       setIsLoadingFile(true);
       
-      // In a real implementation, this would be an API call to fetch the file content
-      // For demo purposes, we'll simulate fetching the file after a brief delay
       const timer = setTimeout(() => {
-        // This is a placeholder for actual file loading logic
-        // In a real app, you would make an API call to fetch the file content
         fetch(debugFilePath)
           .then(response => response.text())
           .then(content => {
@@ -88,32 +84,64 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     setTimeout(() => setCopying(null), 2000);
   };
 
-  // Format debug log to extract sections
+  const handleDownload = async () => {
+    if (!debugSession?.id) {
+      toast({
+        title: "Error",
+        description: "No debugging session available to download",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsDownloading(true);
+    
+    try {
+      const response = await kubernetesApi.downloadDebugFile(debugSession.id);
+      
+      const link = document.createElement('a');
+      link.href = response.url;
+      link.download = `debug-session-${debugSession.id}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Download started",
+        description: "Debug file is being downloaded",
+      });
+    } catch (error) {
+      console.error('Error downloading debug file:', error);
+      toast({
+        title: "Download failed",
+        description: "Failed to download the debug file",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const formatDebugLog = (log: string) => {
     if (!log) return { request: '', response: '', sections: [] };
 
-    // Split into Request and Response sections
     const requestMatch = log.match(/## Request\n([\s\S]+?)(?=\n## Response|\n$)/);
     const responseMatch = log.match(/## Response\n([\s\S]+)/);
 
     const request = requestMatch ? requestMatch[1].trim() : '';
     const responseRaw = responseMatch ? responseMatch[1].trim() : '';
 
-    // Parse code blocks and sections from the response
     const sections: { type: 'text' | 'command' | 'output'; content: string; }[] = [];
     
     if (responseRaw) {
-      // Split by code blocks
       const parts = responseRaw.split(/```(?:bash|yaml|json|sh)?([\s\S]+?)```/g);
       
       parts.forEach((part, index) => {
         if (index % 2 === 0) {
-          // Text content between code blocks
           if (part.trim()) {
             sections.push({ type: 'text', content: part.trim() });
           }
         } else {
-          // Code block content
           const trimmedPart = part.trim();
           if (trimmedPart.startsWith('kubectl') || trimmedPart.startsWith('helm') || trimmedPart.startsWith('k9s')) {
             sections.push({ type: 'command', content: trimmedPart });
@@ -127,18 +155,15 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     return { request, response: responseRaw, sections };
   };
 
-  // Determine which log to use - either from the debug session or the file
   const logToUse = debugFileContent || (debugSession ? debugSession.debugLog : '');
   
   const { request, sections } = formatDebugLog(logToUse);
 
-  // Format timestamp for messages
   const getTimeStamp = () => {
     const now = new Date();
     return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Darker background colors for namespace section
   const getNamespaceBackgroundColor = () => {
     return issue?.severity === 'critical' ? 'bg-red-950 text-red-50' :
            issue?.severity === 'high' ? 'bg-orange-950 text-orange-50' :
@@ -146,7 +171,6 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
            'bg-professional-gray-dark text-green-50';
   };
 
-  // Get appropriate background color for the chat bubbles based on type
   const getChatBubbleStyle = (type: 'text' | 'command' | 'output') => {
     switch (type) {
       case 'text':
@@ -160,15 +184,12 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     }
   };
 
-  // Get color for request message bubble
   const getRequestBubbleStyle = () => {
     return 'bg-gray-100 dark:bg-gray-800';
   };
 
-  // Main loading state (when user first clicks an issue)
   const showMainLoadingState = isLoading && !debugSession;
 
-  // File loading state (when debug file is being fetched)
   const showFileLoadingState = isLoadingFile && debugFilePath;
 
   return (
@@ -177,11 +198,25 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
         <SheetHeader className="pb-4">
           <div className="flex justify-between items-center">
             <SheetTitle className="text-xl">Kubernetes Troubleshooting</SheetTitle>
-            <SheetClose asChild>
-              <Button variant="ghost" size="icon" onClick={onClose}>
-                <X className="h-5 w-5" />
-              </Button>
-            </SheetClose>
+            <div className="flex gap-2">
+              {debugSession?.id && (
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={handleDownload} 
+                  disabled={isDownloading}
+                  className="h-9 w-9"
+                  title="Download debug file"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              )}
+              <SheetClose asChild>
+                <Button variant="ghost" size="icon" onClick={onClose}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </SheetClose>
+            </div>
           </div>
           {issue && (
             <SheetDescription>
