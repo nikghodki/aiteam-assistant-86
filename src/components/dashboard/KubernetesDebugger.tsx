@@ -1,4 +1,3 @@
-
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { 
   Terminal, 
@@ -18,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { cn } from '@/lib/utils';
-import { kubernetesApi } from '@/services/api';
+import { kubernetesApi, CommandResult } from '@/services/api';
 import {
   Tabs,
   TabsContent,
@@ -42,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 interface ClusterInfo {
   arn: string;
@@ -80,6 +80,7 @@ const KubernetesDebugger = () => {
   const [commandOutput, setCommandOutput] = useState('');
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [commandLoading, setCommandLoading] = useState(false);
+  const [commandError, setCommandError] = useState<string | null>(null);
   
   const [debugSession, setDebugSession] = useState<{id: string; debugLog: string} | null>(null);
   const [debugSteps, setDebugSteps] = useState<string[]>([]);
@@ -117,9 +118,19 @@ const KubernetesDebugger = () => {
     if (!command.trim() || !selectedClusterArn) return;
     
     setCommandLoading(true);
+    setCommandError(null);
+    
     try {
+      console.log("Running command:", command, "on cluster:", selectedClusterArn, "in namespace:", selectedNamespace);
       const result = await kubernetesApi.runCommand(selectedClusterArn, command, selectedNamespace);
-      setCommandOutput(result.output);
+      console.log("Command result:", result);
+      
+      if (result.exitCode !== 0) {
+        setCommandError(result.error || "Unknown error occurred during command execution");
+        setCommandOutput(result.output || "No output available");
+      } else {
+        setCommandOutput(result.output);
+      }
       
       if (!commandHistory.includes(command)) {
         setCommandHistory(prev => [command, ...prev].slice(0, 10));
@@ -135,11 +146,17 @@ const KubernetesDebugger = () => {
         });
       }
     } catch (error: any) {
+      console.error("API Error:", error);
+      setCommandError(error.message || "Failed to execute command");
+      setCommandOutput("Command execution failed. Please check the console for more details.");
+      
       toast({
         title: "API Error",
         description: error.message || "Failed to execute command",
         variant: "destructive",
       });
+      
+      setDebugSteps(prev => [...prev, `Error: Failed to execute command "${command}"`]);
     } finally {
       setCommandLoading(false);
     }
@@ -456,6 +473,14 @@ const KubernetesDebugger = () => {
               </Button>
             </form>
           </div>
+          
+          {commandError && (
+            <Alert variant="destructive" className="m-4 border-red-400 bg-red-50/50">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Command Error</AlertTitle>
+              <AlertDescription>{commandError}</AlertDescription>
+            </Alert>
+          )}
           
           <div className="relative min-h-[250px] max-h-[350px] overflow-auto bg-gradient-terminal text-gray-100 p-4 font-mono text-sm rounded-b-lg">
             {commandLoading ? (
