@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Ticket, ExternalLink, AlertCircle } from 'lucide-react';
+import { Ticket, ExternalLink, AlertCircle, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { jiraApi, JiraTicket as JiraTicketType } from '@/services/api';
+import { jiraApi, JiraTicket as JiraTicketType, JiraProject } from '@/services/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface JiraTicketListProps {
   refreshTrigger?: number;
@@ -14,26 +21,61 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
   const { user } = useAuth();
   const [tickets, setTickets] = useState<JiraTicketType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [projects, setProjects] = useState<JiraProject[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    setIsLoadingProjects(true);
+    try {
+      const projectsData = await jiraApi.getProjects();
+      setProjects(projectsData);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      const mockProjects: JiraProject[] = [
+        { id: 'DEMO-1', key: 'DEMO', name: 'Demo Project' },
+        { id: 'ENG-1', key: 'ENG', name: 'Engineering' },
+        { id: 'OPS-1', key: 'OPS', name: 'Operations' }
+      ];
+      setProjects(mockProjects);
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
 
   useEffect(() => {
     const fetchTickets = async () => {
       setIsLoading(true);
       
       try {
-        // Fetch tickets reported by the current user using the new API
         const userTickets = await jiraApi.getUserReportedTickets();
-        setTickets(userTickets);
+        
+        let filteredTickets = userTickets;
+        if (selectedProject) {
+          filteredTickets = userTickets.filter(ticket => ticket.project === selectedProject);
+        }
+        
+        setTickets(filteredTickets);
       } catch (error) {
         console.error('Error fetching Jira tickets:', error);
         
-        // Fallback to localStorage if API fails
         const savedTickets = localStorage.getItem('jiraTickets');
         if (savedTickets) {
           const parsedTickets = JSON.parse(savedTickets).map((ticket: any) => ({
             ...ticket,
             createdAt: new Date(ticket.createdAt || ticket.created || Date.now())
           }));
-          setTickets(parsedTickets);
+          
+          let filteredTickets = parsedTickets;
+          if (selectedProject) {
+            filteredTickets = parsedTickets.filter((ticket: any) => ticket.project === selectedProject);
+          }
+          
+          setTickets(filteredTickets);
         }
       } finally {
         setIsLoading(false);
@@ -41,16 +83,14 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
     };
     
     fetchTickets();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, selectedProject]);
 
-  // Save tickets to localStorage as backup
   useEffect(() => {
     if (tickets.length > 0) {
       localStorage.setItem('jiraTickets', JSON.stringify(tickets));
     }
   }, [tickets]);
 
-  // Function to add a mock ticket (for demo purposes)
   const addMockTicket = () => {
     const mockTicket: JiraTicketType = {
       key: `JIRA-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -61,7 +101,7 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
       priority: Math.random() > 0.7 ? 'High' : Math.random() > 0.4 ? 'Medium' : 'Low',
       created: new Date().toISOString(),
       reporter: user?.name,
-      project: 'DEMO',
+      project: selectedProject || 'DEMO',
       issueType: 'Bug'
     };
     
@@ -106,6 +146,10 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
     }).format(date);
   };
 
+  const handleProjectChange = (value: string) => {
+    setSelectedProject(value === "all" ? null : value);
+  };
+
   return (
     <div className="h-[600px] max-h-[600px] overflow-hidden flex flex-col">
       <div className="flex justify-between items-center mb-4">
@@ -113,16 +157,35 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
           {tickets.length} {tickets.length === 1 ? 'ticket' : 'tickets'}
         </div>
         
-        {/* For demo purposes - add a mock ticket button */}
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={addMockTicket}
-          className="text-xs"
-        >
-          <Ticket size={12} className="mr-1" />
-          Add Demo Ticket
-        </Button>
+        <div className="flex space-x-2">
+          <Select
+            value={selectedProject || "all"}
+            onValueChange={handleProjectChange}
+            disabled={isLoadingProjects}
+          >
+            <SelectTrigger className="w-40 text-xs h-8 text-left">
+              <SelectValue placeholder="Filter by project" />
+            </SelectTrigger>
+            <SelectContent align="start">
+              <SelectItem value="all">All Projects</SelectItem>
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.key}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={addMockTicket}
+            className="text-xs"
+          >
+            <Ticket size={12} className="mr-1" />
+            Add Demo Ticket
+          </Button>
+        </div>
       </div>
       
       {isLoading ? (
@@ -138,7 +201,9 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
             <AlertCircle size={24} className="mb-2 opacity-50" />
             <span className="text-sm">No tickets found</span>
             <p className="text-xs mt-1 text-center max-w-[200px]">
-              Use the chat assistant to create your first Jira ticket.
+              {selectedProject 
+                ? `No tickets found for project: ${selectedProject}` 
+                : "Use the chat assistant or create ticket form to create your first Jira ticket."}
             </p>
           </div>
         </div>
@@ -181,9 +246,16 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
                   <span className="text-xs text-muted-foreground">
                     {ticket.created ? formatDate(ticket.created) : 'Just now'}
                   </span>
-                  <Badge variant="secondary" className="text-xs">
-                    {ticket.status || 'Open'}
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    {ticket.project && (
+                      <Badge variant="outline" className="text-xs bg-background/50">
+                        {ticket.project}
+                      </Badge>
+                    )}
+                    <Badge variant="secondary" className="text-xs">
+                      {ticket.status || 'Open'}
+                    </Badge>
+                  </div>
                 </div>
               </div>
             ))}
