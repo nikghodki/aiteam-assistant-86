@@ -1,12 +1,20 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, RefreshCw, XCircle, Ticket } from 'lucide-react';
+import { Send, User, Bot, RefreshCw, XCircle, Ticket, ChevronDown } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { jiraApi, ChatResponse, JiraTicket as JiraTicketType } from '@/services/api';
+import { jiraApi, ChatResponse, JiraTicket as JiraTicketType, JiraProject, JiraIssueType } from '@/services/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ChatMessage {
   id: string;
@@ -27,6 +35,8 @@ interface JiraTicketInfo {
   description: string;
   priority: string;
   status: string;
+  project?: string;
+  issueType?: string;
 }
 
 interface JiraTicketChatProps {
@@ -64,6 +74,13 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
   const [ticketFormVisible, setTicketFormVisible] = useState(false);
   const [ticketSummary, setTicketSummary] = useState('');
   const [ticketDescription, setTicketDescription] = useState('');
+  const [ticketPriority, setTicketPriority] = useState('Medium');
+  const [projects, setProjects] = useState<JiraProject[]>([]);
+  const [selectedProject, setSelectedProject] = useState('');
+  const [issueTypes, setIssueTypes] = useState<JiraIssueType[]>([]);
+  const [selectedIssueType, setSelectedIssueType] = useState('');
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [isLoadingIssueTypes, setIsLoadingIssueTypes] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -84,7 +101,72 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
         timestamp: new Date()
       }
     ]);
+    
+    // Fetch projects when component mounts
+    fetchProjects();
   }, []);
+  
+  // Fetch Jira projects
+  const fetchProjects = async () => {
+    setIsLoadingProjects(true);
+    try {
+      const projectsData = await jiraApi.getProjects();
+      setProjects(projectsData);
+      
+      if (projectsData.length > 0) {
+        setSelectedProject(projectsData[0].key);
+        // Fetch issue types for the first project
+        fetchIssueTypes(projectsData[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      // Add fallback mock projects
+      const mockProjects: JiraProject[] = [
+        { id: 'DEMO-1', key: 'DEMO', name: 'Demo Project' },
+        { id: 'ENG-1', key: 'ENG', name: 'Engineering' },
+        { id: 'OPS-1', key: 'OPS', name: 'Operations' }
+      ];
+      setProjects(mockProjects);
+      setSelectedProject('DEMO');
+      
+      // Also set mock issue types
+      const mockIssueTypes: JiraIssueType[] = [
+        { id: 'BUG-1', name: 'Bug' },
+        { id: 'TASK-1', name: 'Task' },
+        { id: 'STORY-1', name: 'Story' }
+      ];
+      setIssueTypes(mockIssueTypes);
+      setSelectedIssueType('Bug');
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
+  
+  // Fetch issue types for a project
+  const fetchIssueTypes = async (projectId: string) => {
+    setIsLoadingIssueTypes(true);
+    try {
+      const issueTypesData = await jiraApi.getIssueTypes(projectId);
+      setIssueTypes(issueTypesData);
+      
+      if (issueTypesData.length > 0) {
+        setSelectedIssueType(issueTypesData[0].name);
+      }
+    } catch (error) {
+      console.error('Error fetching issue types:', error);
+      
+      // Add fallback mock issue types
+      const mockIssueTypes: JiraIssueType[] = [
+        { id: 'BUG-1', name: 'Bug' },
+        { id: 'TASK-1', name: 'Task' },
+        { id: 'STORY-1', name: 'Story' }
+      ];
+      setIssueTypes(mockIssueTypes);
+      setSelectedIssueType('Bug');
+    } finally {
+      setIsLoadingIssueTypes(false);
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,6 +242,16 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
     }
   };
   
+  const handleProjectChange = (projectKey: string) => {
+    setSelectedProject(projectKey);
+    
+    // Find project by key and fetch issue types
+    const project = projects.find(p => p.key === projectKey);
+    if (project) {
+      fetchIssueTypes(project.id);
+    }
+  };
+  
   const handleCreateTicket = async () => {
     if (!ticketSummary.trim()) {
       toast({
@@ -172,8 +264,14 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
     setIsLoading(true);
     
     try {
-      // Create a real Jira ticket using the API
-      const ticketResponse = await jiraApi.createTicket(ticketSummary, ticketDescription);
+      // Create a real Jira ticket using the enhanced API
+      const ticketResponse = await jiraApi.createTicket({
+        summary: ticketSummary,
+        description: ticketDescription,
+        priority: ticketPriority,
+        project: selectedProject,
+        issueType: selectedIssueType
+      });
       
       // Create a ticket info object to pass to the parent component
       const ticket: JiraTicketInfo = {
@@ -181,8 +279,10 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
         url: ticketResponse.url,
         summary: ticketSummary,
         description: ticketDescription,
-        priority: 'Medium',
-        status: 'Open'
+        priority: ticketPriority,
+        status: 'Open',
+        project: selectedProject,
+        issueType: selectedIssueType
       };
       
       // Add confirmation message
@@ -204,6 +304,7 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
       setTicketFormVisible(false);
       setTicketSummary('');
       setTicketDescription('');
+      setTicketPriority('Medium');
       
       // Notify parent component
       if (onTicketCreated) {
@@ -229,6 +330,7 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
     setTicketFormVisible(false);
     setTicketSummary('');
     setTicketDescription('');
+    setTicketPriority('Medium');
   };
   
   const clearChat = () => {
@@ -243,6 +345,7 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
     setTicketFormVisible(false);
     setTicketSummary('');
     setTicketDescription('');
+    setTicketPriority('Medium');
   };
 
   return (
@@ -335,7 +438,7 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
         </div>
       </div>
       
-      {/* Ticket creation form */}
+      {/* Enhanced ticket creation form */}
       {ticketFormVisible && (
         <div className="p-3 border-t border-border/30 bg-muted/20">
           <div className="space-y-3">
@@ -349,6 +452,81 @@ const JiraTicketChat = ({ onTicketCreated }: JiraTicketChatProps) => {
                 disabled={isLoading}
               />
             </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="ticket-project" className="text-xs font-medium block mb-1">Project</label>
+                <Select
+                  value={selectedProject}
+                  onValueChange={handleProjectChange}
+                  disabled={isLoading || isLoadingProjects}
+                >
+                  <SelectTrigger className="w-full text-left">
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    {isLoadingProjects ? (
+                      <div className="flex items-center justify-center py-2">
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
+                        <span className="text-xs">Loading...</span>
+                      </div>
+                    ) : (
+                      projects.map((project) => (
+                        <SelectItem key={project.id} value={project.key}>
+                          {project.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <label htmlFor="ticket-type" className="text-xs font-medium block mb-1">Issue Type</label>
+                <Select
+                  value={selectedIssueType}
+                  onValueChange={setSelectedIssueType}
+                  disabled={isLoading || isLoadingIssueTypes}
+                >
+                  <SelectTrigger className="w-full text-left">
+                    <SelectValue placeholder="Select issue type" />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    {isLoadingIssueTypes ? (
+                      <div className="flex items-center justify-center py-2">
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
+                        <span className="text-xs">Loading...</span>
+                      </div>
+                    ) : (
+                      issueTypes.map((type) => (
+                        <SelectItem key={type.id} value={type.name}>
+                          {type.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div>
+              <label htmlFor="ticket-priority" className="text-xs font-medium block mb-1">Priority</label>
+              <Select
+                value={ticketPriority}
+                onValueChange={setTicketPriority}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-full text-left">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent align="start">
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
             <div>
               <label htmlFor="ticket-description" className="text-xs font-medium block mb-1">Description</label>
               <Textarea

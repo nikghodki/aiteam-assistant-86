@@ -1,21 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Ticket, ExternalLink, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { jiraApi } from '@/services/api';
-
-interface JiraTicket {
-  key: string;
-  url: string;
-  summary: string;
-  description: string;
-  status: 'Open' | 'In Progress' | 'Resolved' | 'Closed';
-  priority: 'High' | 'Medium' | 'Low';
-  createdAt: Date;
-}
+import { jiraApi, JiraTicket as JiraTicketType } from '@/services/api';
 
 interface JiraTicketListProps {
   refreshTrigger?: number;
@@ -23,7 +12,7 @@ interface JiraTicketListProps {
 
 const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
   const { user } = useAuth();
-  const [tickets, setTickets] = useState<JiraTicket[]>([]);
+  const [tickets, setTickets] = useState<JiraTicketType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -31,21 +20,9 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
       setIsLoading(true);
       
       try {
-        // Fetch tickets from the API
-        const userTickets = await jiraApi.getUserTickets();
-        
-        // Transform the API response to match our JiraTicket interface
-        const transformedTickets = userTickets.map((ticket: any) => ({
-          key: ticket.key,
-          url: ticket.url || `https://jira.example.com/browse/${ticket.key}`,
-          summary: ticket.summary || ticket.title || 'No summary available',
-          description: ticket.description || 'No description available',
-          status: ticket.status || 'Open',
-          priority: ticket.priority || 'Medium',
-          createdAt: new Date(ticket.created || ticket.createdAt || Date.now())
-        }));
-        
-        setTickets(transformedTickets);
+        // Fetch tickets reported by the current user using the new API
+        const userTickets = await jiraApi.getUserReportedTickets();
+        setTickets(userTickets);
       } catch (error) {
         console.error('Error fetching Jira tickets:', error);
         
@@ -54,7 +31,7 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
         if (savedTickets) {
           const parsedTickets = JSON.parse(savedTickets).map((ticket: any) => ({
             ...ticket,
-            createdAt: new Date(ticket.createdAt)
+            createdAt: new Date(ticket.createdAt || ticket.created || Date.now())
           }));
           setTickets(parsedTickets);
         }
@@ -75,14 +52,17 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
 
   // Function to add a mock ticket (for demo purposes)
   const addMockTicket = () => {
-    const mockTicket: JiraTicket = {
+    const mockTicket: JiraTicketType = {
       key: `JIRA-${Math.floor(1000 + Math.random() * 9000)}`,
       url: `https://jira.example.com/browse/JIRA-${Math.floor(1000 + Math.random() * 9000)}`,
       summary: 'Sample ticket for demonstration',
       description: 'This is a sample ticket created for demonstration purposes.',
       status: Math.random() > 0.5 ? 'Open' : 'In Progress',
       priority: Math.random() > 0.7 ? 'High' : Math.random() > 0.4 ? 'Medium' : 'Low',
-      createdAt: new Date()
+      created: new Date().toISOString(),
+      reporter: user?.name,
+      project: 'DEMO',
+      issueType: 'Bug'
     };
     
     setTickets(prev => [mockTicket, ...prev]);
@@ -116,7 +96,8 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
     }
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
@@ -171,7 +152,7 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center">
-                    <div className={cn("w-2 h-2 rounded-full mr-2", getStatusColor(ticket.status))}></div>
+                    <div className={cn("w-2 h-2 rounded-full mr-2", getStatusColor(ticket.status || ''))}></div>
                     <a 
                       href={ticket.url} 
                       target="_blank" 
@@ -184,9 +165,9 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
                   </div>
                   <Badge 
                     variant="outline" 
-                    className={cn("text-xs px-1.5 py-0", getPriorityColor(ticket.priority))}
+                    className={cn("text-xs px-1.5 py-0", getPriorityColor(ticket.priority || 'Medium'))}
                   >
-                    {ticket.priority}
+                    {ticket.priority || 'Medium'}
                   </Badge>
                 </div>
                 
@@ -198,10 +179,10 @@ const JiraTicketList = ({ refreshTrigger = 0 }: JiraTicketListProps) => {
                 
                 <div className="flex justify-between items-center mt-1">
                   <span className="text-xs text-muted-foreground">
-                    {formatDate(ticket.createdAt)}
+                    {ticket.created ? formatDate(ticket.created) : 'Just now'}
                   </span>
                   <Badge variant="secondary" className="text-xs">
-                    {ticket.status}
+                    {ticket.status || 'Open'}
                   </Badge>
                 </div>
               </div>

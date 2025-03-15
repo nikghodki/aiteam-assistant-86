@@ -1,4 +1,3 @@
-
 // API base URL should be configured in your environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -25,6 +24,9 @@ export interface JiraTicket {
   status?: string;
   priority?: string;
   created?: string;
+  reporter?: string;
+  project?: string;
+  issueType?: string;
 }
 
 export interface AccessRequest {
@@ -73,6 +75,27 @@ export interface KubernetesCluster {
   version?: string;
   environment?: 'production' | 'qa' | 'staging';
   nodeCount?: number;
+}
+
+// Enhanced Jira ticket interfaces
+export interface JiraTicketCreateRequest {
+  summary: string;
+  description: string;
+  priority?: string;
+  project?: string;
+  issueType?: string;
+}
+
+export interface JiraProject {
+  id: string;
+  key: string;
+  name: string;
+}
+
+export interface JiraIssueType {
+  id: string;
+  name: string;
+  description?: string;
 }
 
 // RBAC interfaces
@@ -286,28 +309,40 @@ export const kubernetesApi = {
   },
 };
 
-// Jira Ticket API
+// Enhanced Jira Ticket API
 export const jiraApi = {
-  // Create a ticket
-  createTicket: (summary: string, description: string, priority: string = 'Medium') => 
+  // Create a ticket with more detailed fields
+  createTicket: (ticketData: JiraTicketCreateRequest) => 
     apiCall<JiraTicket>('/jira/ticket', {
       method: 'POST',
-      body: JSON.stringify({ summary, description, priority }),
+      body: JSON.stringify(ticketData),
     }),
 
-  // Get user's tickets
-  getUserTickets: () => 
-    apiCall<any[]>('/jira/tickets'),
+  // Get user's tickets with optional filters
+  getUserTickets: (filters?: { reporter?: string, status?: string }) => 
+    apiCall<JiraTicket[]>(`/jira/tickets${filters ? `?${new URLSearchParams(filters as Record<string, string>).toString()}` : ''}`),
+  
+  // Get tickets reported by the current user
+  getUserReportedTickets: () => 
+    apiCall<JiraTicket[]>('/jira/tickets/reported-by-me'),
 
   // Get ticket details
   getTicketDetails: (ticketKey: string) => 
-    apiCall<any>(`/jira/tickets/${ticketKey}`),
+    apiCall<JiraTicket>(`/jira/tickets/${ticketKey}`),
 
-  // Chat with assistant
-  chatWithAssistant: (message: string) => 
+  // Get available Jira projects
+  getProjects: () => 
+    apiCall<JiraProject[]>('/jira/projects'),
+
+  // Get issue types for a project
+  getIssueTypes: (projectId?: string) => 
+    apiCall<JiraIssueType[]>(`/jira/issue-types${projectId ? `?projectId=${projectId}` : ''}`),
+
+  // Chat with assistant for Jira
+  chatWithAssistant: (message: string, context?: { ticketKey?: string }) => 
     apiCall<ChatResponse>('/jira/chat', {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, context }),
     }),
 };
 
