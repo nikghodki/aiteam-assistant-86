@@ -21,6 +21,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { cn } from '@/lib/utils';
 import { kubernetesApi, CommandResult } from '@/services/api';
+import KubernetesDebugDrawer from './KubernetesDebugDrawer';
 import {
   Tabs,
   TabsContent,
@@ -96,6 +97,9 @@ const KubernetesDebugger = () => {
   const [commandError, setCommandError] = useState<string | null>(null);
   
   const [debugSession, setDebugSession] = useState<{id: string; debugLog: string} | null>(null);
+  
+  const [isDebugDrawerOpen, setIsDebugDrawerOpen] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<NamespaceIssue | null>(null);
 
   const { data: clusters, isLoading: isLoadingClusters } = useQuery({
     queryKey: ['clusters', selectedEnvironment],
@@ -224,7 +228,7 @@ const KubernetesDebugger = () => {
       } else {
         setDebugSession({
           id: `debug-${Date.now()}`,
-          debugLog: `Debug Session - ${new Date().toLocaleString()}\n\nCluster: ${selectedCluster}\n\nNamespace: ${selectedNamespace}\n\nUser: ${message}\n\nAssistant: ${response.response}`
+          debugLog: `## Request\n${message}\n\n## Response\n${response.response}`
         });
       }
     } catch (error: any) {
@@ -302,16 +306,19 @@ Severity: ${issue.severity}
 What steps should I take to investigate and resolve this issue?`;
     
     setMessage(prompt);
+    setSelectedIssue(issue);
     
     setTimeout(() => {
       const formEvent = new Event('submit', { cancelable: true, bubbles: true }) as unknown as React.FormEvent;
       handleChatSubmit(formEvent);
     }, 100);
     
-    const chatSection = document.getElementById('kubernetes-assistant');
-    if (chatSection) {
-      chatSection.scrollIntoView({ behavior: 'smooth' });
-    }
+    setIsDebugDrawerOpen(true);
+  };
+
+  const closeDebugDrawer = () => {
+    setIsDebugDrawerOpen(false);
+    setSelectedIssue(null);
   };
 
   const getSeverityColor = (severity: string) => {
@@ -740,6 +747,16 @@ What steps should I take to investigate and resolve this issue?`;
           </div>
         </GlassMorphicCard>
       </div>
+
+      <KubernetesDebugDrawer
+        isOpen={isDebugDrawerOpen}
+        onClose={closeDebugDrawer}
+        debugSession={debugSession}
+        issue={selectedIssue ? {
+          ...selectedIssue,
+          namespace: selectedNamespace
+        } : undefined}
+      />
     </div>
   );
 };
