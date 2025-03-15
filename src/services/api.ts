@@ -267,25 +267,16 @@ export const kubernetesApi = {
    * @param clusterArn The ARN of the cluster
    * @returns An array of namespace names
    */
-  getNamespaces: async (clusterArn: string): Promise<string[]> => {
-    try {
-      // The clusterArn is required
-      if (!clusterArn) {
-        throw new Error('Cluster ARN is required');
-      }
-      
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/kubernetes/namespaces?clusterArn=${encodeURIComponent(clusterArn)}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch namespaces');
-      }
-      
-      return await response.json();
-    } catch (error: any) {
-      console.error('Error fetching namespaces:', error);
-      throw new Error(error.message || 'Failed to fetch namespaces');
+  getNamespaces: (clusterArn: string): Promise<string[]> => {
+    // The clusterArn is required
+    if (!clusterArn) {
+      return Promise.reject(new Error('Cluster ARN is required'));
     }
+    
+    return apiCall<string[]>(`/kubernetes/namespaces`, {
+      method: 'POST',
+      body: JSON.stringify({ clusterArn }),
+    });
   },
 };
 

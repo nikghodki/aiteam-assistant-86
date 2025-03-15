@@ -69,31 +69,26 @@ const KubernetesDebugger = () => {
   const [selectedClusterArn, setSelectedClusterArn] = useState<string>('');
   const [selectedNamespace, setSelectedNamespace] = useState<string>('default');
   
-  // Chat state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     { role: 'assistant', content: 'How can I help you debug your Kubernetes cluster today?' }
   ]);
   const [message, setMessage] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   
-  // Command execution state
   const [command, setCommand] = useState('kubectl get pods -n default');
   const [commandOutput, setCommandOutput] = useState('');
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [commandLoading, setCommandLoading] = useState(false);
   
-  // Debug session state
   const [debugSession, setDebugSession] = useState<{id: string; debugLog: string} | null>(null);
   const [debugSteps, setDebugSteps] = useState<string[]>([]);
 
-  // Get clusters based on environment
   const { data: clusters, isLoading: isLoadingClusters } = useQuery({
     queryKey: ['clusters', selectedEnvironment],
     queryFn: () => kubernetesApi.getClusters(selectedEnvironment),
     staleTime: 30000,
   });
 
-  // Get namespaces for selected cluster
   const { data: namespaces, isLoading: isLoadingNamespaces } = useQuery({
     queryKey: ['namespaces', selectedClusterArn],
     queryFn: () => kubernetesApi.getNamespaces(selectedClusterArn),
@@ -101,7 +96,6 @@ const KubernetesDebugger = () => {
     enabled: !!selectedClusterArn,
   });
 
-  // Set first cluster as selected when clusters load
   useEffect(() => {
     if (clusters && clusters.length > 0 && !selectedCluster) {
       setSelectedCluster(clusters[0].name);
@@ -109,13 +103,10 @@ const KubernetesDebugger = () => {
     }
   }, [clusters]);
 
-  // Update command when namespace changes
   useEffect(() => {
     if (selectedNamespace && command.includes('-n ')) {
-      // Replace the namespace in the existing command
       setCommand(command.replace(/-n\s+([^\s]+)/, `-n ${selectedNamespace}`));
     } else if (selectedNamespace && !command.includes('-n ')) {
-      // Add namespace flag if not present
       setCommand(`${command} -n ${selectedNamespace}`);
     }
   }, [selectedNamespace]);
@@ -129,12 +120,10 @@ const KubernetesDebugger = () => {
       const result = await kubernetesApi.runCommand(selectedClusterArn, command);
       setCommandOutput(result.output);
       
-      // Add to command history if unique
       if (!commandHistory.includes(command)) {
         setCommandHistory(prev => [command, ...prev].slice(0, 10));
       }
       
-      // Add to debug steps
       setDebugSteps(prev => [...prev, `Executed: ${command}\nResult: ${result.exitCode === 0 ? 'Success' : 'Error'}`]);
       
       if (result.exitCode !== 0) {
@@ -176,14 +165,12 @@ const KubernetesDebugger = () => {
       
       setDebugSteps(prev => [...prev, `AI Assistant: ${response.response.substring(0, 50)}${response.response.length > 50 ? '...' : ''}`]);
       
-      // Check if assistant suggests a command
       const commandMatch = response.response.match(/```(?:bash|sh)?\s*(kubectl .+?)```/);
       if (commandMatch && commandMatch[1]) {
         const suggestedCommand = commandMatch[1].trim();
         setCommand(suggestedCommand);
       }
       
-      // Update debug log
       if (debugSession) {
         setDebugSession({
           ...debugSession,
@@ -231,7 +218,7 @@ const KubernetesDebugger = () => {
   const handleClusterSelect = (name: string, arn: string) => {
     setSelectedCluster(name);
     setSelectedClusterArn(arn);
-    setSelectedNamespace('default'); // Reset namespace when cluster changes
+    setSelectedNamespace('default');
   };
 
   const handleNamespaceChange = (value: string) => {
@@ -279,10 +266,8 @@ const KubernetesDebugger = () => {
 
   return (
     <div className="space-y-6">
-      {/* Environment, Cluster and Namespace Selection */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pb-4">
         <div className="md:col-span-8 space-y-4 bg-gradient-professional rounded-lg p-4 border border-border/50 shadow-sm">
-          {/* Environment Selection */}
           <div className="flex items-center space-x-4">
             <div className="text-sm font-medium">Environment:</div>
             <Tabs 
@@ -304,7 +289,6 @@ const KubernetesDebugger = () => {
             </Tabs>
           </div>
 
-          {/* Cluster Selection Dropdown */}
           <div className="flex items-center space-x-4">
             <div className="text-sm font-medium">Cluster:</div>
             <DropdownMenu>
@@ -357,7 +341,6 @@ const KubernetesDebugger = () => {
             </DropdownMenu>
           </div>
 
-          {/* Namespace Selection */}
           <div className="flex items-center space-x-4">
             <div className="text-sm font-medium">Namespace:</div>
             <Select
@@ -397,7 +380,6 @@ const KubernetesDebugger = () => {
           </div>
         </div>
         
-        {/* Selected Cluster Information & Download button */}
         <div className="md:col-span-4">
           {selectedCluster ? (
             <div className="bg-gradient-soft h-full flex flex-col justify-between rounded-lg p-4 border border-border/50 shadow-sm text-white">
@@ -442,9 +424,7 @@ const KubernetesDebugger = () => {
         </div>
       </div>
 
-      {/* Main Debug Interface */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        {/* Command Terminal */}
         <GlassMorphicCard className="md:col-span-8 bg-gradient-professional">
           <div className="p-4 border-b bg-muted/40">
             <form onSubmit={handleCommandSubmit} className="flex gap-2">
@@ -516,7 +496,6 @@ const KubernetesDebugger = () => {
           )}
         </GlassMorphicCard>
         
-        {/* Command History */}
         <GlassMorphicCard className="md:col-span-4 overflow-hidden">
           <div className="p-4 border-b bg-gradient-professional">
             <h3 className="font-medium text-sm">Command History</h3>
@@ -547,9 +526,7 @@ const KubernetesDebugger = () => {
         </GlassMorphicCard>
       </div>
 
-      {/* Chat and Debug Steps */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        {/* Chat Interface */}
         <GlassMorphicCard className="md:col-span-8">
           <div className="p-4 border-b bg-gradient-professional">
             <h3 className="font-medium text-sm">Kubernetes Assistant</h3>
@@ -619,7 +596,6 @@ const KubernetesDebugger = () => {
           </div>
         </GlassMorphicCard>
         
-        {/* Debug Steps */}
         <GlassMorphicCard className="md:col-span-4">
           <div className="p-4 border-b bg-gradient-professional flex justify-between items-center">
             <h3 className="font-medium text-sm">Debugging Steps</h3>
@@ -657,4 +633,3 @@ const KubernetesDebugger = () => {
 };
 
 export default KubernetesDebugger;
-
