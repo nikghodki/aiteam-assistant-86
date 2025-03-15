@@ -1,4 +1,3 @@
-
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { 
   Terminal, 
@@ -92,6 +91,7 @@ const KubernetesDebugger = () => {
   const [command, setCommand] = useState('kubectl get pods -n default');
   
   const [debugSession, setDebugSession] = useState<{id: string; debugLog: string} | null>(null);
+  const [debugFilePath, setDebugFilePath] = useState<string | undefined>(undefined);
   
   const [isDebugDrawerOpen, setIsDebugDrawerOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<NamespaceIssue | null>(null);
@@ -218,7 +218,12 @@ const KubernetesDebugger = () => {
         debugLog: `## Request\n${message}\n\n## Response\n${response.response}`
       });
       
-      // Once we have the debug response, open the drawer
+      if (response.file_name) {
+        setDebugFilePath(response.file_name);
+      } else {
+        setDebugFilePath(undefined);
+      }
+      
       setIsDebugDrawerOpen(true);
     } catch (error: any) {
       toast({
@@ -285,7 +290,6 @@ What steps should I take to investigate and resolve this issue?`;
     
     setSelectedIssue(issue);
     
-    // Send debug request immediately
     sendDebugRequest(prompt);
   };
 
@@ -663,6 +667,7 @@ What steps should I take to investigate and resolve this issue?`;
           ...selectedIssue,
           namespace: selectedNamespace
         } : undefined}
+        debugFilePath={debugFilePath}
       />
     </div>
   );

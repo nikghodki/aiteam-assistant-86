@@ -207,6 +207,9 @@ def kubernetes_chat():
     
     time.sleep(random.uniform(0.5, 1.5))  # Simulate AI processing time
     
+    # Generate unique file_name for debug data
+    debug_file_name = f"/api/kubernetes/debug-files/debug-{uuid.uuid4()}.txt"
+    
     if "pod" in message.lower() and "not starting" in message.lower():
         return jsonify({
             "response": f"It looks like you're having issues with pods not starting in the {namespace} namespace. Here are some common reasons:\n\n"
@@ -216,7 +219,8 @@ def kubernetes_chat():
                        f"Let's check the pod status with:\n\n"
                        f"```\nkubectl get pods -n {namespace}\n```\n\n"
                        f"Then we can describe a specific pod to see detailed status:\n\n"
-                       f"```\nkubectl describe pod <pod-name> -n {namespace}\n```"
+                       f"```\nkubectl describe pod <pod-name> -n {namespace}\n```",
+            "file_name": debug_file_name
         })
     elif "deployment" in message.lower() and "scaling" in message.lower():
         return jsonify({
@@ -224,13 +228,15 @@ def kubernetes_chat():
                        f"```\nkubectl scale deployment/<deployment-name> --replicas=<count> -n {namespace}\n```\n\n"
                        f"Or you can edit the deployment directly:\n\n"
                        f"```\nkubectl edit deployment/<deployment-name> -n {namespace}\n```\n\n"
-                       f"And update the `spec.replicas` field to your desired count."
+                       f"And update the `spec.replicas` field to your desired count.",
+            "file_name": debug_file_name
         })
     else:
         return jsonify({
             "response": f"I'll help you debug your Kubernetes issues in the {namespace} namespace on cluster {cluster_arn.split('/')[-1]}. "
                        f"Could you provide more details about what specific problem you're experiencing? "
-                       f"For example, are you seeing pod crashes, network issues, or resource constraints?"
+                       f"For example, are you seeing pod crashes, network issues, or resource constraints?",
+            "file_name": debug_file_name
         })
 
 # Get issues in a namespace

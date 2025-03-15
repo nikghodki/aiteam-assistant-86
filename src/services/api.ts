@@ -43,6 +43,7 @@ export interface CommandResult {
 
 export interface ChatResponse {
   response: string;
+  file_name?: string;
 }
 
 export interface DocumentResult {
