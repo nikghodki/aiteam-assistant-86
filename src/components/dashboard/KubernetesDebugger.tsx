@@ -1,3 +1,4 @@
+
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { 
   Terminal, 
@@ -93,7 +94,10 @@ const KubernetesDebugger = () => {
 
   const { data: namespaces, isLoading: isLoadingNamespaces } = useQuery({
     queryKey: ['namespaces', selectedClusterArn],
-    queryFn: () => kubernetesApi.getNamespaces(selectedClusterArn),
+    queryFn: () => {
+      if (!selectedClusterArn) return Promise.resolve([]);
+      return kubernetesApi.getNamespaces(selectedClusterArn);
+    },
     staleTime: 30000,
     enabled: !!selectedClusterArn,
   });
@@ -122,7 +126,13 @@ const KubernetesDebugger = () => {
     
     try {
       console.log("Running command:", command, "on cluster:", selectedClusterArn, "in namespace:", selectedNamespace);
-      const result = await kubernetesApi.runCommand(selectedClusterArn, command, selectedNamespace);
+      
+      const result = await kubernetesApi.runCommand(
+        selectedClusterArn, 
+        command, 
+        selectedNamespace || 'default'
+      );
+      
       console.log("Command result:", result);
       
       if (result.exitCode !== 0) {

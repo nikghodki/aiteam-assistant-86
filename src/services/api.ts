@@ -237,7 +237,12 @@ export const kubernetesApi = {
   runCommand: (clusterArn: string, command: string, namespace: string, jiraTicketKey?: string) => 
     apiCall<CommandResult>('/kubernetes/command', {
       method: 'POST',
-      body: JSON.stringify({ clusterArn, command, namespace, jiraTicketKey }),
+      body: JSON.stringify({ 
+        clusterArn, 
+        command, 
+        namespace, 
+        jiraTicketKey 
+      }),
     }),
 
   // Chat with the assistant
