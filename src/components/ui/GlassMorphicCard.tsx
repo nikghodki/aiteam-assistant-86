@@ -7,13 +7,15 @@ interface GlassMorphicCardProps {
   className?: string;
   hoverEffect?: boolean;
   style?: React.CSSProperties;
+  id?: string; // Add id prop
 }
 
 const GlassMorphicCard = ({ 
   children, 
   className, 
   hoverEffect = true,
-  style
+  style,
+  id
 }: GlassMorphicCardProps) => {
   return (
     <div 
@@ -23,6 +25,7 @@ const GlassMorphicCard = ({
         className
       )}
       style={style}
+      id={id}
     >
       {children}
     </div>
