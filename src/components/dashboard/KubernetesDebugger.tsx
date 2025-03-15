@@ -12,7 +12,9 @@ import {
   X, 
   ChevronDown,
   LayoutGrid,
-  Bug
+  Bug,
+  ExternalLink,
+  MessageSquare
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -289,6 +291,27 @@ const KubernetesDebugger = () => {
       title: "Debug Log Downloaded",
       description: "The debug session log has been downloaded successfully",
     });
+  };
+
+  const handleIssueClick = (issue: NamespaceIssue) => {
+    const prompt = `I need help debugging an issue in my Kubernetes cluster. 
+There's a problem with a ${issue.kind} named "${issue.name}" in the "${selectedNamespace}" namespace:
+Issue: ${issue.message}
+Severity: ${issue.severity}
+
+What steps should I take to investigate and resolve this issue?`;
+    
+    setMessage(prompt);
+    
+    setTimeout(() => {
+      const formEvent = new Event('submit', { cancelable: true, bubbles: true }) as unknown as React.FormEvent;
+      handleChatSubmit(formEvent);
+    }, 100);
+    
+    const chatSection = document.getElementById('kubernetes-assistant');
+    if (chatSection) {
+      chatSection.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   const getSeverityColor = (severity: string) => {
@@ -585,7 +608,7 @@ const KubernetesDebugger = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <GlassMorphicCard className="md:col-span-8">
+        <GlassMorphicCard className="md:col-span-8" id="kubernetes-assistant">
           <div className="p-4 border-b bg-gradient-professional">
             <h3 className="font-medium text-sm">Kubernetes Assistant</h3>
             <p className="text-xs text-muted-foreground mt-1">
@@ -668,22 +691,39 @@ const KubernetesDebugger = () => {
             ) : namespaceIssues && namespaceIssues.length > 0 ? (
               <ul className="space-y-3">
                 {namespaceIssues.map((issue) => (
-                  <li key={issue.id} className="p-3 bg-background rounded-lg border border-border/30 shadow-sm">
+                  <li 
+                    key={issue.id} 
+                    className="p-3 bg-background rounded-lg border border-border/30 shadow-sm hover:border-professional-purple-DEFAULT hover:bg-muted/30 transition-colors cursor-pointer group"
+                    onClick={() => handleIssueClick(issue)}
+                  >
                     <div className="flex justify-between items-start mb-2">
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getSeverityColor(issue.severity)}`}>
                         {issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1)}
                       </span>
                       <span className="text-xs text-muted-foreground">{new Date(issue.timestamp).toLocaleTimeString()}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 mb-2 text-xs font-medium">
-                      <div className="text-muted-foreground">Kind</div>
-                      <div className="text-muted-foreground">Name</div>
-                      <div className="text-muted-foreground">Message</div>
+                    
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Kind</div>
+                        <div className="text-sm font-medium">{issue.kind}</div>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Name</div>
+                        <div className="text-sm truncate">{issue.name}</div>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Message</div>
+                        <div className="text-sm text-muted-foreground">{issue.message}</div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div className="font-medium">{issue.kind}</div>
-                      <div className="truncate">{issue.name}</div>
-                      <div className="text-muted-foreground">{issue.message}</div>
+                    
+                    <div className="flex justify-end mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-xs flex items-center gap-1 text-professional-purple-DEFAULT">
+                        Debug issue <MessageSquare size={12} />
+                      </span>
                     </div>
                   </li>
                 ))}
