@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Check, Copy, Download, X } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -85,10 +86,10 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   };
 
   const handleDownload = async () => {
-    if (!debugSession?.id) {
+    if (!debugSession?.id && !debugFileContent) {
       toast({
         title: "Error",
-        description: "No debugging session available to download",
+        description: "No debugging information available to download",
         variant: "destructive"
       });
       return;
@@ -97,14 +98,30 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     setIsDownloading(true);
     
     try {
-      const response = await kubernetesApi.downloadDebugFile(debugSession.id);
-      
-      const link = document.createElement('a');
-      link.href = response.url;
-      link.download = `debug-session-${debugSession.id}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if (debugSession?.id) {
+        // Download using API if debugSession exists
+        const response = await kubernetesApi.downloadDebugFile(debugSession.id);
+        
+        const link = document.createElement('a');
+        link.href = response.url;
+        link.download = `debug-session-${debugSession.id}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (debugFileContent) {
+        // Download the debug file content if available
+        const blob = new Blob([debugFileContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `debug-file-${new Date().getTime()}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        URL.revokeObjectURL(url);
+      }
       
       toast({
         title: "Download started",
@@ -199,7 +216,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
           <div className="flex justify-between items-center">
             <SheetTitle className="text-xl">Kubernetes Troubleshooting</SheetTitle>
             <div className="flex gap-2">
-              {debugSession?.id && (
+              {(debugSession?.id || debugFileContent) && (
                 <Button 
                   variant="outline" 
                   size="icon" 
