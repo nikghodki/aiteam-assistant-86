@@ -289,6 +289,8 @@ Severity: ${issue.severity}
 What steps should I take to investigate and resolve this issue?`;
     
     setSelectedIssue(issue);
+    setIsDebugDrawerOpen(true);
+    setDebugLoading(true);
     
     sendDebugRequest(prompt);
   };
@@ -668,6 +670,7 @@ What steps should I take to investigate and resolve this issue?`;
           namespace: selectedNamespace
         } : undefined}
         debugFilePath={debugFilePath}
+        isLoading={debugLoading}
       />
     </div>
   );

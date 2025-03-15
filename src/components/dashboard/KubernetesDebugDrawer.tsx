@@ -29,6 +29,7 @@ interface KubernetesDebugDrawerProps {
     namespace: string;
   };
   debugFilePath?: string;
+  isLoading?: boolean;
 }
 
 const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
@@ -37,6 +38,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   debugSession,
   issue,
   debugFilePath,
+  isLoading = false,
 }) => {
   const { toast } = useToast();
   const [copying, setCopying] = useState<string | null>(null);
@@ -163,6 +165,12 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     return 'bg-gray-100 dark:bg-gray-800';
   };
 
+  // Main loading state (when user first clicks an issue)
+  const showMainLoadingState = isLoading && !debugSession;
+
+  // File loading state (when debug file is being fetched)
+  const showFileLoadingState = isLoadingFile && debugFilePath;
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl overflow-auto bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
@@ -210,7 +218,18 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
         </SheetHeader>
         
         <div className="py-4">
-          {isLoadingFile ? (
+          {showMainLoadingState ? (
+            <div className="flex items-center justify-center h-40">
+              <div className="flex flex-col items-center">
+                <div className="flex space-x-2 mb-2">
+                  <div className="w-3 h-3 bg-professional-purple/70 rounded-full animate-bounce delay-100"></div>
+                  <div className="w-3 h-3 bg-professional-purple/70 rounded-full animate-bounce delay-200"></div>
+                  <div className="w-3 h-3 bg-professional-purple/70 rounded-full animate-bounce delay-300"></div>
+                </div>
+                <p className="text-sm text-muted-foreground">Getting AI assistance for this issue...</p>
+              </div>
+            </div>
+          ) : showFileLoadingState ? (
             <div className="flex items-center justify-center h-40">
               <div className="flex flex-col items-center">
                 <div className="flex space-x-2 mb-2">
@@ -223,6 +242,14 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
             </div>
           ) : (
             <div className="flex flex-col">
+              {issue && !debugSession && !showMainLoadingState ? (
+                <Alert className="border-professional-purple-light/30 dark:border-professional-purple-dark/30 mb-4">
+                  <AlertDescription>
+                    Analyzing this issue. The AI assistant will provide debugging steps shortly.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              
               {request && (
                 <div className="flex justify-start mb-4">
                   <div className={cn("rounded-lg p-3 max-w-[85%] shadow-sm", getRequestBubbleStyle())}>
@@ -274,7 +301,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                   ))}
                 </div>
               ) : (
-                !request && (
+                !request && !showMainLoadingState && (
                   <Alert className="border-professional-purple-light/30 dark:border-professional-purple-dark/30">
                     <AlertDescription>
                       No debugging information is available. Please start a debugging session by selecting an issue or asking a question in the Kubernetes Assistant.
