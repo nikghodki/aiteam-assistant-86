@@ -144,9 +144,28 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
            'bg-professional-gray-dark text-green-50';
   };
 
+  // Get appropriate background color for the chat bubbles based on type
+  const getChatBubbleStyle = (type: 'text' | 'command' | 'output') => {
+    switch (type) {
+      case 'text':
+        return 'bg-professional-purple-light/90 dark:bg-professional-purple-dark/80';
+      case 'command':
+        return 'bg-gradient-terminal';
+      case 'output':
+        return 'bg-muted/30 dark:bg-muted/20 border border-border/40';
+      default:
+        return '';
+    }
+  };
+
+  // Get color for request message bubble
+  const getRequestBubbleStyle = () => {
+    return 'bg-gray-100 dark:bg-gray-800';
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl overflow-auto">
+      <SheetContent side="right" className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl overflow-auto bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
         <SheetHeader className="pb-4">
           <div className="flex justify-between items-center">
             <SheetTitle className="text-xl">Kubernetes Troubleshooting</SheetTitle>
@@ -159,30 +178,30 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
           {issue && (
             <SheetDescription>
               <div className="mt-2 space-y-2">
-                <div className="grid grid-cols-3 gap-2 text-sm rounded-lg overflow-hidden border border-border/30">
-                  <div className="font-medium p-2 bg-muted/70">Kind:</div>
+                <div className="grid grid-cols-3 gap-2 text-sm rounded-lg overflow-hidden border border-border/30 shadow-sm">
+                  <div className="font-medium p-2 bg-professional-purple-light/20 dark:bg-professional-purple-dark/20">Kind:</div>
                   <div className="col-span-2 p-2 bg-muted/40">{issue.kind}</div>
                   
-                  <div className="font-medium p-2 bg-muted/70">Name:</div>
+                  <div className="font-medium p-2 bg-professional-purple-light/20 dark:bg-professional-purple-dark/20">Name:</div>
                   <div className="col-span-2 p-2 bg-muted/40">{issue.name}</div>
                   
-                  <div className="font-medium p-2 bg-muted/70">Namespace:</div>
+                  <div className="font-medium p-2 bg-professional-purple-light/20 dark:bg-professional-purple-dark/20">Namespace:</div>
                   <div className={cn("col-span-2 p-2", getNamespaceBackgroundColor())}>{issue.namespace}</div>
                   
-                  <div className="font-medium p-2 bg-muted/70">Severity:</div>
+                  <div className="font-medium p-2 bg-professional-purple-light/20 dark:bg-professional-purple-dark/20">Severity:</div>
                   <div className="col-span-2 p-2 bg-muted/40">
                     <span className={cn(
                       "px-2 py-0.5 rounded-full text-xs",
-                      issue.severity === 'critical' && "bg-red-100 text-red-800",
-                      issue.severity === 'high' && "bg-orange-100 text-orange-800",
-                      issue.severity === 'medium' && "bg-amber-100 text-amber-800",
-                      issue.severity === 'low' && "bg-green-100 text-green-800"
+                      issue.severity === 'critical' && "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
+                      issue.severity === 'high' && "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100",
+                      issue.severity === 'medium' && "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100",
+                      issue.severity === 'low' && "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
                     )}>
                       {issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1)}
                     </span>
                   </div>
                   
-                  <div className="font-medium p-2 bg-muted/70">Issue:</div>
+                  <div className="font-medium p-2 bg-professional-purple-light/20 dark:bg-professional-purple-dark/20">Issue:</div>
                   <div className="col-span-2 p-2 bg-muted/40">{Array.isArray(issue.message) ? issue.message.join(', ') : issue.message}</div>
                 </div>
               </div>
@@ -195,9 +214,9 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
             <div className="flex items-center justify-center h-40">
               <div className="flex flex-col items-center">
                 <div className="flex space-x-2 mb-2">
-                  <div className="w-3 h-3 bg-primary/70 rounded-full animate-bounce delay-100"></div>
-                  <div className="w-3 h-3 bg-primary/70 rounded-full animate-bounce delay-200"></div>
-                  <div className="w-3 h-3 bg-primary/70 rounded-full animate-bounce delay-300"></div>
+                  <div className="w-3 h-3 bg-professional-purple/70 rounded-full animate-bounce delay-100"></div>
+                  <div className="w-3 h-3 bg-professional-purple/70 rounded-full animate-bounce delay-200"></div>
+                  <div className="w-3 h-3 bg-professional-purple/70 rounded-full animate-bounce delay-300"></div>
                 </div>
                 <p className="text-sm text-muted-foreground">Loading debugging information...</p>
               </div>
@@ -206,9 +225,9 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
             <div className="flex flex-col">
               {request && (
                 <div className="flex justify-start mb-4">
-                  <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 max-w-[85%] shadow-sm">
+                  <div className={cn("rounded-lg p-3 max-w-[85%] shadow-sm", getRequestBubbleStyle())}>
                     <div className="text-sm">
-                      <p className="font-semibold text-primary-foreground mb-1">You</p>
+                      <p className="font-semibold text-professional-purple dark:text-professional-purple-light mb-1">You</p>
                       <p className="whitespace-pre-wrap break-words">{request}</p>
                       <p className="text-xs text-muted-foreground mt-1 text-right">{getTimeStamp()}</p>
                     </div>
@@ -221,16 +240,16 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                   {sections.map((section, index) => (
                     <div key={index} className={`flex ${section.type === 'text' ? 'justify-end' : 'justify-start'} mb-2`}>
                       {section.type === 'text' ? (
-                        <div className="bg-primary/10 rounded-lg p-3 max-w-[85%] shadow-sm">
+                        <div className={cn("rounded-lg p-3 max-w-[85%] shadow-sm", getChatBubbleStyle(section.type))}>
                           <div className="text-sm">
                             <p className="font-semibold text-primary-foreground mb-1">K8s Assistant</p>
                             <p className="whitespace-pre-wrap break-words">{section.content}</p>
-                            <p className="text-xs text-muted-foreground mt-1 text-right">{getTimeStamp()}</p>
+                            <p className="text-xs text-white/70 mt-1 text-right">{getTimeStamp()}</p>
                           </div>
                         </div>
                       ) : section.type === 'command' ? (
                         <div className="w-[85%]">
-                          <div className="bg-gradient-terminal text-white p-3 rounded-lg font-mono text-sm shadow-sm relative mb-1">
+                          <div className={cn("text-white p-3 rounded-lg font-mono text-sm shadow-sm relative mb-1", getChatBubbleStyle(section.type))}>
                             <pre className="whitespace-pre-wrap overflow-auto max-h-[200px]">{section.content}</pre>
                             <Button
                               variant="ghost"
@@ -241,11 +260,11 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                               {copying === `cmd-${index}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                             </Button>
                           </div>
-                          <p className="text-xs text-muted-foreground ml-2">Try this command ↑</p>
+                          <p className="text-xs text-professional-purple-dark dark:text-professional-purple-light ml-2">Try this command ↑</p>
                         </div>
                       ) : (
                         <div className="w-[85%]">
-                          <div className="bg-muted/30 p-3 rounded-lg text-sm border border-border/40 shadow-sm mb-1">
+                          <div className={cn("p-3 rounded-lg text-sm shadow-sm mb-1", getChatBubbleStyle(section.type))}>
                             <pre className="whitespace-pre-wrap overflow-auto max-h-[200px]">{section.content}</pre>
                           </div>
                           <p className="text-xs text-muted-foreground ml-2">Command output</p>
@@ -256,7 +275,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                 </div>
               ) : (
                 !request && (
-                  <Alert>
+                  <Alert className="border-professional-purple-light/30 dark:border-professional-purple-dark/30">
                     <AlertDescription>
                       No debugging information is available. Please start a debugging session by selecting an issue or asking a question in the Kubernetes Assistant.
                     </AlertDescription>
