@@ -130,12 +130,18 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   
   const { request, sections } = formatDebugLog(logToUse);
 
+  // Format timestamp for messages
+  const getTimeStamp = () => {
+    const now = new Date();
+    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl overflow-auto">
         <SheetHeader className="pb-4">
           <div className="flex justify-between items-center">
-            <SheetTitle className="text-xl">Kubernetes Debugging Steps</SheetTitle>
+            <SheetTitle className="text-xl">Kubernetes Troubleshooting</SheetTitle>
             <SheetClose asChild>
               <Button variant="ghost" size="icon" onClick={onClose}>
                 <X className="h-5 w-5" />
@@ -176,7 +182,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
           )}
         </SheetHeader>
         
-        <div className="py-4 space-y-6">
+        <div className="py-4">
           {isLoadingFile ? (
             <div className="flex items-center justify-center h-40">
               <div className="flex flex-col items-center">
@@ -189,29 +195,35 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
               </div>
             </div>
           ) : (
-            <>
+            <div className="flex flex-col">
               {request && (
-                <div>
-                  <h3 className="text-md font-semibold mb-2">Request</h3>
-                  <div className="bg-muted/40 rounded-md p-4 text-sm whitespace-pre-wrap">
-                    {request}
+                <div className="flex justify-start mb-4">
+                  <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 max-w-[85%] shadow-sm">
+                    <div className="text-sm">
+                      <p className="font-semibold text-primary-foreground mb-1">You</p>
+                      <p className="whitespace-pre-wrap break-words">{request}</p>
+                      <p className="text-xs text-muted-foreground mt-1 text-right">{getTimeStamp()}</p>
+                    </div>
                   </div>
                 </div>
               )}
               
-              {sections.length > 0 && (
-                <div>
-                  <h3 className="text-md font-semibold mb-2">Debugging Steps</h3>
-                  <div className="space-y-4">
-                    {sections.map((section, index) => (
-                      <div key={index} className="space-y-2">
-                        {section.type === 'text' ? (
-                          <div className="text-sm">{section.content}</div>
-                        ) : section.type === 'command' ? (
-                          <div className="relative">
-                            <div className="bg-gradient-terminal text-white p-3 rounded-md font-mono text-sm overflow-auto">
-                              <pre className="whitespace-pre-wrap">{section.content}</pre>
-                            </div>
+              {sections.length > 0 ? (
+                <div className="space-y-4">
+                  {sections.map((section, index) => (
+                    <div key={index} className={`flex ${section.type === 'text' ? 'justify-end' : 'justify-start'} mb-2`}>
+                      {section.type === 'text' ? (
+                        <div className="bg-primary/10 rounded-lg p-3 max-w-[85%] shadow-sm">
+                          <div className="text-sm">
+                            <p className="font-semibold text-primary-foreground mb-1">K8s Assistant</p>
+                            <p className="whitespace-pre-wrap break-words">{section.content}</p>
+                            <p className="text-xs text-muted-foreground mt-1 text-right">{getTimeStamp()}</p>
+                          </div>
+                        </div>
+                      ) : section.type === 'command' ? (
+                        <div className="w-[85%]">
+                          <div className="bg-gradient-terminal text-white p-3 rounded-lg font-mono text-sm shadow-sm relative mb-1">
+                            <pre className="whitespace-pre-wrap overflow-auto max-h-[200px]">{section.content}</pre>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -221,25 +233,29 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                               {copying === `cmd-${index}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                             </Button>
                           </div>
-                        ) : (
-                          <div className="bg-muted/30 p-3 rounded-md text-sm overflow-auto border border-border/40">
-                            <pre className="whitespace-pre-wrap">{section.content}</pre>
+                          <p className="text-xs text-muted-foreground ml-2">Try this command ↑</p>
+                        </div>
+                      ) : (
+                        <div className="w-[85%]">
+                          <div className="bg-muted/30 p-3 rounded-lg text-sm border border-border/40 shadow-sm mb-1">
+                            <pre className="whitespace-pre-wrap overflow-auto max-h-[200px]">{section.content}</pre>
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                          <p className="text-xs text-muted-foreground ml-2">Command output</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
+              ) : (
+                !request && (
+                  <Alert>
+                    <AlertDescription>
+                      No debugging information is available. Please start a debugging session by selecting an issue or asking a question in the Kubernetes Assistant.
+                    </AlertDescription>
+                  </Alert>
+                )
               )}
-              
-              {!request && sections.length === 0 && (
-                <Alert>
-                  <AlertDescription>
-                    No debugging information is available. Please start a debugging session by selecting an issue or asking a question in the Kubernetes Assistant.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </>
+            </div>
           )}
         </div>
       </SheetContent>
