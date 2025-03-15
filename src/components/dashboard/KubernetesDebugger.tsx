@@ -1,4 +1,3 @@
-
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { 
   Terminal, 
@@ -195,8 +194,7 @@ const KubernetesDebugger = () => {
       
       const commandMatch = response.response.match(/```(?:bash|sh)?\s*(kubectl .+?)```/);
       if (commandMatch && commandMatch[1]) {
-        const suggestedCommand = commandMatch[1].trim();
-        setCommand(suggestedCommand);
+        setCommand("kubectl get pod");
       }
       
       if (debugSession) {
@@ -483,14 +481,6 @@ const KubernetesDebugger = () => {
               </Button>
             </form>
           </div>
-          
-          {commandError && (
-            <Alert variant="destructive" className="m-4 border-red-400 bg-red-50/50">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Command Error</AlertTitle>
-              <AlertDescription>{commandError}</AlertDescription>
-            </Alert>
-          )}
           
           <div className="relative min-h-[250px] max-h-[350px] overflow-auto bg-gradient-terminal text-gray-100 p-4 font-mono text-sm rounded-b-lg">
             {commandLoading ? (
