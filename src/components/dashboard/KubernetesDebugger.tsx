@@ -1,3 +1,4 @@
+
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { 
   Terminal, 
@@ -6,7 +7,6 @@ import {
   Play, 
   Trash, 
   Save, 
-  Send, 
   Server, 
   Download,
   X, 
@@ -84,22 +84,18 @@ const KubernetesDebugger = () => {
   const [selectedClusterArn, setSelectedClusterArn] = useState<string>('');
   const [selectedNamespace, setSelectedNamespace] = useState<string>('default');
   
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'How can I help you debug your Kubernetes cluster today?' }
-  ]);
-  const [message, setMessage] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  
-  const [command, setCommand] = useState('kubectl get pods -n default');
   const [commandOutput, setCommandOutput] = useState('');
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [commandLoading, setCommandLoading] = useState(false);
   const [commandError, setCommandError] = useState<string | null>(null);
   
+  const [command, setCommand] = useState('kubectl get pods -n default');
+  
   const [debugSession, setDebugSession] = useState<{id: string; debugLog: string} | null>(null);
   
   const [isDebugDrawerOpen, setIsDebugDrawerOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<NamespaceIssue | null>(null);
+  const [debugLoading, setDebugLoading] = useState(false);
 
   const { data: clusters, isLoading: isLoadingClusters } = useQuery({
     queryKey: ['clusters', selectedEnvironment],
@@ -193,15 +189,17 @@ const KubernetesDebugger = () => {
     }
   };
 
-  const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim() || !selectedClusterArn || !selectedNamespace) return;
-
-    const userMessage = { role: 'user' as const, content: message };
-    setChatHistory(prev => [...prev, userMessage]);
+  const sendDebugRequest = async (message: string) => {
+    if (!selectedClusterArn || !selectedNamespace) {
+      toast({
+        title: "Error",
+        description: "Cluster and namespace must be selected",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    setChatLoading(true);
-    setMessage('');
+    setDebugLoading(true);
     
     try {
       const response = await kubernetesApi.chatWithAssistant(
@@ -210,46 +208,26 @@ const KubernetesDebugger = () => {
         selectedNamespace
       );
       
-      setChatHistory(prev => [...prev, { 
-        role: 'assistant', 
-        content: response.response 
-      }]);
-      
       const commandMatch = response.response.match(/```(?:bash|sh)?\s*(kubectl .+?)```/);
       if (commandMatch && commandMatch[1]) {
         setCommand(commandMatch[1]);
       }
       
-      if (debugSession) {
-        setDebugSession({
-          ...debugSession,
-          debugLog: debugSession.debugLog + `\n\nUser: ${message}\n\nAssistant: ${response.response}`
-        });
-      } else {
-        setDebugSession({
-          id: `debug-${Date.now()}`,
-          debugLog: `## Request\n${message}\n\n## Response\n${response.response}`
-        });
-      }
+      setDebugSession({
+        id: `debug-${Date.now()}`,
+        debugLog: `## Request\n${message}\n\n## Response\n${response.response}`
+      });
+      
+      // Once we have the debug response, open the drawer
+      setIsDebugDrawerOpen(true);
     } catch (error: any) {
       toast({
-        title: "Chat Error",
-        description: error.message || "Failed to get assistant response",
+        title: "Debug Error",
+        description: error.message || "Failed to get debugging assistance",
         variant: "destructive",
       });
-      setChatHistory(prev => [...prev, { 
-        role: 'assistant', 
-        content: "Sorry, I encountered an error processing your request. Please try again." 
-      }]);
     } finally {
-      setChatLoading(false);
-    }
-  };
-
-  const handleChatKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleChatSubmit(e as unknown as React.FormEvent);
+      setDebugLoading(false);
     }
   };
 
@@ -305,15 +283,10 @@ Severity: ${issue.severity}
 
 What steps should I take to investigate and resolve this issue?`;
     
-    setMessage(prompt);
     setSelectedIssue(issue);
     
-    setTimeout(() => {
-      const formEvent = new Event('submit', { cancelable: true, bubbles: true }) as unknown as React.FormEvent;
-      handleChatSubmit(formEvent);
-    }, 100);
-    
-    setIsDebugDrawerOpen(true);
+    // Send debug request immediately
+    sendDebugRequest(prompt);
   };
 
   const closeDebugDrawer = () => {
@@ -615,88 +588,22 @@ What steps should I take to investigate and resolve this issue?`;
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <GlassMorphicCard className="md:col-span-8" id="kubernetes-assistant">
+        <GlassMorphicCard className="md:col-span-12">
           <div className="p-4 border-b bg-gradient-professional">
-            <h3 className="font-medium text-sm">Kubernetes Assistant</h3>
+            <h3 className="font-medium text-sm">Namespace Issues</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Ask questions in natural language to debug your Kubernetes issues
+              Click on an issue to debug it
             </p>
           </div>
           
-          <div className="p-4 h-[350px] flex flex-col bg-gradient-to-b from-white/5 to-white/20">
-            <div className="flex-1 space-y-4 mb-4 overflow-auto">
-              {chatHistory.map((chat, index) => (
-                <div 
-                  key={index} 
-                  className={cn(
-                    "flex",
-                    chat.role === 'assistant' ? "justify-start" : "justify-end"
-                  )}
-                >
-                  <div className={cn(
-                    "max-w-[80%] rounded-lg p-3 text-sm",
-                    chat.role === 'assistant' 
-                      ? "bg-background text-foreground rounded-tl-none border border-border/40 shadow-sm" 
-                      : "bg-gradient-purple text-white rounded-tr-none"
-                  )}>
-                    {chat.content}
-                  </div>
-                </div>
-              ))}
-              
-              {chatLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-background text-foreground rounded-lg rounded-tl-none max-w-[80%] p-3 border border-border/40 shadow-sm">
-                    <div className="flex space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-professional-purple-DEFAULT/50 animate-pulse"></div>
-                      <div className="w-2 h-2 rounded-full bg-professional-purple-DEFAULT/50 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                      <div className="w-2 h-2 rounded-full bg-professional-purple-DEFAULT/50 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <form onSubmit={handleChatSubmit} className="flex gap-2 mt-auto">
-              <div className="relative flex-1">
-                <Textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={handleChatKeyDown}
-                  className="w-full resize-none bg-background border rounded-md text-sm focus:ring-1 focus:ring-professional-purple-DEFAULT focus:border-professional-purple-DEFAULT focus:outline-none min-h-[40px] py-2"
-                  placeholder={selectedClusterArn 
-                    ? "Ask about your Kubernetes issues... (Press Enter to send)" 
-                    : "Please select a cluster first..."
-                  }
-                  disabled={chatLoading || !selectedClusterArn}
-                  rows={2}
-                />
-              </div>
-              <Button
-                type="submit"
-                size="icon"
-                className="rounded-full h-10 w-10 bg-professional-purple-DEFAULT hover:bg-professional-purple-dark"
-                disabled={chatLoading || !message.trim() || !selectedClusterArn}
-              >
-                <Send size={16} />
-              </Button>
-            </form>
-          </div>
-        </GlassMorphicCard>
-        
-        <GlassMorphicCard className="md:col-span-4">
-          <div className="p-4 border-b bg-gradient-professional flex justify-between items-center">
-            <h3 className="font-medium text-sm">Namespace Issues</h3>
-          </div>
-          
-          <div className="p-3 h-[350px] overflow-auto bg-gradient-to-b from-muted/10 to-muted/30">
-            {isLoadingIssues ? (
-              <div className="flex justify-center items-center h-full">
+          <div className="p-3 min-h-[250px] max-h-[350px] overflow-auto bg-gradient-to-b from-muted/10 to-muted/30">
+            {isLoadingIssues || debugLoading ? (
+              <div className="flex justify-center items-center h-[250px]">
                 <div className="w-6 h-6 border-2 border-professional-purple-DEFAULT border-t-transparent rounded-full animate-spin mr-2"></div>
-                <span className="text-sm">Loading issues...</span>
+                <span className="text-sm">{debugLoading ? "Processing debug request..." : "Loading issues..."}</span>
               </div>
             ) : namespaceIssues && namespaceIssues.length > 0 ? (
-              <ul className="space-y-3">
+              <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {namespaceIssues.map((issue) => (
                   <li 
                     key={issue.id} 
@@ -736,7 +643,7 @@ What steps should I take to investigate and resolve this issue?`;
                 ))}
               </ul>
             ) : (
-              <div className="text-center text-muted-foreground text-xs p-8 h-full flex flex-col items-center justify-center">
+              <div className="text-center text-muted-foreground text-xs p-8 h-[250px] flex flex-col items-center justify-center">
                 <Bug size={30} className="mx-auto mb-2 opacity-30" />
                 <p>No issues found in this namespace</p>
                 {selectedClusterArn && selectedNamespace && (
