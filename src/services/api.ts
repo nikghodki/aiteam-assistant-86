@@ -146,7 +146,8 @@ export interface OIDCAuthResult {
 export interface NamespaceIssue {
   id: string;
   severity: 'critical' | 'high' | 'medium' | 'low';
-  component: string;
+  kind: string;
+  name: string;
   message: string;
   timestamp: string;
 }

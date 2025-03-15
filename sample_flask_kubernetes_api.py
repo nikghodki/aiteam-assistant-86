@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import time
@@ -46,13 +45,14 @@ namespaces_by_cluster = {
     "arn:aws:eks:us-west-2:123456789012:cluster/staging-cluster": ["default", "kube-system", "staging", "monitoring"]
 }
 
-# Mock namespace issues data
+# Updated mock namespace issues data to include kind and name
 namespace_issues = {
     "default": [
         {
             "id": str(uuid.uuid4()),
             "severity": "low",
-            "component": "CoreDNS",
+            "kind": "Pod",
+            "name": "coredns-74ff55c5b-zt8b9",
             "message": "CoreDNS pods are running at high CPU utilization",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         }
@@ -61,14 +61,16 @@ namespace_issues = {
         {
             "id": str(uuid.uuid4()),
             "severity": "critical",
-            "component": "etcd",
+            "kind": "StatefulSet",
+            "name": "etcd-manager",
             "message": "etcd is experiencing high latency",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         },
         {
             "id": str(uuid.uuid4()),
             "severity": "high",
-            "component": "kube-apiserver",
+            "kind": "Pod",
+            "name": "kube-apiserver-ip-10-0-23-45",
             "message": "API server is experiencing high request rate",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         }
@@ -77,7 +79,8 @@ namespace_issues = {
         {
             "id": str(uuid.uuid4()),
             "severity": "medium",
-            "component": "Prometheus",
+            "kind": "Deployment",
+            "name": "prometheus",
             "message": "Prometheus storage is nearly full",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         }
@@ -86,14 +89,16 @@ namespace_issues = {
         {
             "id": str(uuid.uuid4()),
             "severity": "high",
-            "component": "Deployment/frontend",
+            "kind": "Deployment",
+            "name": "frontend",
             "message": "Pod OOMKilled events detected - insufficient memory",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         },
         {
             "id": str(uuid.uuid4()),
             "severity": "medium",
-            "component": "ConfigMap/app-config",
+            "kind": "ConfigMap",
+            "name": "app-config",
             "message": "ConfigMap out of sync with deployment",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         }
@@ -102,7 +107,8 @@ namespace_issues = {
         {
             "id": str(uuid.uuid4()),
             "severity": "low",
-            "component": "Job/integration-tests",
+            "kind": "Job",
+            "name": "integration-tests",
             "message": "Integration test job failing intermittently",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         }

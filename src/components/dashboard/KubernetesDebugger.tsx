@@ -1,4 +1,3 @@
-
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { 
   Terminal, 
@@ -63,6 +62,8 @@ interface NamespaceIssue {
   component: string;
   message: string;
   timestamp: string;
+  kind: string;
+  name: string;
 }
 
 const environments = [
@@ -197,7 +198,6 @@ const KubernetesDebugger = () => {
     setMessage('');
     
     try {
-      // Update to pass both cluster and namespace but not jiraTicketKey
       const response = await kubernetesApi.chatWithAssistant(
         selectedClusterArn, 
         message,
@@ -675,8 +675,16 @@ const KubernetesDebugger = () => {
                       </span>
                       <span className="text-xs text-muted-foreground">{new Date(issue.timestamp).toLocaleTimeString()}</span>
                     </div>
-                    <p className="text-sm font-medium mb-1">{issue.component}</p>
-                    <p className="text-xs text-muted-foreground">{issue.message}</p>
+                    <div className="grid grid-cols-3 gap-2 mb-2 text-xs font-medium">
+                      <div className="text-muted-foreground">Kind</div>
+                      <div className="text-muted-foreground">Name</div>
+                      <div className="text-muted-foreground">Message</div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="font-medium">{issue.kind}</div>
+                      <div className="truncate">{issue.name}</div>
+                      <div className="text-muted-foreground">{issue.message}</div>
+                    </div>
                   </li>
                 ))}
               </ul>
