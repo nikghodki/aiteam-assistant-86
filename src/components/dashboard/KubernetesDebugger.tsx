@@ -1,3 +1,4 @@
+
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { 
   Terminal, 
@@ -117,7 +118,7 @@ const KubernetesDebugger = () => {
     
     setCommandLoading(true);
     try {
-      const result = await kubernetesApi.runCommand(selectedClusterArn, command);
+      const result = await kubernetesApi.runCommand(selectedClusterArn, command, selectedNamespace);
       setCommandOutput(result.output);
       
       if (!commandHistory.includes(command)) {
