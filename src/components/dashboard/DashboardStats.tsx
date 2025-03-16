@@ -69,6 +69,11 @@ const DashboardStats = () => {
         return result || []; // Ensure we always return an array, even if API returns undefined
       } catch (error) {
         console.error("Error fetching documentation history:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load documentation query history",
+          variant: "destructive"
+        });
         return []; // Return empty array on error
       }
     },
@@ -92,6 +97,11 @@ const DashboardStats = () => {
   });
 
   const isLoading = isLoadingClusters || isLoadingGroups || isLoadingDocHistory || isLoadingJiraTickets;
+
+  // For debugging
+  console.log("Active clusters data:", clusters);
+  console.log("Doc history data:", docHistory);
+  console.log("Clusters length:", Array.isArray(clusters) ? clusters.length : 'not an array');
 
   // Calculate the stats using the actual API data
   const statsData = {

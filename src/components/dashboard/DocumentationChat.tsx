@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, RefreshCw, XCircle } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
@@ -153,6 +152,8 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath, 
       // Invalidate the doc-history query to refresh the dashboard stats
       // This ensures the documentation queries count is updated in the dashboard
       await queryClient.invalidateQueries({ queryKey: ['doc-history'] });
+      
+      console.log("Documentation query count updated after chat message");
       
     } catch (error) {
       console.error('Error sending message:', error);
