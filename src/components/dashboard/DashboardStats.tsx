@@ -77,7 +77,8 @@ const DashboardStats = () => {
         return []; // Return empty array on error
       }
     },
-    staleTime: 60000,
+    staleTime: 0, // Set staleTime to 0 to always refetch when needed
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   // Get Jira tickets
@@ -90,6 +91,11 @@ const DashboardStats = () => {
         return result || []; // Ensure we always return an array, even if API returns undefined
       } catch (error) {
         console.error("Error fetching Jira tickets:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load Jira tickets data",
+          variant: "destructive"
+        });
         return []; // Return empty array on error
       }
     },
@@ -102,6 +108,7 @@ const DashboardStats = () => {
   console.log("Active clusters data:", clusters);
   console.log("Doc history data:", docHistory);
   console.log("Clusters length:", Array.isArray(clusters) ? clusters.length : 'not an array');
+  console.log("Doc history length:", Array.isArray(docHistory) ? docHistory.length : 'not an array');
 
   // Calculate the stats using the actual API data
   const statsData = {
