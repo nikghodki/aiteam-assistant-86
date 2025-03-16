@@ -27,10 +27,10 @@ const DashboardStats = () => {
         // Explicitly call the kubernetes API endpoint
         const result = await kubernetesApi.getClusters();
         console.log("Kubernetes clusters fetched:", result);
-        return result;
+        return result || []; // Ensure we always return an array, even if API returns undefined
       } catch (error) {
         console.error("Error fetching kubernetes clusters:", error);
-        throw error;
+        return []; // Return empty array on error
       }
     },
     staleTime: 60000,
@@ -71,10 +71,10 @@ const DashboardStats = () => {
       try {
         const result = await docsApi.getQueryHistory();
         console.log("Documentation query history fetched:", result);
-        return result;
+        return result || []; // Ensure we always return an array, even if API returns undefined
       } catch (error) {
         console.error("Error fetching documentation history:", error);
-        throw error;
+        return []; // Return empty array on error
       }
     },
     staleTime: 60000,
@@ -93,7 +93,15 @@ const DashboardStats = () => {
   // Get Jira tickets
   const { data: jiraTickets, isLoading: isLoadingJiraTickets } = useQuery({
     queryKey: ['jira-tickets'],
-    queryFn: () => jiraApi.getUserReportedTickets(),
+    queryFn: async () => {
+      try {
+        const result = await jiraApi.getUserReportedTickets();
+        return result || []; // Ensure we always return an array, even if API returns undefined
+      } catch (error) {
+        console.error("Error fetching Jira tickets:", error);
+        return []; // Return empty array on error
+      }
+    },
     staleTime: 60000,
     meta: {
       onError: (error: Error) => {

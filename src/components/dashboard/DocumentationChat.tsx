@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, RefreshCw, XCircle } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,6 +7,12 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+
+// Define the ChatResponse type to match what the API returns
+interface ChatResponse {
+  response: string;
+  filePath?: string;
+}
 
 interface ChatMessage {
   id: string;
@@ -26,6 +33,7 @@ const SampleMessages: ChatMessage[] = [
 
 interface DocumentationChatProps {
   onDebugFilePath?: (path: string) => void;
+  showInline?: boolean;
 }
 
 // Function to extract file path from assistant's response
@@ -63,7 +71,7 @@ const formatMessage = (message: string): JSX.Element => {
   );
 };
 
-const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath }) => {
+const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath, showInline = false }) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>(SampleMessages);
@@ -119,10 +127,10 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath }
     
     try {
       // Get the response from the documentation assistant
-      const response = await docsApi.chatWithAssistant(inputMessage);
+      const chatResponse: ChatResponse = await docsApi.chatWithAssistant(inputMessage);
       
       // Extract file path from response if present
-      const filePath = extractFilePath(response);
+      const filePath = chatResponse.filePath || extractFilePath(chatResponse.response);
       if (filePath) {
         setDebugFilePath(filePath);
       }
@@ -130,7 +138,7 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath }
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: getSimplifiedContent(response),
+        content: chatResponse.response ? getSimplifiedContent(chatResponse.response) : '',
         timestamp: new Date(),
         attachedFile: filePath || undefined,
       };
@@ -158,6 +166,64 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath }
     }
   };
 
+  // If showing inline (in the Documentation page), render a different layout
+  if (showInline) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map((message) => (
+            <div key={message.id} className={`flex items-start ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={cn("p-3 rounded-lg max-w-[75%] shadow-sm",
+                message.role === 'user' ? "bg-gray-100 dark:bg-gray-700 text-right" : "bg-professional-purple-light/10 dark:bg-professional-purple-dark/10"
+              )}>
+                <div className="text-sm">
+                  {message.role === 'user' ? (
+                    <p className="font-semibold text-professional-purple dark:text-professional-purple-light mb-1">You</p>
+                  ) : (
+                    <p className="font-semibold text-primary-foreground mb-1">Assistant</p>
+                  )}
+                  <p className="whitespace-pre-wrap break-words">{formatMessage(message.content)}</p>
+                  {message.attachedFile && (
+                    <a href={message.attachedFile} target="_blank" rel="noopener noreferrer" className="text-xs text-professional-blue-DEFAULT underline">
+                      View File
+                    </a>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1 text-right">{message.timestamp.toLocaleTimeString()}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+        <div className="p-4 border-t dark:border-gray-700">
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            handleSendMessage();
+          }} className="relative">
+            <Textarea
+              value={inputMessage}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask me anything about the documentation..."
+              className="w-full pr-10 resize-none focus:ring-0 focus-visible:ring-0 dark:bg-gray-700"
+              rows={3}
+              disabled={isLoading}
+            />
+            <button
+              type="submit"
+              className="absolute right-2 bottom-2 bg-professional-purple-DEFAULT hover:bg-professional-purple-dark text-white rounded-md p-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || !inputMessage.trim()}
+              aria-label="Send message"
+            >
+              {isLoading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send size={16} />}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Original floating chat UI for the dashboard
   return (
     <div className={cn("fixed bottom-6 right-6 z-50 rounded-md shadow-lg overflow-hidden transition-all duration-300 ease-in-out",
       minimized ? "w-96 h-12 hover:h-64" : "w-96 h-64"
