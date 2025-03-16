@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, RefreshCw, XCircle } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,6 +5,7 @@ import { docsApi } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ChatMessage {
   id: string;
@@ -70,6 +70,7 @@ const DocumentationChat = ({ showInline = false, onDebugFilePath }: Documentatio
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [minimized, setMinimized] = useState(false);
+  const queryClient = useQueryClient();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -108,6 +109,7 @@ const DocumentationChat = ({ showInline = false, onDebugFilePath }: Documentatio
     setIsLoading(true);
     
     try {
+      // Get the response from the documentation assistant
       const response = await docsApi.chatWithAssistant(inputMessage);
       
       // Extract file path from response if present
@@ -127,6 +129,10 @@ const DocumentationChat = ({ showInline = false, onDebugFilePath }: Documentatio
       if (debugFilePath && onDebugFilePath) {
         onDebugFilePath(debugFilePath);
       }
+
+      // Invalidate the doc-history query to refresh the dashboard stats
+      queryClient.invalidateQueries({ queryKey: ['doc-history'] });
+      
     } catch (error) {
       console.error('Error sending message:', error);
       toast({

@@ -22,7 +22,11 @@ const DashboardStats = () => {
   // Get clusters data
   const { data: clusters, isLoading: isLoadingClusters } = useQuery({
     queryKey: ['kubernetes-clusters'],
-    queryFn: () => kubernetesApi.getClusters(),
+    queryFn: async () => {
+      const result = await kubernetesApi.getClusters();
+      console.log("Kubernetes clusters fetched:", result);
+      return result;
+    },
     staleTime: 60000,
     meta: {
       onError: (error: Error) => {
@@ -57,7 +61,11 @@ const DashboardStats = () => {
   // Get documentation query history
   const { data: docHistory, isLoading: isLoadingDocHistory } = useQuery({
     queryKey: ['doc-history'],
-    queryFn: () => docsApi.getQueryHistory(),
+    queryFn: async () => {
+      const result = await docsApi.getQueryHistory();
+      console.log("Documentation query history fetched:", result);
+      return result;
+    },
     staleTime: 60000,
     meta: {
       onError: (error: Error) => {

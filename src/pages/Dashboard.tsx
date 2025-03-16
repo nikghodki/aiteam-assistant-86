@@ -21,6 +21,8 @@ const Dashboard = () => {
     setIsRefreshing(true);
     
     try {
+      console.log("Refreshing dashboard data...");
+      
       // Invalidate all relevant queries to trigger refetches
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['kubernetes-clusters'] }),
