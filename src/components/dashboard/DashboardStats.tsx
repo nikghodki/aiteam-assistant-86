@@ -30,20 +30,15 @@ const DashboardStats = () => {
         return result || []; // Ensure we always return an array, even if API returns undefined
       } catch (error) {
         console.error("Error fetching kubernetes clusters:", error);
-        return []; // Return empty array on error
-      }
-    },
-    staleTime: 60000,
-    meta: {
-      onError: (error: Error) => {
-        console.error("Error fetching kubernetes clusters:", error);
         toast({
           title: "Error",
           description: "Failed to load cluster data",
           variant: "destructive"
         });
+        return []; // Return empty array on error
       }
-    }
+    },
+    staleTime: 60000,
   });
 
   // Get user groups data
@@ -78,16 +73,6 @@ const DashboardStats = () => {
       }
     },
     staleTime: 60000,
-    meta: {
-      onError: (error: Error) => {
-        console.error("Error fetching documentation history:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load documentation query history",
-          variant: "destructive"
-        });
-      }
-    }
   });
 
   // Get Jira tickets
@@ -96,6 +81,7 @@ const DashboardStats = () => {
     queryFn: async () => {
       try {
         const result = await jiraApi.getUserReportedTickets();
+        console.log("Jira tickets fetched:", result);
         return result || []; // Ensure we always return an array, even if API returns undefined
       } catch (error) {
         console.error("Error fetching Jira tickets:", error);
@@ -103,22 +89,9 @@ const DashboardStats = () => {
       }
     },
     staleTime: 60000,
-    meta: {
-      onError: (error: Error) => {
-        console.error("Error fetching Jira tickets:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load Jira tickets",
-          variant: "destructive"
-        });
-      }
-    }
   });
 
   const isLoading = isLoadingClusters || isLoadingGroups || isLoadingDocHistory || isLoadingJiraTickets;
-
-  console.log("Clusters data:", clusters);
-  console.log("Doc history data:", docHistory);
 
   // Calculate the stats using the actual API data
   const statsData = {
