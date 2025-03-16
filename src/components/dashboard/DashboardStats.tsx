@@ -24,6 +24,16 @@ const DashboardStats = () => {
     queryKey: ['kubernetes-clusters'],
     queryFn: () => kubernetesApi.getClusters(),
     staleTime: 60000,
+    meta: {
+      onError: (error: Error) => {
+        console.error("Error fetching kubernetes clusters:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load cluster data",
+          variant: "destructive"
+        });
+      }
+    }
   });
 
   // Get user groups data
@@ -32,6 +42,16 @@ const DashboardStats = () => {
     queryFn: () => user?.name ? accessApi.getUserGroups(user.name) : Promise.resolve([]),
     enabled: !!user?.name,
     staleTime: 60000,
+    meta: {
+      onError: (error: Error) => {
+        console.error("Error fetching user groups:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load group data",
+          variant: "destructive"
+        });
+      }
+    }
   });
 
   // Get documentation query history
@@ -70,13 +90,16 @@ const DashboardStats = () => {
 
   const isLoading = isLoadingClusters || isLoadingGroups || isLoadingDocHistory || isLoadingJiraTickets;
 
-  // Use actual data from the queries
+  console.log("Clusters data:", clusters);
+  console.log("Doc history data:", docHistory);
+
+  // Use actual data from the queries, ensuring we handle undefined/null data
   const statsData = {
-    clusters: clusters ? clusters.length : 0,
-    groups: groups ? groups.length : 0,
+    clusters: Array.isArray(clusters) ? clusters.length : 0,
+    groups: Array.isArray(groups) ? groups.length : 0,
     resolvedIssues: 128, // This is still hardcoded as in the original
-    docQueries: docHistory ? docHistory.length : 0,
-    jiraTickets: jiraTickets ? jiraTickets.length : 0
+    docQueries: Array.isArray(docHistory) ? docHistory.length : 0,
+    jiraTickets: Array.isArray(jiraTickets) ? jiraTickets.length : 0
   };
 
   const stats = [
