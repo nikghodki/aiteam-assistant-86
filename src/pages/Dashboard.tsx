@@ -24,6 +24,7 @@ const Dashboard = () => {
       console.log("Refreshing dashboard data...");
       
       // Invalidate all relevant queries to trigger refetches
+      // This will cause the dependent components to re-fetch their data
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['kubernetes-clusters'] }),
         queryClient.invalidateQueries({ queryKey: ['user-groups'] }),

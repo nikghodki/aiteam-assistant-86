@@ -23,9 +23,15 @@ const DashboardStats = () => {
   const { data: clusters, isLoading: isLoadingClusters } = useQuery({
     queryKey: ['kubernetes-clusters'],
     queryFn: async () => {
-      const result = await kubernetesApi.getClusters();
-      console.log("Kubernetes clusters fetched:", result);
-      return result;
+      try {
+        // Explicitly call the kubernetes API endpoint
+        const result = await kubernetesApi.getClusters();
+        console.log("Kubernetes clusters fetched:", result);
+        return result;
+      } catch (error) {
+        console.error("Error fetching kubernetes clusters:", error);
+        throw error;
+      }
     },
     staleTime: 60000,
     meta: {
@@ -62,9 +68,14 @@ const DashboardStats = () => {
   const { data: docHistory, isLoading: isLoadingDocHistory } = useQuery({
     queryKey: ['doc-history'],
     queryFn: async () => {
-      const result = await docsApi.getQueryHistory();
-      console.log("Documentation query history fetched:", result);
-      return result;
+      try {
+        const result = await docsApi.getQueryHistory();
+        console.log("Documentation query history fetched:", result);
+        return result;
+      } catch (error) {
+        console.error("Error fetching documentation history:", error);
+        throw error;
+      }
     },
     staleTime: 60000,
     meta: {
@@ -101,11 +112,13 @@ const DashboardStats = () => {
   console.log("Clusters data:", clusters);
   console.log("Doc history data:", docHistory);
 
-  // Use actual data from the queries, ensuring we handle undefined/null data
+  // Calculate the stats using the actual API data
   const statsData = {
+    // Ensure we properly count the clusters from the array
     clusters: Array.isArray(clusters) ? clusters.length : 0,
     groups: Array.isArray(groups) ? groups.length : 0,
     resolvedIssues: 128, // This is still hardcoded as in the original
+    // Make sure we count the doc queries properly
     docQueries: Array.isArray(docHistory) ? docHistory.length : 0,
     jiraTickets: Array.isArray(jiraTickets) ? jiraTickets.length : 0
   };
