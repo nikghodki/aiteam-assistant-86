@@ -19,52 +19,58 @@ const DashboardStats = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // Get dynamic dashboard stats
-  const { data: dashboardStats, isLoading: isLoadingStats } = useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats'],
-    queryFn: async () => {
-      try {
-        // Fetch actual data from APIs
-        const [clusters, groups, docHistory] = await Promise.all([
-          kubernetesApi.getClusters(),
-          accessApi.getUserGroups(user.name),
-          docsApi.getQueryHistory(),
-        ]);
-        
-        const jiraTickets = await jiraApi.getUserReportedTickets();
-        
-        return {
-          clusters: clusters.length,
-          groups: groups.length,
-          resolvedIssues: 128, // Could be replaced with actual data
-          docQueries: docHistory.length,
-          jiraTickets: jiraTickets.length
-        };
-      } catch (error) {
-        console.error("Error fetching dashboard stats:", error);
-        toast({
-          title: "Error fetching dashboard stats",
-          description: "Could not load dashboard statistics",
-          variant: "destructive"
-        });
-        return {
-          clusters: 0,
-          groups: 0,
-          resolvedIssues: 0,
-          docQueries: 0,
-          jiraTickets: 0
-        };
-      }
-    },
+  // Get clusters data
+  const { data: clusters, isLoading: isLoadingClusters } = useQuery({
+    queryKey: ['kubernetes-clusters'],
+    queryFn: () => kubernetesApi.getClusters(),
     staleTime: 60000,
   });
-  
+
+  // Get user groups data
+  const { data: groups, isLoading: isLoadingGroups } = useQuery({
+    queryKey: ['user-groups', user?.name],
+    queryFn: () => user?.name ? accessApi.getUserGroups(user.name) : Promise.resolve([]),
+    enabled: !!user?.name,
+    staleTime: 60000,
+  });
+
+  // Get documentation query history
+  const { data: docHistory, isLoading: isLoadingDocHistory } = useQuery({
+    queryKey: ['doc-history'],
+    queryFn: () => docsApi.getQueryHistory(),
+    staleTime: 60000,
+    onError: (error) => {
+      console.error("Error fetching documentation history:", error);
+    }
+  });
+
+  // Get Jira tickets
+  const { data: jiraTickets, isLoading: isLoadingJiraTickets } = useQuery({
+    queryKey: ['jira-tickets'],
+    queryFn: () => jiraApi.getUserReportedTickets(),
+    staleTime: 60000,
+    onError: (error) => {
+      console.error("Error fetching Jira tickets:", error);
+    }
+  });
+
+  const isLoading = isLoadingClusters || isLoadingGroups || isLoadingDocHistory || isLoadingJiraTickets;
+
+  // Use actual data from the queries
+  const statsData = {
+    clusters: clusters?.length || 0,
+    groups: groups?.length || 0,
+    resolvedIssues: 128, // This is still hardcoded as in the original
+    docQueries: docHistory?.length || 0,
+    jiraTickets: jiraTickets?.length || 0
+  };
+
   const stats = [
-    { label: 'Active Clusters', value: dashboardStats?.clusters || '0', icon: Server, color: 'text-primary' },
-    { label: 'Groups Memberships', value: dashboardStats?.groups || '0', icon: Users, color: 'text-green-500' },
-    { label: 'Resolved Issues', value: dashboardStats?.resolvedIssues || '0', icon: Terminal, color: 'text-amber-500' },
-    { label: 'Documentation Queries', value: dashboardStats?.docQueries || '0', icon: Search, color: 'text-purple-500' },
-    { label: 'Jira Tickets', value: dashboardStats?.jiraTickets || '0', icon: Link, color: 'text-blue-500' },
+    { label: 'Active Clusters', value: statsData.clusters, icon: Server, color: 'text-primary' },
+    { label: 'Groups Memberships', value: statsData.groups, icon: Users, color: 'text-green-500' },
+    { label: 'Resolved Issues', value: statsData.resolvedIssues, icon: Terminal, color: 'text-amber-500' },
+    { label: 'Documentation Queries', value: statsData.docQueries, icon: Search, color: 'text-purple-500' },
+    { label: 'Jira Tickets', value: statsData.jiraTickets, icon: Link, color: 'text-blue-500' },
   ];
 
   return (
@@ -74,7 +80,9 @@ const DashboardStats = () => {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-muted-foreground text-sm">{stat.label}</p>
-              <h3 className="text-2xl font-bold mt-1">{stat.value}</h3>
+              <h3 className="text-2xl font-bold mt-1">
+                {isLoading ? '...' : stat.value.toString()}
+              </h3>
             </div>
             <div className={cn("p-2 rounded-md bg-muted/80", stat.color)}>
               <stat.icon size={20} />

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { RefreshCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
 import DashboardStats from '@/components/dashboard/DashboardStats';
@@ -14,29 +14,42 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
-  // Setup query client for manual refetch of all dashboard data
-  const { refetch: refetchStats } = useQuery({
-    queryKey: ['dashboard-stats'],
-    enabled: false // Don't automatically fetch on component mount since our child components will
-  });
+  const queryClient = useQueryClient();
   
   // Handle manual refresh of all dashboard data
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refetchStats();
     
-    // Manually invalidate other query caches to trigger refetches
-    window.dispatchEvent(new CustomEvent('dashboard:refresh'));
-    
-    toast({
-      title: "Dashboard refreshed",
-      description: "The dashboard data has been updated",
-    });
-    
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 1000); // Show spinner for at least a second for visual feedback
+    try {
+      // Invalidate all relevant queries to trigger refetches
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['kubernetes-clusters'] }),
+        queryClient.invalidateQueries({ queryKey: ['user-groups'] }),
+        queryClient.invalidateQueries({ queryKey: ['doc-history'] }),
+        queryClient.invalidateQueries({ queryKey: ['jira-tickets'] }),
+        queryClient.invalidateQueries({ queryKey: ['recent-activities'] })
+      ]);
+      
+      // Manually dispatch event for any non-React Query components
+      window.dispatchEvent(new CustomEvent('dashboard:refresh'));
+      
+      toast({
+        title: "Dashboard refreshed",
+        description: "The dashboard data has been updated",
+      });
+    } catch (error) {
+      console.error("Error refreshing dashboard:", error);
+      toast({
+        title: "Refresh failed",
+        description: "Could not refresh some dashboard data",
+        variant: "destructive"
+      });
+    } finally {
+      // Show spinner for at least a second for visual feedback
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 1000);
+    }
   };
 
   return (
