@@ -42,6 +42,11 @@ const DashboardStats = () => {
     meta: {
       onError: (error: Error) => {
         console.error("Error fetching documentation history:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load documentation query history",
+          variant: "destructive"
+        });
       }
     }
   });
@@ -54,6 +59,11 @@ const DashboardStats = () => {
     meta: {
       onError: (error: Error) => {
         console.error("Error fetching Jira tickets:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load Jira tickets",
+          variant: "destructive"
+        });
       }
     }
   });
@@ -62,11 +72,11 @@ const DashboardStats = () => {
 
   // Use actual data from the queries
   const statsData = {
-    clusters: clusters?.length || 0,
-    groups: groups?.length || 0,
+    clusters: clusters ? clusters.length : 0,
+    groups: groups ? groups.length : 0,
     resolvedIssues: 128, // This is still hardcoded as in the original
-    docQueries: docHistory?.length || 0,
-    jiraTickets: jiraTickets?.length || 0
+    docQueries: docHistory ? docHistory.length : 0,
+    jiraTickets: jiraTickets ? jiraTickets.length : 0
   };
 
   const stats = [
