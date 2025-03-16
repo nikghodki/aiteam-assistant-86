@@ -39,8 +39,10 @@ const DashboardStats = () => {
     queryKey: ['doc-history'],
     queryFn: () => docsApi.getQueryHistory(),
     staleTime: 60000,
-    onError: (error) => {
-      console.error("Error fetching documentation history:", error);
+    meta: {
+      onError: (error: Error) => {
+        console.error("Error fetching documentation history:", error);
+      }
     }
   });
 
@@ -49,8 +51,10 @@ const DashboardStats = () => {
     queryKey: ['jira-tickets'],
     queryFn: () => jiraApi.getUserReportedTickets(),
     staleTime: 60000,
-    onError: (error) => {
-      console.error("Error fetching Jira tickets:", error);
+    meta: {
+      onError: (error: Error) => {
+        console.error("Error fetching Jira tickets:", error);
+      }
     }
   });
 
