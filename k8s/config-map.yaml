@@ -1,0 +1,7 @@
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-assistant-ui-config
+data:
+  VITE_API_BASE_URL: "https://api.example.com"  # Replace with your actual API URL

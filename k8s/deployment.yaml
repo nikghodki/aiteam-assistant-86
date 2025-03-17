@@ -1,0 +1,45 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-assistant-ui
+  labels:
+    app: ai-assistant-ui
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-assistant-ui
+  template:
+    metadata:
+      labels:
+        app: ai-assistant-ui
+    spec:
+      containers:
+      - name: ai-assistant-ui
+        image: ai-assistant-ui:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: "512Mi"
+          requests:
+            cpu: "0.2"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        env:
+        - name: NODE_ENV
+          value: production
