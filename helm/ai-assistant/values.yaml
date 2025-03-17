@@ -32,7 +32,7 @@ ui:
   ingress:
     enabled: true
     annotations:
-      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
       nginx.ingress.kubernetes.io/use-regex: "true"
       nginx.ingress.kubernetes.io/rewrite-target: /$1
     hosts:
@@ -44,7 +44,7 @@ ui:
       enabled: false
       secretName: ai-assistant-tls
   env:
-    VITE_API_BASE_URL: "https://ai-assistant-api.default.svc.cluster.local"
+    VITE_API_BASE_URL: "http://ai-assistant-api.default.svc.cluster.local"
 
 api:
   name: ai-assistant-api

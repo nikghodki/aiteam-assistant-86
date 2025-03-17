@@ -4,7 +4,7 @@ kind: Ingress
 metadata:
   name: ai-assistant-ui
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/rewrite-target: /$1
 spec:
@@ -20,8 +20,4 @@ spec:
             name: ai-assistant-ui
             port:
               number: 80
-  # Uncomment this section if you have SSL certificates configured
-  # tls:
-  # - hosts:
-  #   - ai-assistant.example.com
-  #   secretName: ai-assistant-tls
+  # TLS section removed to ensure HTTP works
