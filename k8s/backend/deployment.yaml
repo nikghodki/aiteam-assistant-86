@@ -40,6 +40,6 @@ spec:
             port: 8000
           initialDelaySeconds: 5
           periodSeconds: 5
-        env:
-        - name: FLASK_ENV
-          value: production
+        envFrom:
+        - configMapRef:
+            name: ai-assistant-api-config

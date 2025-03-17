@@ -4,4 +4,4 @@ kind: ConfigMap
 metadata:
   name: ai-assistant-ui-config
 data:
-  VITE_API_BASE_URL: "https://api.ai-assistant.example.com"  # Replace with your actual API URL
+  VITE_API_BASE_URL: "http://ai-assistant-api"  # Internal Kubernetes service name

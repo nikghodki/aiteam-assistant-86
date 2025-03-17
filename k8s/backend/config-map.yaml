@@ -6,4 +6,5 @@ metadata:
 data:
   FLASK_APP: "app.py"
   FLASK_ENV: "production"
+  FLASK_DEBUG: "0"
   # Add any other environment variables needed by your Flask app
