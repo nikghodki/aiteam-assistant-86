@@ -45,4 +45,4 @@ spec:
         - name: NODE_ENV
           value: {{ .Values.global.environment }}
         - name: VITE_API_BASE_URL
-          value: "http://{{ .Values.api.name }}"
+          value: {{ .Values.ui.env.VITE_API_BASE_URL | quote }}

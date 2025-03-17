@@ -44,6 +44,8 @@ ui:
     tls:
       enabled: false
       secretName: ai-assistant-tls
+  env:
+    VITE_API_BASE_URL: "http://ai-assistant-api.default.svc.cluster.local"
 
 api:
   name: ai-assistant-api
