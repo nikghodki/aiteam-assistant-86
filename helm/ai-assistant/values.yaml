@@ -1,4 +1,3 @@
-
 # Default values for ai-assistant
 # This is a YAML-formatted file.
 
@@ -45,7 +44,7 @@ ui:
       enabled: false
       secretName: ai-assistant-tls
   env:
-    VITE_API_BASE_URL: "http://ai-assistant-api.default.svc.cluster.local"
+    VITE_API_BASE_URL: "https://ai-assistant-api.default.svc.cluster.local"
 
 api:
   name: ai-assistant-api
