@@ -27,8 +27,10 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN apk add --no-cache bash && \
     chmod +x /docker-entrypoint.sh && \
-    # Ensure correct line endings for the entrypoint script
-    sed -i 's/\r$//' /docker-entrypoint.sh
+    # Make sure the file has Unix line endings (more aggressive fix)
+    tr -d '\r' < /docker-entrypoint.sh > /docker-entrypoint.sh.unix && \
+    mv /docker-entrypoint.sh.unix /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
 
 # Expose port 80
 EXPOSE 80
