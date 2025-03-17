@@ -24,9 +24,11 @@ COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Create a script to replace environment variables at runtime
-RUN apk add --no-cache bash
-COPY docker-entrypoint.sh /
-RUN chmod +x /docker-entrypoint.sh
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN apk add --no-cache bash && \
+    chmod +x /docker-entrypoint.sh && \
+    # Ensure correct line endings for the entrypoint script
+    sed -i 's/\r$//' /docker-entrypoint.sh
 
 # Expose port 80
 EXPOSE 80
