@@ -73,3 +73,7 @@ api:
     FLASK_APP: app.py
     FLASK_ENV: production
     FLASK_DEBUG: "0"
+    WORKERS: "2"
+    TIMEOUT: "120"
+    PYTHONDONTWRITEBYTECODE: "1"
+    PYTHONUNBUFFERED: "1"
