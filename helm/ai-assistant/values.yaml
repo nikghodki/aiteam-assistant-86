@@ -1,0 +1,75 @@
+
+# Default values for ai-assistant
+# This is a YAML-formatted file.
+
+global:
+  namespace: default
+  environment: production
+
+ui:
+  name: ai-assistant-ui
+  replicaCount: 2
+  image:
+    repository: ai-assistant-ui
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  ingress:
+    enabled: true
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/use-regex: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$1
+    hosts:
+      - host: ai-assistant.example.com
+        paths:
+          - path: /(.*)
+            pathType: Prefix
+    tls:
+      enabled: false
+      secretName: ai-assistant-tls
+
+api:
+  name: ai-assistant-api
+  replicaCount: 2
+  image:
+    repository: ai-assistant-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8000
+  configMap:
+    FLASK_APP: app.py
+    FLASK_ENV: production
+    FLASK_DEBUG: "0"

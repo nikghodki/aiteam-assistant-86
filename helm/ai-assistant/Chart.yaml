@@ -1,0 +1,7 @@
+
+apiVersion: v2
+name: ai-assistant
+description: A Helm chart for deploying AI Assistant UI and API components
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
