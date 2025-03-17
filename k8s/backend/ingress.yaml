@@ -1,0 +1,27 @@
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-assistant-api
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: api.ai-assistant.example.com  # Replace with your actual API domain
+    http:
+      paths:
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: ai-assistant-api
+            port:
+              number: 80
+  # Uncomment this section if you have SSL certificates configured
+  # tls:
+  # - hosts:
+  #   - api.ai-assistant.example.com
+  #   secretName: ai-assistant-api-tls

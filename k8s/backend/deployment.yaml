@@ -1,0 +1,45 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-assistant-api
+  labels:
+    app: ai-assistant-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-assistant-api
+  template:
+    metadata:
+      labels:
+        app: ai-assistant-api
+    spec:
+      containers:
+      - name: ai-assistant-api
+        image: ai-assistant-api:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            cpu: "0.5"
+            memory: "512Mi"
+          requests:
+            cpu: "0.2"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /api/kubernetes/clusters
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/kubernetes/clusters
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        env:
+        - name: FLASK_ENV
+          value: production
