@@ -45,7 +45,7 @@ ui:
       enabled: true
       secretName: ai-assistant-tls
   env:
-    VITE_API_BASE_URL: "http://ai-assistant-api.default.svc.cluster.local"
+    VITE_API_BASE_URL: "https://ai-assistant-api.default.svc.cluster.local"
 
 api:
   name: ai-assistant-api
@@ -69,7 +69,7 @@ api:
     targetMemoryUtilizationPercentage: 80
   service:
     type: ClusterIP
-    port: 80
+    port: 443
     targetPort: 8000
   configMap:
     FLASK_APP: app.py
@@ -79,3 +79,5 @@ api:
     TIMEOUT: "120"
     PYTHONDONTWRITEBYTECODE: "1"
     PYTHONUNBUFFERED: "1"
+    HTTPS_ENABLED: "1"
+

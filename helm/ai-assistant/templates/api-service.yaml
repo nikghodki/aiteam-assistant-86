@@ -12,6 +12,7 @@ spec:
   - port: {{ .Values.api.service.port }}
     targetPort: {{ .Values.api.service.targetPort }}
     protocol: TCP
-    name: http
+    name: https
   selector:
     app: {{ .Values.api.name }}
+

@@ -32,14 +32,17 @@ spec:
           httpGet:
             path: /api/kubernetes/clusters
             port: 8000
+            scheme: HTTPS
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /api/kubernetes/clusters
             port: 8000
+            scheme: HTTPS
           initialDelaySeconds: 5
           periodSeconds: 5
         envFrom:
         - configMapRef:
             name: ai-assistant-api-config
+

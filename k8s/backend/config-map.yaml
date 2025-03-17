@@ -7,4 +7,6 @@ data:
   FLASK_APP: "app.py"
   FLASK_ENV: "production"
   FLASK_DEBUG: "0"
+  HTTPS_ENABLED: "1"  # Enable HTTPS for the Flask app
   # Add any other environment variables needed by your Flask app
+

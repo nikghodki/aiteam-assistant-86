@@ -44,4 +44,5 @@ spec:
         - name: NODE_ENV
           value: production
         - name: VITE_API_BASE_URL
-          value: "http://ai-assistant-api"
+          value: "https://ai-assistant-api"
+
