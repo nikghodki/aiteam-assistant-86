@@ -1,5 +1,5 @@
 
-#!/bin/bash
+#!/bin/sh
 set -e
 
 # Replace environment variables in the JavaScript files
