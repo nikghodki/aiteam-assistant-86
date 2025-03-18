@@ -34,6 +34,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   loginWithOIDC: (provider: string) => void;
+  loginWithSAML: () => void;
   saveOIDCConfig: (provider: string, config: OIDCConfig) => void;
   getOIDCConfig: (provider: string) => OIDCConfig | null;
 }
@@ -43,10 +44,34 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User>(mockUser);
   const [isLoading, setIsLoading] = useState(true);
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://localhost:8000/api';
 
   useEffect(() => {
-    // Check if user is already authenticated (e.g., from localStorage)
+    // Check if user is already authenticated (e.g., from localStorage or URL params)
     const checkAuth = () => {
+      // Check URL parameters for SAML SSO login response
+      const params = new URLSearchParams(window.location.search);
+      const userData = params.get('user_data');
+      
+      if (userData) {
+        try {
+          // Decode base64 user data from SAML response
+          const decodedData = atob(userData);
+          const parsedUser = JSON.parse(decodedData);
+          
+          setUser({ ...parsedUser, authenticated: true });
+          localStorage.setItem('user', JSON.stringify(parsedUser));
+          
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setIsLoading(false);
+          return;
+        } catch (error) {
+          console.error('Failed to parse user data from URL:', error);
+        }
+      }
+      
+      // Fall back to localStorage
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         try {
@@ -65,17 +90,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    // Simplified login (replace with real authentication)
+    // Use the backend API for authentication
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include',
+      });
       
-      // For demo, we'll just authenticate the mock user
-      const authenticatedUser = { ...mockUser, email, authenticated: true };
-      setUser(authenticatedUser);
-      localStorage.setItem('user', JSON.stringify(authenticatedUser));
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Login failed');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.user) {
+        const authenticatedUser = { ...data.user, authenticated: true };
+        setUser(authenticatedUser);
+        localStorage.setItem('user', JSON.stringify(authenticatedUser));
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (error) {
       console.error('Login failed:', error);
       throw new Error('Login failed. Please check your credentials.');
@@ -132,9 +173,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // After authentication, the IdP will redirect back to our callback URL
   };
 
-  const logout = () => {
+  const loginWithSAML = () => {
+    setIsLoading(true);
+    
+    // Redirect to the SAML login endpoint with a redirect URL back to the dashboard
+    const redirectUrl = encodeURIComponent(`${window.location.origin}/dashboard`);
+    window.location.href = `${API_BASE_URL}/auth/saml/login?redirect_url=${redirectUrl}`;
+    
+    // The server will handle the SAML authentication flow
+    // After authentication, it will redirect back to our callback URL with user data
+  };
+
+  const logout = async () => {
+    setIsLoading(true);
+    
+    try {
+      // Call the logout API
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (error) {
+      console.error('Logout API call failed:', error);
+    }
+    
+    // Reset user state regardless of API success
     setUser({ ...mockUser, authenticated: false });
     localStorage.removeItem('user');
+    setIsLoading(false);
   };
 
   return (
@@ -144,6 +210,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       login, 
       logout, 
       loginWithOIDC,
+      loginWithSAML,
       saveOIDCConfig,
       getOIDCConfig
     }}>

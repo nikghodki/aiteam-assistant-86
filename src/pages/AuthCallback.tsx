@@ -20,6 +20,15 @@ const AuthCallback = () => {
         const error = urlParams.get('error');
         const errorDescription = urlParams.get('error_description');
         
+        // Check for user_data (from SAML callback)
+        const userData = urlParams.get('user_data');
+        if (userData) {
+          // This is handled in AuthContext, so we just redirect to dashboard
+          navigate('/dashboard');
+          return;
+        }
+        
+        // This must be an OIDC callback
         // Get the provider from session storage
         const provider = sessionStorage.getItem('oidc_provider');
         
