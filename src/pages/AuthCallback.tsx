@@ -9,6 +9,7 @@ const AuthCallback = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -37,6 +38,9 @@ const AuthCallback = () => {
             // Update auth context to reflect logged-in state
             if (login) {
               await login(decodedUserData.email, 'password-not-used');
+              console.log("User authenticated successfully via context");
+            } else {
+              console.error("Login function not available in context");
             }
             
             // Show success toast
@@ -45,11 +49,16 @@ const AuthCallback = () => {
               description: `Welcome, ${decodedUserData.name || decodedUserData.email}!`,
             });
             
+            // Set a flag to indicate successful processing
+            setIsProcessing(false);
+            
             // Redirect to dashboard with replace:true to prevent back navigation to the callback page
             console.log("Redirecting to dashboard...");
             setTimeout(() => {
+              console.log("Now navigating to dashboard");
               navigate('/dashboard', { replace: true });
-            }, 500);
+            }, 800);
+            
             return;
           } catch (e) {
             console.error('Failed to parse user data:', e);

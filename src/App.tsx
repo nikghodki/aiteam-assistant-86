@@ -40,6 +40,9 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+              {/* Auth callback route must be outside of any nesting and at the top of routes to ensure priority */}
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
               <Route path="/dashboard" element={<Dashboard />} />
@@ -78,8 +81,6 @@ const App = () => (
                   <RoleManagement />
                 </ProtectedRoute>
               } />
-              {/* Make sure auth callback route is at the top level, not nested */}
-              <Route path="/auth/callback" element={<AuthCallback />} />
               {/* Catch all route for 404 errors */}
               <Route path="*" element={<NotFound />} />
             </Routes>
