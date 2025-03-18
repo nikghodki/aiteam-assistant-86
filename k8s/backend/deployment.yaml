@@ -45,4 +45,19 @@ spec:
         envFrom:
         - configMapRef:
             name: ai-assistant-api-config
-
+        volumeMounts:
+        - name: ssl-certs
+          mountPath: /app/cert.pem
+          subPath: cert.pem
+        - name: ssl-certs
+          mountPath: /app/key.pem
+          subPath: key.pem
+      volumes:
+      - name: ssl-certs
+        secret:
+          secretName: ai-assistant-api-ssl
+          items:
+          - key: cert.pem
+            path: cert.pem
+          - key: key.pem
+            path: key.pem

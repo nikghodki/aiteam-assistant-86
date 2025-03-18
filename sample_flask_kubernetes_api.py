@@ -8,6 +8,7 @@ import os
 import json
 from urllib.parse import quote
 import base64
+import ssl
 
 # Conditionally import SAML libraries - will fail gracefully if not installed
 try:
@@ -20,7 +21,7 @@ except ImportError:
     print("Warning: SAML libraries not installed. SAML authentication will be disabled.")
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True)
+CORS(app, supports_credentials=True, origins=['*'], allow_headers=['Content-Type', 'Authorization'])
 
 # Set a secret key for sessions
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', str(uuid.uuid4()))
@@ -335,6 +336,13 @@ def get_namespace_issues():
 if __name__ == '__main__':
     # For development, use HTTP or self-signed HTTPS
     if os.environ.get('HTTPS_ENABLED', '0') == '1':
-        app.run(host='0.0.0.0', port=8000, ssl_context='adhoc')
+        # Create SSL context with proper ciphers and protocols
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain('cert.pem', 'key.pem')
+        # Set secure protocols
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        # Set secure ciphers
+        context.set_ciphers('ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384')
+        app.run(host='0.0.0.0', port=8000, ssl_context=context)
     else:
         app.run(host='0.0.0.0', port=8000, debug=True)
