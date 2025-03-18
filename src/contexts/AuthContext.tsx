@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { OIDCConfig } from '@/services/api';
 
 // Simplified user model with authentication support
 export interface User {
@@ -23,6 +24,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  saveOIDCConfig: (provider: string, config: OIDCConfig) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -107,12 +109,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   };
 
+  // Add the saveOIDCConfig method to save OIDC configuration to localStorage
+  const saveOIDCConfig = (provider: string, config: OIDCConfig) => {
+    const oidcConfigKey = `oidc_config_${provider}`;
+    localStorage.setItem(oidcConfigKey, JSON.stringify(config));
+    console.log(`OIDC configuration for ${provider} saved to localStorage`);
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
       isLoading, 
       login, 
-      logout
+      logout,
+      saveOIDCConfig
     }}>
       {children}
     </AuthContext.Provider>
