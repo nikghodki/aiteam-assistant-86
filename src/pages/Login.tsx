@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
-import { LogIn, Mail, Github } from 'lucide-react';
+import { Github, LogIn, Mail } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, loginWithGoogle, isLoading, user } = useAuth();
+  const { login, loginWithGoogle, loginWithGithub, isLoading, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -44,11 +44,23 @@ const Login = () => {
     try {
       await loginWithGoogle();
       // Note: The actual redirect will be handled by the Google auth flow
-      // We don't need to navigate here as the backend will handle redirection
     } catch (error) {
       toast({
         title: "Google login failed",
         description: "There was a problem signing in with Google. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGithubLogin = async () => {
+    try {
+      await loginWithGithub();
+      // Note: The actual redirect will be handled by the GitHub auth flow
+    } catch (error) {
+      toast({
+        title: "GitHub login failed",
+        description: "There was a problem signing in with GitHub. Please try again.",
         variant: "destructive",
       });
     }
@@ -91,6 +103,18 @@ const Login = () => {
               />
             </svg>
             <span>Sign in with Google</span>
+          </Button>
+
+          {/* GitHub Sign-In Button */}
+          <Button 
+            type="button" 
+            variant="outline" 
+            className="w-full flex items-center justify-center gap-2" 
+            onClick={handleGithubLogin}
+            disabled={isLoading}
+          >
+            <Github className="h-4 w-4" />
+            <span>Sign in with GitHub</span>
           </Button>
 
           <div className="relative flex items-center justify-center">

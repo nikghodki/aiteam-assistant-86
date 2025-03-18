@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { OIDCConfig } from '@/services/api';
 
@@ -24,6 +23,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  loginWithGithub: () => Promise<void>;
   logout: () => void;
   saveOIDCConfig: (provider: string, config: OIDCConfig) => void;
 }
@@ -95,22 +95,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     
     try {
-      // For demonstration purposes, we'll simulate a Google login
-      // In a real app, you would use Firebase, Google Auth API, or your backend for this
-      
-      // 1. In a real implementation, open a popup window for Google authentication
-      // 2. Redirect to Google's sign-in page
-      // 3. Process the callback with user information
-      
-      // For this demo, we'll simulate a successful Google login
       window.open(`${API_BASE_URL}/auth/google`, '_self');
-      
-      // The actual handling of the Google auth callback would be done in a separate component
-      // This is just a placeholder function that initiates the flow
-      
     } catch (error) {
       console.error('Google login failed:', error);
       throw new Error('Google login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginWithGithub = async () => {
+    setIsLoading(true);
+    
+    try {
+      window.open(`${API_BASE_URL}/auth/github`, '_self');
+    } catch (error) {
+      console.error('GitHub login failed:', error);
+      throw new Error('GitHub login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +121,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     
     try {
-      // Call the logout API
       await fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
@@ -129,13 +129,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('Logout API call failed:', error);
     }
     
-    // Reset user state regardless of API success
     setUser({ ...mockUser, authenticated: false });
     localStorage.removeItem('user');
     setIsLoading(false);
   };
 
-  // Add the saveOIDCConfig method to save OIDC configuration to localStorage
   const saveOIDCConfig = (provider: string, config: OIDCConfig) => {
     const oidcConfigKey = `oidc_config_${provider}`;
     localStorage.setItem(oidcConfigKey, JSON.stringify(config));
@@ -148,6 +146,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isLoading, 
       login, 
       loginWithGoogle,
+      loginWithGithub,
       logout,
       saveOIDCConfig
     }}>

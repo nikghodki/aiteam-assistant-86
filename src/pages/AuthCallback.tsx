@@ -20,7 +20,7 @@ const AuthCallback = () => {
         const error = urlParams.get('error');
         const errorDescription = urlParams.get('error_description');
         
-        // Check for user_data (from Google or SAML callback)
+        // Check for user_data (from Google, GitHub or SAML callback)
         const userData = urlParams.get('user_data');
         if (userData) {
           try {
