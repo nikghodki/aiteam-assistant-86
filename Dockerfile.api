@@ -28,15 +28,10 @@ EXPOSE 8000
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    HTTPS_ENABLED=1
+    HTTPS_ENABLED=0
 
 # Command to run the application with Gunicorn
 # - workers: 2 worker processes (adjust based on available CPU cores)
 # - timeout: 120 seconds for long-running requests
 # - bind: listening on all interfaces, port 8000
-# - certfile/keyfile: SSL certificate files
-# - Add Gunicorn options for ssl and alpn
-CMD ["gunicorn", "--workers=2", "--timeout=120", "--bind=0.0.0.0:8000", \
-     "--certfile=cert.pem", "--keyfile=key.pem", "--ssl-version=TLSv1_2", \
-     "--ciphers=HIGH:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!PSK:!RC4", \
-     "app:app"]
+CMD ["gunicorn", "--workers=2", "--timeout=120", "--bind=0.0.0.0:8000", "app:app"]

@@ -32,14 +32,14 @@ spec:
           httpGet:
             path: /api/kubernetes/clusters
             port: 8000
-            scheme: HTTPS
+            scheme: HTTP
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /api/kubernetes/clusters
             port: 8000
-            scheme: HTTPS
+            scheme: HTTP
           initialDelaySeconds: 5
           periodSeconds: 5
         envFrom:
