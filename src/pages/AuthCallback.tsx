@@ -13,6 +13,8 @@ const AuthCallback = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        console.log("AuthCallback component mounted - processing authentication data");
+        
         // Get the authorization code from URL
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
@@ -23,9 +25,11 @@ const AuthCallback = () => {
         // Check for user_data (from Google, GitHub or SAML callback)
         const userData = urlParams.get('user_data');
         if (userData) {
+          console.log("Found user_data in URL, processing...");
           try {
             // Decode the user data
             const decodedUserData = JSON.parse(atob(userData));
+            console.log("Successfully decoded user data:", decodedUserData.email || "no email");
             
             // Store user data in localStorage
             localStorage.setItem('user', JSON.stringify(decodedUserData));
@@ -37,6 +41,7 @@ const AuthCallback = () => {
             });
             
             // Redirect to dashboard
+            console.log("Redirecting to dashboard...");
             navigate('/dashboard', { replace: true });
             return;
           } catch (e) {

@@ -78,6 +78,7 @@ const App = () => (
                   <RoleManagement />
                 </ProtectedRoute>
               } />
+              {/* Updated the auth callback route - make sure it's not nested under any path */}
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
