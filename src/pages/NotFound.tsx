@@ -56,9 +56,9 @@ const NotFound = () => {
             description: `Welcome, ${decodedUserData.name || decodedUserData.email}!`,
           });
           
-          // Redirect to dashboard with a slight delay
+          // Redirect to front page with a slight delay
           setTimeout(() => {
-            navigate('/dashboard', { replace: true });
+            navigate('/', { replace: true });
           }, 1500);
           return;
         }
@@ -100,7 +100,7 @@ const NotFound = () => {
           <h1 className="text-2xl font-bold mb-4 text-blue-500">Processing Authentication</h1>
           <div className="mt-4 w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-md text-gray-600 mt-4">Please wait while we complete your login...</p>
-          <p className="text-sm text-gray-500 mt-2">You will be redirected to the dashboard automatically.</p>
+          <p className="text-sm text-gray-500 mt-2">You will be redirected to the front page automatically.</p>
         </div>
       </div>
     );

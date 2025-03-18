@@ -54,12 +54,9 @@ const AuthCallback = () => {
             // Set a flag to indicate successful processing
             setIsProcessing(false);
             
-            // Redirect to dashboard with replace:true to prevent back navigation to the callback page
-            console.log("Redirecting to dashboard...");
-            setTimeout(() => {
-              navigate('/dashboard', { replace: true });
-            }, 1500); // Use a longer delay to ensure everything is processed
-            
+            // Redirect to frontpage with replace:true to prevent back navigation to the callback page
+            console.log("Redirecting to frontpage...");
+            navigate('/', { replace: true });
             return;
           } catch (e) {
             console.error('Failed to parse user data:', e);
@@ -82,7 +79,7 @@ const AuthCallback = () => {
             description: errorDescription || "There was an error during authentication.",
             variant: "destructive",
           });
-          setTimeout(() => navigate('/login'), 3000);
+          setTimeout(() => navigate('/'), 3000);
           return;
         }
         
@@ -106,8 +103,8 @@ const AuthCallback = () => {
           description: `Successfully authenticated with ${provider}`,
         });
         
-        // Redirect to dashboard
-        navigate('/dashboard', { replace: true });
+        // Redirect to frontpage instead of dashboard
+        navigate('/', { replace: true });
       } catch (err: any) {
         console.error('Error processing authentication callback:', err);
         setError(err?.message || 'An unexpected error occurred');
@@ -116,7 +113,7 @@ const AuthCallback = () => {
           description: err?.message || "An unexpected error occurred during authentication.",
           variant: "destructive",
         });
-        setTimeout(() => navigate('/login'), 3000);
+        setTimeout(() => navigate('/'), 3000);
       }
     };
     
@@ -130,14 +127,14 @@ const AuthCallback = () => {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Authentication Failed</h1>
           <p className="mt-2 text-gray-600">{error}</p>
-          <p className="mt-4">Redirecting to login page...</p>
+          <p className="mt-4">Redirecting to front page...</p>
         </div>
       ) : (
         <div className="text-center">
           <h1 className="text-2xl font-bold">Authentication in progress</h1>
           <div className="mt-4 w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-4">Please wait while we complete your authentication...</p>
-          <p className="text-sm text-gray-500 mt-2">You will be redirected to the dashboard automatically.</p>
+          <p className="text-sm text-gray-500 mt-2">You will be redirected to the front page automatically.</p>
         </div>
       )}
     </div>
