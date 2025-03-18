@@ -5,10 +5,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Settings, UserCircle } from 'lucide-react';
+import { Settings, UserCircle, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from '@/components/ui/use-toast';
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+      toast({
+        title: "Logged out successfully",
+        description: "You have been logged out of your account",
+      });
+    } catch (error) {
+      console.error('Logout failed:', error);
+      toast({
+        title: "Logout failed",
+        description: "There was a problem logging you out",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <Layout>
@@ -35,10 +56,16 @@ const Profile = () => {
               </Avatar>
               <h3 className="text-xl font-medium">{user?.name}</h3>
               <p className="text-sm text-muted-foreground">{user?.email}</p>
-              <Button variant="outline" size="sm" className="mt-6">
-                <Settings className="mr-2 h-4 w-4" />
-                Edit Profile
-              </Button>
+              <div className="flex gap-2 mt-6">
+                <Button variant="outline" size="sm">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Edit Profile
+                </Button>
+                <Button variant="destructive" size="sm" onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
