@@ -5,3 +5,4 @@ metadata:
   name: ai-assistant-ui-config
 data:
   VITE_API_BASE_URL: "https://ai-assistant-api"  # Internal Kubernetes service name with HTTPS
+  NODE_TLS_REJECT_UNAUTHORIZED: "0"  # For development only - allows self-signed certs

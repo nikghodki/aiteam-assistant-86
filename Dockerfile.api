@@ -12,7 +12,9 @@ COPY sample_flask_kubernetes_api.py app.py
 
 # Generate self-signed certificate for development (in production, use proper certificates)
 RUN apt-get update && apt-get install -y openssl && \
-    openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365 -subj "/CN=localhost" && \
+    openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365 \
+    -subj "/C=US/ST=California/L=San Francisco/O=AI Assistant/CN=localhost" \
+    -addext "subjectAltName = DNS:localhost,DNS:ai-assistant-api,IP:127.0.0.1" && \
     chmod 600 key.pem
 
 # Create a non-root user and switch to it
@@ -33,4 +35,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # - timeout: 120 seconds for long-running requests
 # - bind: listening on all interfaces, port 8000
 # - certfile/keyfile: SSL certificate files
-CMD ["gunicorn", "--workers=2", "--timeout=120", "--bind=0.0.0.0:8000", "--certfile=cert.pem", "--keyfile=key.pem", "app:app"]
+# - Add Gunicorn options for ssl and alpn
+CMD ["gunicorn", "--workers=2", "--timeout=120", "--bind=0.0.0.0:8000", \
+     "--certfile=cert.pem", "--keyfile=key.pem", "--ssl-version=TLSv1_2", \
+     "--ciphers=HIGH:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!PSK:!RC4", \
+     "app:app"]

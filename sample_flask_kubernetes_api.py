@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify, redirect, session, url_for, make_response
 from flask_cors import CORS
 import time
@@ -28,17 +27,44 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', str(uuid.uuid4()))
 
 # Mock data for demo purposes
 kubernetes_clusters = [
-    # ... keep existing code (kubernetes_clusters array definition)
+    {"name": "cluster1", "environment": "dev"},
+    {"name": "cluster2", "environment": "staging"},
+    {"name": "cluster3", "environment": "prod"}
 ]
 
 # Mock namespace data
 namespaces_by_cluster = {
-    # ... keep existing code (namespaces_by_cluster object definition)
+    "cluster1": ["namespace-a", "namespace-b"],
+    "cluster2": ["namespace-c", "namespace-d"],
+    "cluster3": ["namespace-e", "namespace-f"]
 }
 
 # Updated mock namespace issues data to include kind and name
 namespace_issues = {
-    # ... keep existing code (namespace_issues object definition)
+    "namespace-a": [
+        {"issue": "High CPU Usage", "kind": "Pod", "name": "pod-1"},
+        {"issue": "Memory Leak", "kind": "Container", "name": "container-2"}
+    ],
+    "namespace-b": [
+        {"issue": "Network Congestion", "kind": "Service", "name": "service-3"},
+        {"issue": "Disk Full", "kind": "Volume", "name": "volume-4"}
+    ],
+    "namespace-c": [
+        {"issue": "Failed Deployments", "kind": "Deployment", "name": "deployment-5"},
+        {"issue": "Configuration Error", "kind": "ConfigMap", "name": "config-6"}
+    ],
+    "namespace-d": [
+        {"issue": "Security Vulnerability", "kind": "Pod", "name": "pod-7"},
+        {"issue": "Outdated Image", "kind": "Container", "name": "container-8"}
+    ],
+    "namespace-e": [
+        {"issue": "Resource Contention", "kind": "Node", "name": "node-9"},
+        {"issue": "Downtime Incident", "kind": "Service", "name": "service-10"}
+    ],
+    "namespace-f": [
+        {"issue": "Data Corruption", "kind": "PersistentVolumeClaim", "name": "pvc-11"},
+        {"issue": "Access Denied", "kind": "Role", "name": "role-12"}
+    ]
 }
 
 # User storage - in production this would be a database
@@ -311,27 +337,60 @@ def check_session():
 # Get clusters by environment
 @app.route('/api/kubernetes/clusters', methods=['GET'])
 def get_clusters():
-    # ... keep existing code (get_clusters function implementation)
+    """Return list of Kubernetes clusters"""
+    return jsonify(kubernetes_clusters)
 
 # Get namespaces for a cluster
 @app.route('/api/kubernetes/namespaces', methods=['POST'])
 def get_namespaces():
-    # ... keep existing code (get_namespaces function implementation)
+    """Return list of namespaces for a given cluster"""
+    data = request.json
+    cluster_name = data.get('cluster')
+    if cluster_name and cluster_name in namespaces_by_cluster:
+        return jsonify(namespaces_by_cluster[cluster_name])
+    else:
+        return jsonify([]), 400
 
 # Execute a command on a Kubernetes cluster
 @app.route('/api/kubernetes/command', methods=['POST'])
 def run_command():
-    # ... keep existing code (run_command function implementation)
+    """Execute a kubectl command (mock)"""
+    data = request.json
+    cluster = data.get('cluster')
+    namespace = data.get('namespace')
+    command = data.get('command')
+    
+    # Simulate command execution and return a result
+    result = f"Command '{command}' executed on cluster '{cluster}' in namespace '{namespace}'"
+    return jsonify({"result": result})
 
 # Chat with Kubernetes assistant
 @app.route('/api/kubernetes/chat', methods=['POST'])
 def kubernetes_chat():
-    # ... keep existing code (kubernetes_chat function implementation)
+    """Simulate interaction with a Kubernetes assistant"""
+    data = request.json
+    message = data.get('message')
+    
+    # Generate a canned response
+    responses = [
+        "I am an AI assistant for Kubernetes.",
+        "How can I help you today?",
+        "I can assist with deployments, troubleshooting, and more."
+    ]
+    
+    response = random.choice(responses)
+    return jsonify({"response": response})
 
 # Get issues in a namespace
 @app.route('/api/kubernetes/namespace-issues', methods=['POST'])
 def get_namespace_issues():
-    # ... keep existing code (get_namespace_issues function implementation)
+    """Return list of issues for a given namespace"""
+    data = request.json
+    namespace = data.get('namespace')
+    if namespace and namespace in namespace_issues:
+        return jsonify(namespace_issues[namespace])
+    else:
+        return jsonify([]), 400
 
 if __name__ == '__main__':
     # For development, use HTTP or self-signed HTTPS
@@ -339,10 +398,20 @@ if __name__ == '__main__':
         # Create SSL context with proper ciphers and protocols
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.load_cert_chain('cert.pem', 'key.pem')
-        # Set secure protocols
+        
+        # Set secure protocols - allow TLS 1.2 and 1.3
         context.minimum_version = ssl.TLSVersion.TLSv1_2
-        # Set secure ciphers
-        context.set_ciphers('ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384')
+        context.maximum_version = ssl.TLSVersion.TLSv1_3
+        
+        # Set cipher suite with broader compatibility but still secure
+        context.set_ciphers('HIGH:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!PSK:!RC4')
+        
+        # Add ALPN protocols for HTTP/2 and HTTP/1.1
+        context.set_alpn_protocols(['h2', 'http/1.1'])
+        
+        # Disable compression to prevent CRIME attacks
+        context.options |= ssl.OP_NO_COMPRESSION
+        
         app.run(host='0.0.0.0', port=8000, ssl_context=context)
     else:
         app.run(host='0.0.0.0', port=8000, debug=True)

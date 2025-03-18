@@ -16,3 +16,5 @@ data:
   SAML_SP_ACS_URL: "https://ai-assistant-api/saml/acs"
   SAML_SP_SLS_URL: "https://ai-assistant-api/saml/sls"
   FLASK_SECRET_KEY: "secure-random-secret-key-for-session-management"
+  SSL_CERT_PATH: "/app/cert.pem"
+  SSL_KEY_PATH: "/app/key.pem"
