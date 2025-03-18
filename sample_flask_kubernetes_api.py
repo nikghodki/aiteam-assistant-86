@@ -273,6 +273,61 @@ def check_session():
     
     return jsonify({"authenticated": False})
 
+# About API endpoints
+@app.route('/api/about', methods=['GET'])
+def get_about():
+    """Return basic information about the platform"""
+    about_info = {
+        "name": "AI Assistant Platform",
+        "version": "1.0.0",
+        "description": "A comprehensive platform for Kubernetes debugging, documentation search, and access management",
+        "maintainer": "Platform Team",
+        "contact": "platform-team@example.com"
+    }
+    
+    return jsonify(about_info)
+
+@app.route('/api/about/health', methods=['GET'])
+def get_health():
+    """Return health status of the platform"""
+    health_info = {
+        "status": "healthy",
+        "uptime": "3 days, 4 hours",
+        "services": {
+            "kubernetes": "operational",
+            "documentation": "operational",
+            "access_management": "operational",
+            "authentication": "operational"
+        },
+        "timestamp": time.time()
+    }
+    
+    return jsonify(health_info)
+
+@app.route('/api/about/stats', methods=['GET'])
+def get_stats():
+    """Return usage statistics of the platform"""
+    stats_info = {
+        "users": {
+            "total": 150,
+            "active": 42
+        },
+        "requests": {
+            "total": 1250,
+            "today": 78
+        },
+        "kubernetes": {
+            "clusters": 3,
+            "debugSessions": 24
+        },
+        "documentation": {
+            "searches": 345,
+            "chatSessions": 125
+        }
+    }
+    
+    return jsonify(stats_info)
+
 # Get clusters by environment
 @app.route('/api/kubernetes/clusters', methods=['GET'])
 def get_clusters():
