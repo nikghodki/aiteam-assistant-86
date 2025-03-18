@@ -8,13 +8,6 @@ data:
   FLASK_ENV: "production"
   FLASK_DEBUG: "0"
   HTTPS_ENABLED: "0"  # Disable HTTPS for the Flask app
-  # SAML SSO Configuration
-  SAML_IDP_ENTITY_ID: "https://idp.example.com/saml2/metadata"
-  SAML_IDP_SSO_URL: "https://idp.example.com/saml2/sso"
-  SAML_IDP_SLO_URL: "https://idp.example.com/saml2/slo"
-  SAML_SP_ENTITY_ID: "http://ai-assistant-api/saml/metadata"
-  SAML_SP_ACS_URL: "http://ai-assistant-api/saml/acs"
-  SAML_SP_SLS_URL: "http://ai-assistant-api/saml/sls"
   FLASK_SECRET_KEY: "secure-random-secret-key-for-session-management"
   SSL_CERT_PATH: "/app/cert.pem"
   SSL_KEY_PATH: "/app/key.pem"
