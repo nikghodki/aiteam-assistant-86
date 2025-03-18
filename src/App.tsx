@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -39,9 +40,11 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Auth callback routes with both paths to ensure we catch all variants */}
+              {/* Auth callback - need to catch ALL variations */}
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="auth/callback" element={<AuthCallback />} />
+              <Route path="*/auth/callback" element={<AuthCallback />} />
+              <Route path="/*/auth/callback" element={<AuthCallback />} />
               
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />

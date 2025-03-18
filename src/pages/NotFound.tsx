@@ -1,8 +1,7 @@
 
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -21,8 +20,8 @@ const NotFound = () => {
     );
     
     // Check if this is a misrouted auth callback
-    if (location.pathname.includes('/auth/callback') && location.search.includes('user_data')) {
-      console.log("Detected misrouted auth callback, attempting to handle it directly");
+    if (location.search.includes('user_data')) {
+      console.log("Detected misrouted auth callback in NotFound, attempting to handle it directly");
       setIsProcessingAuth(true);
       
       // Instead of redirecting, try to process the auth data directly
@@ -60,33 +59,35 @@ const NotFound = () => {
           // Redirect to dashboard with a slight delay
           setTimeout(() => {
             navigate('/dashboard', { replace: true });
-          }, 800);
+          }, 1500);
+          return;
         }
       }
     } catch (error) {
       console.error("Failed to process auth callback data:", error);
       setIsProcessingAuth(false);
       
-      // If processing fails, try the redirect approach as fallback
+      // If processing fails, try a different approach
       toast({
         title: "Authentication error",
-        description: "There was an issue processing your login. Trying fallback method...",
+        description: "There was an issue processing your login. Trying alternative method...",
         variant: "destructive",
       });
       
+      // Try redirecting to the auth callback route directly
       setTimeout(() => {
-        window.location.href = `/auth/callback${location.search}`;
+        // Navigate to the AuthCallback component directly
+        navigate('/auth/callback' + location.search, { replace: true });
       }, 1000);
     }
   };
 
   // Manual redirect handler
-  const handleRedirectToAuthCallback = () => {
-    if (location.pathname.includes('/auth/callback') && location.search.includes('user_data')) {
+  const handleManualRedirect = () => {
+    if (location.search.includes('user_data')) {
       console.log("Manual redirect to auth callback initiated");
-      
-      // Try processing directly first
-      handleAuthCallback();
+      // Try redirecting to the auth callback route
+      navigate('/auth/callback' + location.search, { replace: true });
     } else {
       navigate('/');
     }
@@ -99,6 +100,7 @@ const NotFound = () => {
           <h1 className="text-2xl font-bold mb-4 text-blue-500">Processing Authentication</h1>
           <div className="mt-4 w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-md text-gray-600 mt-4">Please wait while we complete your login...</p>
+          <p className="text-sm text-gray-500 mt-2">You will be redirected to the dashboard automatically.</p>
         </div>
       </div>
     );
@@ -115,15 +117,15 @@ const NotFound = () => {
           Current path: <code className="bg-gray-200 px-1 rounded">{location.pathname}</code>
         </p>
         
-        {location.pathname.includes('/auth/callback') && location.search.includes('user_data') ? (
+        {location.search.includes('user_data') ? (
           <div className="space-y-4">
             <p className="text-amber-600">This appears to be a misrouted authentication callback.</p>
             <Button 
-              onClick={handleRedirectToAuthCallback}
+              onClick={handleManualRedirect}
               variant="default"
               className="mr-2"
             >
-              Fix Authentication
+              Complete Authentication
             </Button>
           </div>
         ) : (

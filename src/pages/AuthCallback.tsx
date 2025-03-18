@@ -1,12 +1,13 @@
 
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/use-toast';
 import { oidcApi } from '@/services/api';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(true);
@@ -15,9 +16,10 @@ const AuthCallback = () => {
     const handleCallback = async () => {
       try {
         console.log("AuthCallback component mounted - processing authentication data");
+        console.log("Current location:", location.pathname, location.search);
         
         // Get the authorization code from URL
-        const urlParams = new URLSearchParams(window.location.search);
+        const urlParams = new URLSearchParams(location.search);
         const code = urlParams.get('code');
         const state = urlParams.get('state');
         const error = urlParams.get('error');
@@ -55,9 +57,8 @@ const AuthCallback = () => {
             // Redirect to dashboard with replace:true to prevent back navigation to the callback page
             console.log("Redirecting to dashboard...");
             setTimeout(() => {
-              console.log("Now navigating to dashboard");
               navigate('/dashboard', { replace: true });
-            }, 800);
+            }, 1500); // Use a longer delay to ensure everything is processed
             
             return;
           } catch (e) {
@@ -106,7 +107,7 @@ const AuthCallback = () => {
         });
         
         // Redirect to dashboard
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       } catch (err: any) {
         console.error('Error processing authentication callback:', err);
         setError(err?.message || 'An unexpected error occurred');
@@ -119,8 +120,9 @@ const AuthCallback = () => {
       }
     };
     
+    // Execute the callback handler
     handleCallback();
-  }, [navigate, login]);
+  }, [navigate, login, location]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-white to-professional-gray-light/50">
@@ -135,6 +137,7 @@ const AuthCallback = () => {
           <h1 className="text-2xl font-bold">Authentication in progress</h1>
           <div className="mt-4 w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-4">Please wait while we complete your authentication...</p>
+          <p className="text-sm text-gray-500 mt-2">You will be redirected to the dashboard automatically.</p>
         </div>
       )}
     </div>
