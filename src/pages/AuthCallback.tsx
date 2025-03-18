@@ -34,15 +34,22 @@ const AuthCallback = () => {
             // Store user data in localStorage
             localStorage.setItem('user', JSON.stringify(decodedUserData));
             
+            // Update auth context to reflect logged-in state
+            if (login) {
+              await login(decodedUserData.email, 'password-not-used');
+            }
+            
             // Show success toast
             toast({
               title: "Login successful",
               description: `Welcome, ${decodedUserData.name || decodedUserData.email}!`,
             });
             
-            // Redirect to dashboard
+            // Redirect to dashboard with replace:true to prevent back navigation to the callback page
             console.log("Redirecting to dashboard...");
-            navigate('/dashboard', { replace: true });
+            setTimeout(() => {
+              navigate('/dashboard', { replace: true });
+            }, 500);
             return;
           } catch (e) {
             console.error('Failed to parse user data:', e);

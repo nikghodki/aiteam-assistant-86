@@ -19,13 +19,16 @@ const NotFound = () => {
     // Check if this is a misrouted auth callback
     if (location.pathname.includes('/auth/callback') && location.search.includes('user_data')) {
       console.log("Detected misrouted auth callback, will attempt to redirect");
+      // Try to immediately redirect to the correct auth callback URL
+      window.location.href = `/auth/callback${location.search}`;
     }
   }, [location]);
 
   // Handle potential auth callback redirect
   const handleRedirectToAuthCallback = () => {
     if (location.pathname.includes('/auth/callback') && location.search.includes('user_data')) {
-      navigate(`/auth/callback${location.search}`);
+      // Use window.location for a full page redirect rather than React Router navigate
+      window.location.href = `/auth/callback${location.search}`;
     } else {
       navigate('/');
     }
