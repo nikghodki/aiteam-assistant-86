@@ -364,6 +364,8 @@ def github_callback():
     # Encode user data for URL
     user_data_str = base64.b64encode(json.dumps(user_info).encode('utf-8')).decode('utf-8')
     frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    
+    # Ensure we redirect to the correct path - use '/auth/callback' not '/dashboard/auth/callback'
     redirect_url = f"{frontend_url}/auth/callback?user_data={quote(user_data_str)}"
     
     return redirect(redirect_url)
