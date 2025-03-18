@@ -20,12 +20,29 @@ const AuthCallback = () => {
         const error = urlParams.get('error');
         const errorDescription = urlParams.get('error_description');
         
-        // Check for user_data (from SAML callback)
+        // Check for user_data (from Google or SAML callback)
         const userData = urlParams.get('user_data');
         if (userData) {
-          // This is handled in AuthContext, so we just redirect to dashboard
-          navigate('/dashboard');
-          return;
+          try {
+            // Decode the user data
+            const decodedUserData = JSON.parse(atob(userData));
+            
+            // Store user data in localStorage
+            localStorage.setItem('user', JSON.stringify(decodedUserData));
+            
+            // Show success toast
+            toast({
+              title: "Login successful",
+              description: `Welcome, ${decodedUserData.name || decodedUserData.email}!`,
+            });
+            
+            // Redirect to dashboard
+            navigate('/dashboard', { replace: true });
+            return;
+          } catch (e) {
+            console.error('Failed to parse user data:', e);
+            throw new Error('Authentication failed: Invalid user data');
+          }
         }
         
         // This must be an OIDC callback

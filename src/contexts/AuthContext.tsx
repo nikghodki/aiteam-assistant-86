@@ -23,6 +23,7 @@ interface AuthContextType {
   user: User;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => void;
   saveOIDCConfig: (provider: string, config: OIDCConfig) => void;
 }
@@ -90,6 +91,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const loginWithGoogle = async () => {
+    setIsLoading(true);
+    
+    try {
+      // For demonstration purposes, we'll simulate a Google login
+      // In a real app, you would use Firebase, Google Auth API, or your backend for this
+      
+      // 1. In a real implementation, open a popup window for Google authentication
+      // 2. Redirect to Google's sign-in page
+      // 3. Process the callback with user information
+      
+      // For this demo, we'll simulate a successful Google login
+      window.open(`${API_BASE_URL}/auth/google`, '_self');
+      
+      // The actual handling of the Google auth callback would be done in a separate component
+      // This is just a placeholder function that initiates the flow
+      
+    } catch (error) {
+      console.error('Google login failed:', error);
+      throw new Error('Google login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     setIsLoading(true);
     
@@ -121,6 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user, 
       isLoading, 
       login, 
+      loginWithGoogle,
       logout,
       saveOIDCConfig
     }}>

@@ -25,6 +25,11 @@ CORS(app, supports_credentials=True, origins=['*'], allow_headers=['Content-Type
 # Set a secret key for sessions
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', str(uuid.uuid4()))
 
+# Google OAuth configuration (would use real values in production)
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'your-google-client-id')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', 'your-google-client-secret')
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:8000/api/auth/google/callback')
+
 # Mock data for demo purposes
 kubernetes_clusters = [
     {"name": "cluster1", "environment": "dev"},
@@ -159,113 +164,78 @@ def login():
     
     return jsonify({"error": "Invalid email or password"}), 401
 
-@app.route('/api/auth/saml/login', methods=['GET'])
-def saml_login():
-    """Initiate SAML login flow"""
-    if not SAML_ENABLED:
-        return jsonify({"error": "SAML authentication is not enabled"}), 501
+# Google OAuth routes
+@app.route('/api/auth/google', methods=['GET'])
+def google_login():
+    """Initiate Google OAuth login flow"""
+    # In a real implementation, this would redirect to Google's OAuth endpoint
+    # For this demo, we'll simulate the process by directly creating a user
     
-    req = prepare_flask_request(request)
-    auth = init_saml_auth(req)
+    # Generate a random state for security
+    state = str(uuid.uuid4())
+    session['oauth_state'] = state
     
-    if not auth:
-        return jsonify({"error": "SAML configuration error"}), 500
+    # Normally, we would redirect to Google's authorization URL with these parameters:
+    # client_id, redirect_uri, response_type, scope, state
     
-    redirect_url = request.args.get('redirect_url', '/dashboard')
-    session['saml_redirect_url'] = redirect_url
-    
-    # Redirect to IdP
-    sso_built_url = auth.login()
-    return redirect(sso_built_url)
+    # For demo purposes, redirect to our callback with a mock code
+    callback_url = f"/api/auth/google/callback?code=mock_auth_code&state={state}"
+    return redirect(callback_url)
 
-@app.route('/api/auth/saml/metadata', methods=['GET'])
-def saml_metadata():
-    """Serve SAML metadata"""
-    if not SAML_ENABLED:
-        return jsonify({"error": "SAML authentication is not enabled"}), 501
+@app.route('/api/auth/google/callback', methods=['GET'])
+def google_callback():
+    """Handle Google OAuth callback"""
+    # Get the authorization code and state from the query parameters
+    code = request.args.get('code')
+    state = request.args.get('state')
     
-    req = prepare_flask_request(request)
-    auth = init_saml_auth(req)
+    # Verify the state to prevent CSRF attacks
+    stored_state = session.get('oauth_state')
+    if not stored_state or stored_state != state:
+        return jsonify({"error": "Invalid state parameter"}), 400
     
-    if not auth:
-        return jsonify({"error": "SAML configuration error"}), 500
+    # Clear the state from the session
+    session.pop('oauth_state', None)
     
-    settings = auth.get_settings()
-    metadata = settings.get_sp_metadata()
-    errors = settings.validate_metadata(metadata)
+    # In a real implementation, we would:
+    # 1. Exchange the authorization code for an access token
+    # 2. Use the access token to get the user's profile information from Google
     
-    if len(errors) == 0:
-        resp = make_response(metadata, 200)
-        resp.headers['Content-Type'] = 'text/xml'
-    else:
-        resp = make_response(', '.join(errors), 500)
+    # For demo purposes, let's create a mock Google user
+    google_email = "google.user@example.com"
     
-    return resp
-
-@app.route('/api/auth/saml/acs', methods=['POST'])
-def saml_acs():
-    """SAML Assertion Consumer Service"""
-    if not SAML_ENABLED:
-        return jsonify({"error": "SAML authentication is not enabled"}), 501
-    
-    req = prepare_flask_request(request)
-    auth = init_saml_auth(req)
-    
-    if not auth:
-        return jsonify({"error": "SAML configuration error"}), 500
-    
-    auth.process_response()
-    errors = auth.get_errors()
-    
-    if len(errors) == 0 and auth.is_authenticated():
-        # Get user attributes from SAML response
-        saml_attributes = auth.get_attributes()
-        name_id = auth.get_nameid()
-        
-        # Get email from SAML attributes or use the name_id if it's an email
-        email = None
-        if 'email' in saml_attributes:
-            email = saml_attributes['email'][0]
-        elif '@' in name_id:
-            email = name_id
-        
-        if not email:
-            return jsonify({"error": "Email not provided in SAML response"}), 400
-        
-        # Create or update user
-        if email not in users:
-            user_id = str(uuid.uuid4())
-            username = email.split('@')[0]
-            users[email] = {
-                "id": user_id,
-                "name": username,
-                "email": email,
-                "password": None,  # SAML users don't have passwords
-                "authenticated": True
-            }
-        
-        # Set user session
-        session['user_id'] = users[email]['id']
-        users[email]['authenticated'] = True
-        
-        # Get redirect URL
-        redirect_url = session.get('saml_redirect_url', '/dashboard')
-        
-        # Create a query param with the user info for frontend
-        user_data = {
-            "id": users[email]['id'],
-            "name": users[email]['name'],
-            "email": email,
+    # Check if this Google user exists in our user database
+    if google_email not in users:
+        # Create a new user
+        user_id = str(uuid.uuid4())
+        users[google_email] = {
+            "id": user_id,
+            "name": "Google User",  # In a real app, get this from Google profile
+            "email": google_email,
+            "password": None,  # Google users don't need a password
+            "photoUrl": "https://lh3.googleusercontent.com/a/default-user", # Mock photo URL
             "authenticated": True
         }
-        
-        # Encode user data for URL
-        user_data_str = base64.b64encode(json.dumps(user_data).encode('utf-8')).decode('utf-8')
-        redirect_with_data = f"{redirect_url}?user_data={quote(user_data_str)}"
-        
-        return redirect(redirect_with_data)
     
-    return jsonify({"error": "SAML authentication failed: " + ', '.join(errors)}), 401
+    # Create user session
+    session['user_id'] = users[google_email]['id']
+    users[google_email]['authenticated'] = True
+    
+    # Return user info by redirecting to the frontend with user data
+    user_data = {
+        "id": users[google_email]['id'],
+        "name": users[google_email]['name'],
+        "email": google_email,
+        "photoUrl": users[google_email].get('photoUrl'),
+        "authenticated": True
+    }
+    
+    # Encode user data for URL
+    user_data_str = base64.b64encode(json.dumps(user_data).encode('utf-8')).decode('utf-8')
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    redirect_url = f"{frontend_url}/auth/callback?user_data={quote(user_data_str)}"
+    
+    return redirect(redirect_url)
 
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():
@@ -283,38 +253,6 @@ def logout():
     
     return jsonify({"success": True})
 
-@app.route('/api/auth/saml/logout', methods=['GET'])
-def saml_logout():
-    """Initiate SAML logout flow"""
-    if not SAML_ENABLED:
-        return jsonify({"error": "SAML authentication is not enabled"}), 501
-    
-    req = prepare_flask_request(request)
-    auth = init_saml_auth(req)
-    
-    if not auth:
-        return jsonify({"error": "SAML configuration error"}), 500
-    
-    name_id = None
-    session_index = None
-    
-    if 'samlNameId' in session:
-        name_id = session['samlNameId']
-    
-    if 'samlSessionIndex' in session:
-        session_index = session['samlSessionIndex']
-    
-    # Clear session first
-    session.clear()
-    
-    # Redirect to IdP for SLO if we have the required info
-    if name_id is not None and session_index is not None:
-        slo_url = auth.logout(name_id=name_id, session_index=session_index)
-        return redirect(slo_url)
-    
-    # Otherwise just return success
-    return jsonify({"success": True})
-
 @app.route('/api/auth/session', methods=['GET'])
 def check_session():
     """Check if user is authenticated"""
@@ -328,6 +266,7 @@ def check_session():
                     "id": user['id'],
                     "name": user['name'],
                     "email": user['email'],
+                    "photoUrl": user.get('photoUrl'),
                     "authenticated": True
                 }
                 return jsonify({"authenticated": True, "user": user_data})
