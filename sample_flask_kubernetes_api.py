@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify, redirect, session, url_for, make_response
 from flask_cors import CORS
 import time
@@ -9,6 +10,9 @@ from urllib.parse import quote
 import base64
 import ssl
 import requests
+import signal
+import sys
+import atexit
 
 # Conditionally import SAML libraries - will fail gracefully if not installed
 try:
@@ -89,6 +93,29 @@ users = {
     }
 }
 
+# Function to gracefully shut down the app
+def graceful_shutdown(signal_num=None, frame=None):
+    print(f"Received signal {signal_num if signal_num else 'shutdown request'}")
+    print("Closing all connections and performing cleanup...")
+    
+    # Close any open database connections or other resources here
+    # For example, if using SQLAlchemy:
+    # db.session.close_all()
+    # db.engine.dispose()
+    
+    # Explicitly close any open requests session pools
+    requests.Session().close()
+    
+    print("Cleanup completed, shutting down...")
+    sys.exit(0)
+
+# Register the shutdown function with signals
+signal.signal(signal.SIGINT, graceful_shutdown)
+signal.signal(signal.SIGTERM, graceful_shutdown)
+
+# Also register at exit to catch non-signal terminations
+atexit.register(graceful_shutdown)
+
 # SAML configuration
 def prepare_flask_request(request):
     """Prepare Flask request for SAML processing"""
@@ -144,6 +171,7 @@ def init_saml_auth(req):
 # Authentication endpoints
 @app.route('/api/auth/login', methods=['POST'])
 def login():
+    # ... keep existing code (login function)
     """Handle email/password login"""
     data = request.json
     if not data or 'email' not in data or 'password' not in data:
@@ -173,6 +201,7 @@ def login():
 # Google OAuth routes
 @app.route('/api/auth/google', methods=['GET'])
 def google_login():
+    # ... keep existing code (google_login function)
     """Initiate Google OAuth login flow"""
     # In a real implementation, this would redirect to Google's OAuth endpoint
     # For this demo, we'll simulate the process by directly creating a user
@@ -190,6 +219,7 @@ def google_login():
 
 @app.route('/api/auth/google/callback', methods=['GET'])
 def google_callback():
+    # ... keep existing code (google_callback function)
     """Handle Google OAuth callback"""
     # Get the authorization code and state from the query parameters
     code = request.args.get('code')
@@ -245,6 +275,7 @@ def google_callback():
 
 @app.route('/api/auth/github', methods=['GET'])
 def github_login():
+    # ... keep existing code (github_login function)
     """Initiate GitHub OAuth login flow"""
     # Generate a random state for security
     state = str(uuid.uuid4())
@@ -270,106 +301,121 @@ def github_login():
 @app.route('/api/auth/github/callback', methods=['GET'])
 def github_callback():
     """Handle GitHub OAuth callback"""
-    # Get the authorization code and state from the query parameters
-    code = request.args.get('code')
-    state = request.args.get('state')
-    
-    # Verify the state to prevent CSRF attacks
-    stored_state = session.get('oauth_state')
-    if not stored_state or stored_state != state:
-        return jsonify({"error": "Invalid state parameter"}), 400
-    
-    # Clear the state from the session
-    session.pop('oauth_state', None)
-    
-    # Exchange the authorization code for an access token
-    token_url = "https://github.com/login/oauth/access_token"
-    token_payload = {
-        'client_id': GITHUB_CLIENT_ID,
-        'client_secret': GITHUB_CLIENT_SECRET,
-        'code': code,
-        'redirect_uri': GITHUB_REDIRECT_URI
-    }
-    
-    # Make POST request to get access token
-    token_response = requests.post(token_url, data=token_payload, headers={'Accept': 'application/json'})
-    
-    # Check if the token request was successful
-    if token_response.status_code != 200:
-        return jsonify({"error": "Failed to obtain access token"}), 400
-    
-    token_data = token_response.json()
-    access_token = token_data.get('access_token')
-    
-    # Use the access token to get user information
-    user_url = "https://api.github.com/user"
-    user_emails_url = "https://api.github.com/user/emails"
-    
-    headers = {
-        'Authorization': f"token {access_token}",
-        'Accept': 'application/json'
-    }
-    
-    # Get user profile
-    user_response = requests.get(user_url, headers=headers)
-    if user_response.status_code != 200:
-        return jsonify({"error": "Failed to fetch user data"}), 400
-    
-    user_data = user_response.json()
-    
-    # Get user emails (to ensure we have the primary email)
-    emails_response = requests.get(user_emails_url, headers=headers)
-    if emails_response.status_code != 200:
-        return jsonify({"error": "Failed to fetch user emails"}), 400
-    
-    emails_data = emails_response.json()
-    
-    # Find the primary email
-    primary_email = None
-    for email in emails_data:
-        if email.get('primary'):
-            primary_email = email.get('email')
-            break
-    
-    if not primary_email:
-        # If no primary email is found, use the first one
-        primary_email = emails_data[0].get('email') if emails_data else user_data.get('email')
-    
-    # Check if this GitHub user exists in our user database
-    if primary_email not in users:
-        # Create a new user
-        user_id = str(uuid.uuid4())
-        users[primary_email] = {
-            "id": user_id,
-            "name": user_data.get('name') or user_data.get('login'),
+    try:
+        # Get the authorization code and state from the query parameters
+        code = request.args.get('code')
+        state = request.args.get('state')
+        
+        # Verify the state to prevent CSRF attacks
+        stored_state = session.get('oauth_state')
+        if not stored_state or stored_state != state:
+            return jsonify({"error": "Invalid state parameter"}), 400
+        
+        # Clear the state from the session
+        session.pop('oauth_state', None)
+        
+        # Create a session for the token request
+        token_session = requests.Session()
+        
+        # Exchange the authorization code for an access token
+        token_url = "https://github.com/login/oauth/access_token"
+        token_payload = {
+            'client_id': GITHUB_CLIENT_ID,
+            'client_secret': GITHUB_CLIENT_SECRET,
+            'code': code,
+            'redirect_uri': GITHUB_REDIRECT_URI
+        }
+        
+        # Make POST request to get access token
+        token_response = token_session.post(token_url, data=token_payload, headers={'Accept': 'application/json'})
+        
+        # Check if the token request was successful
+        if token_response.status_code != 200:
+            return jsonify({"error": "Failed to obtain access token"}), 400
+        
+        token_data = token_response.json()
+        access_token = token_data.get('access_token')
+        
+        # Use the access token to get user information
+        user_url = "https://api.github.com/user"
+        user_emails_url = "https://api.github.com/user/emails"
+        
+        headers = {
+            'Authorization': f"token {access_token}",
+            'Accept': 'application/json'
+        }
+        
+        # Get user profile
+        user_response = token_session.get(user_url, headers=headers)
+        if user_response.status_code != 200:
+            return jsonify({"error": "Failed to fetch user data"}), 400
+        
+        user_data = user_response.json()
+        
+        # Get user emails (to ensure we have the primary email)
+        emails_response = token_session.get(user_emails_url, headers=headers)
+        if emails_response.status_code != 200:
+            return jsonify({"error": "Failed to fetch user emails"}), 400
+        
+        emails_data = emails_response.json()
+        
+        # Find the primary email
+        primary_email = None
+        for email in emails_data:
+            if email.get('primary'):
+                primary_email = email.get('email')
+                break
+        
+        if not primary_email:
+            # If no primary email is found, use the first one
+            primary_email = emails_data[0].get('email') if emails_data else user_data.get('email')
+        
+        # Close the session to prevent resource leaks
+        token_session.close()
+        
+        # Check if this GitHub user exists in our user database
+        if primary_email not in users:
+            # Create a new user
+            user_id = str(uuid.uuid4())
+            users[primary_email] = {
+                "id": user_id,
+                "name": user_data.get('name') or user_data.get('login'),
+                "email": primary_email,
+                "password": None,  # GitHub users don't need a password
+                "photoUrl": user_data.get('avatar_url'),
+                "authenticated": True
+            }
+        
+        # Create user session
+        session['user_id'] = users[primary_email]['id']
+        users[primary_email]['authenticated'] = True
+        
+        # Return user info by redirecting to the frontend with user data
+        user_info = {
+            "id": users[primary_email]['id'],
+            "name": users[primary_email]['name'],
             "email": primary_email,
-            "password": None,  # GitHub users don't need a password
-            "photoUrl": user_data.get('avatar_url'),
+            "photoUrl": users[primary_email].get('photoUrl'),
             "authenticated": True
         }
+        
+        # Encode user data for URL
+        user_data_str = base64.b64encode(json.dumps(user_info).encode('utf-8')).decode('utf-8')
+        frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+        
+        # Ensure we redirect to the correct path - use '/auth/callback' not '/dashboard/auth/callback'
+        redirect_url = f"{frontend_url}/auth/callback?user_data={quote(user_data_str)}"
+        
+        return redirect(redirect_url)
     
-    # Create user session
-    session['user_id'] = users[primary_email]['id']
-    users[primary_email]['authenticated'] = True
-    
-    # Return user info by redirecting to the frontend with user data
-    user_info = {
-        "id": users[primary_email]['id'],
-        "name": users[primary_email]['name'],
-        "email": primary_email,
-        "photoUrl": users[primary_email].get('photoUrl'),
-        "authenticated": True
-    }
-    
-    # Encode user data for URL
-    user_data_str = base64.b64encode(json.dumps(user_info).encode('utf-8')).decode('utf-8')
-    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
-    
-    # Ensure we redirect to the correct path - use '/auth/callback' not '/dashboard/auth/callback'
-    redirect_url = f"{frontend_url}/auth/callback?user_data={quote(user_data_str)}"
-    
-    return redirect(redirect_url)
+    except Exception as e:
+        print(f"Error in GitHub callback: {e}")
+        # Ensure we close any open resources
+        if 'token_session' in locals():
+            token_session.close()
+        return jsonify({"error": f"GitHub authentication failed: {str(e)}"}), 500
 
+# ... keep existing code (all other endpoints)
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():
     """Handle user logout"""
@@ -520,6 +566,10 @@ def get_namespace_issues():
         return jsonify([]), 400
 
 if __name__ == '__main__':
+    # Set up proper connection and socket handling for Gunicorn
+    from werkzeug.serving import WSGIRequestHandler
+    WSGIRequestHandler.protocol_version = "HTTP/1.1"
+    
     # For development, use HTTP or self-signed HTTPS
     if os.environ.get('HTTPS_ENABLED', '0') == '1':
         # Create SSL context with proper ciphers and protocols
@@ -541,4 +591,6 @@ if __name__ == '__main__':
         
         app.run(host='0.0.0.0', port=8000, ssl_context=context)
     else:
+        print("Starting Flask application in HTTP mode...")
         app.run(host='0.0.0.0', port=8000, debug=True)
+
