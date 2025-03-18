@@ -8,6 +8,7 @@ import json
 from urllib.parse import quote
 import base64
 import ssl
+import requests
 
 # Conditionally import SAML libraries - will fail gracefully if not installed
 try:
@@ -29,6 +30,11 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', str(uuid.uuid4()))
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'your-google-client-id')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', 'your-google-client-secret')
 GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:8000/api/auth/google/callback')
+
+# GitHub OAuth configuration
+GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', 'your-github-client-id')
+GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', 'your-github-client-secret')
+GITHUB_REDIRECT_URI = os.environ.get('GITHUB_REDIRECT_URI', 'http://localhost:8000/api/auth/github/callback')
 
 # Mock data for demo purposes
 kubernetes_clusters = [
@@ -232,6 +238,131 @@ def google_callback():
     
     # Encode user data for URL
     user_data_str = base64.b64encode(json.dumps(user_data).encode('utf-8')).decode('utf-8')
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    redirect_url = f"{frontend_url}/auth/callback?user_data={quote(user_data_str)}"
+    
+    return redirect(redirect_url)
+
+@app.route('/api/auth/github', methods=['GET'])
+def github_login():
+    """Initiate GitHub OAuth login flow"""
+    # Generate a random state for security
+    state = str(uuid.uuid4())
+    session['oauth_state'] = state
+    
+    # GitHub OAuth authorization URL
+    github_auth_url = "https://github.com/login/oauth/authorize"
+    
+    # Parameters for GitHub OAuth
+    params = {
+        'client_id': GITHUB_CLIENT_ID,
+        'redirect_uri': GITHUB_REDIRECT_URI,
+        'scope': 'user:email',  # Request access to user's email
+        'state': state
+    }
+    
+    # Build the authorization URL with parameters
+    auth_url = f"{github_auth_url}?{'&'.join([f'{k}={v}' for k, v in params.items()])}"
+    
+    # Redirect to GitHub for authorization
+    return redirect(auth_url)
+
+@app.route('/api/auth/github/callback', methods=['GET'])
+def github_callback():
+    """Handle GitHub OAuth callback"""
+    # Get the authorization code and state from the query parameters
+    code = request.args.get('code')
+    state = request.args.get('state')
+    
+    # Verify the state to prevent CSRF attacks
+    stored_state = session.get('oauth_state')
+    if not stored_state or stored_state != state:
+        return jsonify({"error": "Invalid state parameter"}), 400
+    
+    # Clear the state from the session
+    session.pop('oauth_state', None)
+    
+    # Exchange the authorization code for an access token
+    token_url = "https://github.com/login/oauth/access_token"
+    token_payload = {
+        'client_id': GITHUB_CLIENT_ID,
+        'client_secret': GITHUB_CLIENT_SECRET,
+        'code': code,
+        'redirect_uri': GITHUB_REDIRECT_URI
+    }
+    
+    # Make POST request to get access token
+    token_response = requests.post(token_url, data=token_payload, headers={'Accept': 'application/json'})
+    
+    # Check if the token request was successful
+    if token_response.status_code != 200:
+        return jsonify({"error": "Failed to obtain access token"}), 400
+    
+    token_data = token_response.json()
+    access_token = token_data.get('access_token')
+    
+    # Use the access token to get user information
+    user_url = "https://api.github.com/user"
+    user_emails_url = "https://api.github.com/user/emails"
+    
+    headers = {
+        'Authorization': f"token {access_token}",
+        'Accept': 'application/json'
+    }
+    
+    # Get user profile
+    user_response = requests.get(user_url, headers=headers)
+    if user_response.status_code != 200:
+        return jsonify({"error": "Failed to fetch user data"}), 400
+    
+    user_data = user_response.json()
+    
+    # Get user emails (to ensure we have the primary email)
+    emails_response = requests.get(user_emails_url, headers=headers)
+    if emails_response.status_code != 200:
+        return jsonify({"error": "Failed to fetch user emails"}), 400
+    
+    emails_data = emails_response.json()
+    
+    # Find the primary email
+    primary_email = None
+    for email in emails_data:
+        if email.get('primary'):
+            primary_email = email.get('email')
+            break
+    
+    if not primary_email:
+        # If no primary email is found, use the first one
+        primary_email = emails_data[0].get('email') if emails_data else user_data.get('email')
+    
+    # Check if this GitHub user exists in our user database
+    if primary_email not in users:
+        # Create a new user
+        user_id = str(uuid.uuid4())
+        users[primary_email] = {
+            "id": user_id,
+            "name": user_data.get('name') or user_data.get('login'),
+            "email": primary_email,
+            "password": None,  # GitHub users don't need a password
+            "photoUrl": user_data.get('avatar_url'),
+            "authenticated": True
+        }
+    
+    # Create user session
+    session['user_id'] = users[primary_email]['id']
+    users[primary_email]['authenticated'] = True
+    
+    # Return user info by redirecting to the frontend with user data
+    user_info = {
+        "id": users[primary_email]['id'],
+        "name": users[primary_email]['name'],
+        "email": primary_email,
+        "photoUrl": users[primary_email].get('photoUrl'),
+        "authenticated": True
+    }
+    
+    # Encode user data for URL
+    user_data_str = base64.b64encode(json.dumps(user_info).encode('utf-8')).decode('utf-8')
     frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
     redirect_url = f"{frontend_url}/auth/callback?user_data={quote(user_data_str)}"
     

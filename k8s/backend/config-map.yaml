@@ -11,3 +11,7 @@ data:
   FLASK_SECRET_KEY: "secure-random-secret-key-for-session-management"
   SSL_CERT_PATH: "/app/cert.pem"
   SSL_KEY_PATH: "/app/key.pem"
+  FRONTEND_URL: "http://localhost:5173"
+  GITHUB_CLIENT_ID: ""  # Replace with your GitHub Client ID
+  GITHUB_CLIENT_SECRET: ""  # Replace with your GitHub Client Secret
+  GITHUB_REDIRECT_URI: "http://localhost:8000/api/auth/github/callback"
