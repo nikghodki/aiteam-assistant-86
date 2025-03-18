@@ -56,10 +56,8 @@ const NotFound = () => {
             description: `Welcome, ${decodedUserData.name || decodedUserData.email}!`,
           });
           
-          // Redirect to front page with a slight delay
-          setTimeout(() => {
-            navigate('/', { replace: true });
-          }, 1500);
+          // Force redirect to front page
+          window.location.href = '/';
           return;
         }
       }
@@ -74,11 +72,8 @@ const NotFound = () => {
         variant: "destructive",
       });
       
-      // Try redirecting to the auth callback route directly
-      setTimeout(() => {
-        // Navigate to the AuthCallback component directly
-        navigate('/auth/callback' + location.search, { replace: true });
-      }, 1000);
+      // Force redirect to the auth callback route directly
+      window.location.href = '/auth/callback' + location.search;
     }
   };
 
@@ -86,10 +81,10 @@ const NotFound = () => {
   const handleManualRedirect = () => {
     if (location.search.includes('user_data')) {
       console.log("Manual redirect to auth callback initiated");
-      // Try redirecting to the auth callback route
-      navigate('/auth/callback' + location.search, { replace: true });
+      // Force redirect to the auth callback route
+      window.location.href = '/auth/callback' + location.search;
     } else {
-      navigate('/');
+      window.location.href = '/';
     }
   };
 
@@ -130,7 +125,7 @@ const NotFound = () => {
           </div>
         ) : (
           <Button 
-            onClick={() => navigate('/')}
+            onClick={() => window.location.href = '/'}
             variant="outline"
           >
             Return to Home

@@ -51,12 +51,8 @@ const AuthCallback = () => {
               description: `Welcome, ${decodedUserData.name || decodedUserData.email}!`,
             });
             
-            // Set a flag to indicate successful processing
-            setIsProcessing(false);
-            
-            // Redirect to frontpage with replace:true to prevent back navigation to the callback page
-            console.log("Redirecting to frontpage...");
-            navigate('/', { replace: true });
+            // Force redirect to frontpage
+            window.location.href = '/';
             return;
           } catch (e) {
             console.error('Failed to parse user data:', e);
@@ -79,7 +75,7 @@ const AuthCallback = () => {
             description: errorDescription || "There was an error during authentication.",
             variant: "destructive",
           });
-          setTimeout(() => navigate('/'), 3000);
+          window.location.href = '/';
           return;
         }
         
@@ -103,8 +99,8 @@ const AuthCallback = () => {
           description: `Successfully authenticated with ${provider}`,
         });
         
-        // Redirect to frontpage instead of dashboard
-        navigate('/', { replace: true });
+        // Force redirect to frontpage using window.location for a hard redirect
+        window.location.href = '/';
       } catch (err: any) {
         console.error('Error processing authentication callback:', err);
         setError(err?.message || 'An unexpected error occurred');
@@ -113,7 +109,8 @@ const AuthCallback = () => {
           description: err?.message || "An unexpected error occurred during authentication.",
           variant: "destructive",
         });
-        setTimeout(() => navigate('/'), 3000);
+        // Force redirect to frontpage after error
+        window.location.href = '/';
       }
     };
     
