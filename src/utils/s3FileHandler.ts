@@ -48,3 +48,19 @@ export const isS3Path = (path: string | undefined): boolean => {
   if (!path) return false;
   return path.startsWith('s3://') || path.includes('amazonaws.com');
 };
+
+/**
+ * Downloads a file from the API when a file_name is provided in chat response
+ * @param file_name The file name from the API response
+ * @returns The file content
+ */
+export const downloadFileFromResponse = async (file_name: string | undefined): Promise<string | null> => {
+  if (!file_name) return null;
+  
+  try {
+    return await downloadS3File(file_name);
+  } catch (error) {
+    console.error('Error downloading file from response:', error);
+    return null;
+  }
+};

@@ -6,11 +6,12 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
-import { isS3Path } from '@/utils/s3FileHandler';
+import { isS3Path, downloadFileFromResponse } from '@/utils/s3FileHandler';
 
 interface ChatResponse {
   response: string;
   filePath?: string;
+  file_name?: string;
 }
 
 interface ChatMessage {
@@ -19,6 +20,7 @@ interface ChatMessage {
   content: string;
   timestamp: Date;
   attachedFile?: string;
+  fileContent?: string;
 }
 
 const SampleMessages: ChatMessage[] = [
@@ -122,9 +124,18 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath, 
     try {
       const chatResponse: ChatResponse = await docsApi.chatWithAssistant(inputMessage);
       
-      const filePath = chatResponse.filePath || extractFilePath(chatResponse.response);
+      const filePath = chatResponse.file_name || chatResponse.filePath || extractFilePath(chatResponse.response);
+      
+      let fileContent: string | null = null;
+      
       if (filePath) {
         setDebugFilePath(filePath);
+        try {
+          fileContent = await downloadFileFromResponse(filePath);
+          console.log("Downloaded file content:", fileContent ? `${fileContent.substring(0, 100)}...` : "No content");
+        } catch (error) {
+          console.error("Error downloading file:", error);
+        }
       }
       
       const assistantMessage: ChatMessage = {
@@ -133,6 +144,7 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath, 
         content: chatResponse.response ? getSimplifiedContent(chatResponse.response) : '',
         timestamp: new Date(),
         attachedFile: filePath || undefined,
+        fileContent: fileContent || undefined
       };
       
       setMessages(prev => [...prev, assistantMessage]);
@@ -157,32 +169,48 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath, 
     }
   };
 
+  const renderMessage = (message: ChatMessage) => {
+    return (
+      <div key={message.id} className={`flex items-start ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+        <div className={cn("p-3 rounded-lg max-w-[75%] shadow-sm",
+          message.role === 'user' ? "bg-gray-100 dark:bg-gray-700 text-right" : "bg-professional-purple-light/10 dark:bg-professional-purple-dark/10"
+        )}>
+          <div className="text-sm">
+            {message.role === 'user' ? (
+              <p className="font-semibold text-professional-purple dark:text-professional-purple-light mb-1">You</p>
+            ) : (
+              <p className="font-semibold text-primary-foreground mb-1">Assistant</p>
+            )}
+            <p className="whitespace-pre-wrap break-words">{formatMessage(message.content)}</p>
+            {message.attachedFile && (
+              <div className="mt-2">
+                <a 
+                  href={message.attachedFile} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-xs text-professional-blue-DEFAULT underline"
+                >
+                  View File
+                </a>
+                {message.fileContent && (
+                  <div className="mt-2 p-2 bg-muted rounded-md max-h-[150px] overflow-auto text-xs">
+                    <pre>{message.fileContent}</pre>
+                  </div>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1 text-right">{message.timestamp.toLocaleTimeString()}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (showInline) {
     return (
       <div className="h-full flex flex-col">
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((message) => (
-            <div key={message.id} className={`flex items-start ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={cn("p-3 rounded-lg max-w-[75%] shadow-sm",
-                message.role === 'user' ? "bg-gray-100 dark:bg-gray-700 text-right" : "bg-professional-purple-light/10 dark:bg-professional-purple-dark/10"
-              )}>
-                <div className="text-sm">
-                  {message.role === 'user' ? (
-                    <p className="font-semibold text-professional-purple dark:text-professional-purple-light mb-1">You</p>
-                  ) : (
-                    <p className="font-semibold text-primary-foreground mb-1">Assistant</p>
-                  )}
-                  <p className="whitespace-pre-wrap break-words">{formatMessage(message.content)}</p>
-                  {message.attachedFile && (
-                    <a href={message.attachedFile} target="_blank" rel="noopener noreferrer" className="text-xs text-professional-blue-DEFAULT underline">
-                      View File
-                    </a>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-1 text-right">{message.timestamp.toLocaleTimeString()}</p>
-                </div>
-              </div>
-            </div>
-          ))}
+          {messages.map(renderMessage)}
           <div ref={messagesEndRef} />
         </div>
         <div className="p-4 border-t dark:border-gray-700">
@@ -239,28 +267,7 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath, 
       {!minimized && (
         <div className="flex flex-col h-52 bg-white dark:bg-gray-800">
           <div className="flex-1 p-4 overflow-y-auto space-y-2">
-            {messages.map((message) => (
-              <div key={message.id} className={`flex items-start ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={cn("p-3 rounded-lg max-w-[75%] shadow-sm",
-                  message.role === 'user' ? "bg-gray-100 dark:bg-gray-700 text-right" : "bg-professional-purple-light/10 dark:bg-professional-purple-dark/10"
-                )}>
-                  <div className="text-sm">
-                    {message.role === 'user' ? (
-                      <p className="font-semibold text-professional-purple dark:text-professional-purple-light mb-1">You</p>
-                    ) : (
-                      <p className="font-semibold text-primary-foreground mb-1">Assistant</p>
-                    )}
-                    <p className="whitespace-pre-wrap break-words">{formatMessage(message.content)}</p>
-                    {message.attachedFile && (
-                      <a href={message.attachedFile} target="_blank" rel="noopener noreferrer" className="text-xs text-professional-blue-DEFAULT underline">
-                        View File
-                      </a>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1 text-right">{message.timestamp.toLocaleTimeString()}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+            {messages.map(renderMessage)}
             <div ref={messagesEndRef} />
           </div>
           <div className="p-3 border-t dark:border-gray-700">
