@@ -1,3 +1,4 @@
+
 // API base URL should be configured in your environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -181,35 +182,40 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
     defaultHeaders['Authorization'] = `Bearer ${sessionToken}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
-    credentials: 'include', // Include cookies in cross-origin requests
-  });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+      credentials: 'include', // Include cookies in cross-origin requests
+    });
 
-  if (!response.ok) {
-    // Handle 401 Unauthorized specifically for session expiration
-    if (response.status === 401) {
-      clearSessionToken();
-      // Redirect to login page if session expired
-      window.location.href = '/login';
-      throw new Error('Session expired. Please login again.');
+    if (!response.ok) {
+      // Handle 401 Unauthorized specifically for session expiration
+      if (response.status === 401) {
+        clearSessionToken();
+        // Redirect to login page if session expired
+        window.location.href = '/login';
+        throw new Error('Session expired. Please login again.');
+      }
+      
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `API error: ${response.status}`);
     }
-    
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `API error: ${response.status}`);
-  }
 
-  // Check for session token in response headers and update if present
-  const newSessionToken = response.headers.get('X-Session-Token');
-  if (newSessionToken) {
-    setSessionToken(newSessionToken);
-  }
+    // Check for session token in response headers and update if present
+    const newSessionToken = response.headers.get('X-Session-Token');
+    if (newSessionToken) {
+      setSessionToken(newSessionToken);
+    }
 
-  return response.json();
+    return response.json();
+  } catch (error) {
+    console.error('API call failed:', error);
+    throw error;
+  }
 };
 
 // Access Management API
