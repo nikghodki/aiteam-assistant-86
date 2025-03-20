@@ -155,17 +155,60 @@ export interface NamespaceIssue {
   timestamp: string;
 }
 
-// Session token management
+// Authentication token management
+const TOKEN_STORAGE_KEY = 'jwt_token';
+const TOKEN_EXPIRY_KEY = 'jwt_token_expiry';
+
+// Get token with expiry check
 const getSessionToken = (): string | null => {
-  return localStorage.getItem('session_token');
+  const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+  const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
+  
+  // If we have both token and expiry
+  if (token && expiry) {
+    // Check if token has expired
+    const expiryTime = parseInt(expiry, 10);
+    if (Date.now() < expiryTime) {
+      return token;
+    } else {
+      // Token expired, clear it
+      clearSessionToken();
+      // Could trigger a refresh here
+      console.warn('JWT token expired');
+    }
+  }
+  
+  return null;
 };
 
-const setSessionToken = (token: string): void => {
-  localStorage.setItem('session_token', token);
+// Set token with expiry
+const setSessionToken = (token: string, expiryInSeconds = 86400): void => {
+  localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  const expiryTime = Date.now() + (expiryInSeconds * 1000);
+  localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
 };
 
 const clearSessionToken = (): void => {
-  localStorage.removeItem('session_token');
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+  localStorage.removeItem(TOKEN_EXPIRY_KEY);
+};
+
+// Parse the JWT token to get expiry time
+const parseJwt = (token: string): any => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error parsing JWT:', error);
+    return null;
+  }
 };
 
 // Helper function for API calls
@@ -176,7 +219,7 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
     'Content-Type': 'application/json',
   };
 
-  // Add session token to headers if available
+  // Add JWT token to headers if available
   const sessionToken = getSessionToken();
   if (sessionToken) {
     defaultHeaders['Authorization'] = `Bearer ${sessionToken}`;
@@ -193,10 +236,44 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
     });
 
     if (!response.ok) {
-      // Handle 401 Unauthorized specifically for session expiration
+      // Handle 401 Unauthorized specifically for token expiration
       if (response.status === 401) {
         clearSessionToken();
-        // Redirect to login page if session expired
+        // Attempt to refresh token before redirecting
+        try {
+          const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+            method: 'POST',
+            credentials: 'include',
+          });
+          
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json();
+            if (refreshData.token) {
+              // If token refresh is successful, store the new token
+              setSessionToken(refreshData.token, refreshData.expiresIn || 86400);
+              
+              // Retry the original request with the new token
+              const retryOptions = {
+                ...options,
+                headers: {
+                  ...defaultHeaders,
+                  'Authorization': `Bearer ${refreshData.token}`,
+                  ...options.headers,
+                }
+              };
+              
+              const retryResponse = await fetch(url, retryOptions);
+              
+              if (retryResponse.ok) {
+                return retryResponse.json();
+              }
+            }
+          }
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+        }
+        
+        // If we reach here, refresh failed or retry failed
         window.location.href = '/login';
         throw new Error('Session expired. Please login again.');
       }
@@ -205,10 +282,16 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
       throw new Error(errorData.message || `API error: ${response.status}`);
     }
 
-    // Check for session token in response headers and update if present
-    const newSessionToken = response.headers.get('X-Session-Token');
-    if (newSessionToken) {
-      setSessionToken(newSessionToken);
+    // Check for JWT token in response headers and update if present
+    const newJwtToken = response.headers.get('X-JWT-Token');
+    if (newJwtToken) {
+      // Parse token to get expiry
+      const tokenData = parseJwt(newJwtToken);
+      const expiresIn = tokenData && tokenData.exp ? 
+        (tokenData.exp * 1000 - Date.now()) / 1000 : 
+        86400; // Default to 24 hours
+      
+      setSessionToken(newJwtToken, expiresIn);
     }
 
     return response.json();
@@ -513,5 +596,6 @@ export const getUserInfo = (): User => {
 export const sessionManager = {
   getSessionToken,
   setSessionToken,
-  clearSessionToken
+  clearSessionToken,
+  parseJwt
 };

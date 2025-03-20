@@ -29,6 +29,7 @@ interface AuthContextType {
   logout: () => void;
   saveOIDCConfig: (provider: string, config: OIDCConfig) => void;
   sessionToken: string | null;
+  refreshSessionToken: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,7 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedUser = localStorage.getItem('user');
       const token = sessionManager.getSessionToken();
       
-      if (storedUser) {
+      if (storedUser && token) {
         try {
           const parsedUser = JSON.parse(storedUser);
           setUser({ ...parsedUser, authenticated: true });
@@ -62,6 +63,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     checkAuth();
   }, []);
+
+  // New function to refresh the session token
+  const refreshSessionToken = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`
+        },
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.sessionToken) {
+        sessionManager.setSessionToken(data.sessionToken);
+        setSessionToken(data.sessionToken);
+        return;
+      }
+      
+      throw new Error('Invalid response from server');
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      // If token refresh fails, log the user out
+      logout();
+      throw error;
+    }
+  };
 
   const login = async (email: string, password: string) => {
     // Use the backend API for authentication
@@ -89,10 +123,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(authenticatedUser);
         localStorage.setItem('user', JSON.stringify(authenticatedUser));
         
-        // Store session token if provided
-        if (data.sessionToken) {
-          sessionManager.setSessionToken(data.sessionToken);
-          setSessionToken(data.sessionToken);
+        // Store JWT token if provided
+        if (data.token) {
+          sessionManager.setSessionToken(data.token);
+          setSessionToken(data.token);
         }
       } else {
         throw new Error('Invalid response from server');
@@ -168,7 +202,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       loginWithGithub,
       logout,
       saveOIDCConfig,
-      sessionToken
+      sessionToken,
+      refreshSessionToken
     }}>
       {children}
     </AuthContext.Provider>
