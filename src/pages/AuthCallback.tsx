@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/use-toast';
-import { oidcApi } from '@/services/api';
+import { oidcApi, sessionManager } from '@/services/api';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -24,6 +24,13 @@ const AuthCallback = () => {
         const state = urlParams.get('state');
         const error = urlParams.get('error');
         const errorDescription = urlParams.get('error_description');
+        const sessionToken = urlParams.get('session_token');
+        
+        // Check for session token and store it if available
+        if (sessionToken) {
+          console.log("Found session token in URL, storing...");
+          sessionManager.setSessionToken(sessionToken);
+        }
         
         // Check for user_data (from Google, GitHub or SAML callback)
         const userData = urlParams.get('user_data');
@@ -84,6 +91,11 @@ const AuthCallback = () => {
         
         if (!result.success) {
           throw new Error(result.error || `Authentication with ${provider} failed`);
+        }
+        
+        // Store session token if available in result
+        if (result.sessionToken) {
+          sessionManager.setSessionToken(result.sessionToken);
         }
         
         // Handle successful authentication

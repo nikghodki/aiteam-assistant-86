@@ -153,6 +153,19 @@ export interface NamespaceIssue {
   timestamp: string;
 }
 
+// Session token management
+const getSessionToken = (): string | null => {
+  return localStorage.getItem('session_token');
+};
+
+const setSessionToken = (token: string): void => {
+  localStorage.setItem('session_token', token);
+};
+
+const clearSessionToken = (): void => {
+  localStorage.removeItem('session_token');
+};
+
 // Helper function for API calls
 const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -161,17 +174,38 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
     'Content-Type': 'application/json',
   };
 
+  // Add session token to headers if available
+  const sessionToken = getSessionToken();
+  if (sessionToken) {
+    defaultHeaders['Authorization'] = `Bearer ${sessionToken}`;
+  }
+
   const response = await fetch(url, {
     ...options,
     headers: {
       ...defaultHeaders,
       ...options.headers,
     },
+    credentials: 'include', // Include cookies in cross-origin requests
   });
 
   if (!response.ok) {
+    // Handle 401 Unauthorized specifically for session expiration
+    if (response.status === 401) {
+      clearSessionToken();
+      // Redirect to login page if session expired
+      window.location.href = '/login';
+      throw new Error('Session expired. Please login again.');
+    }
+    
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || `API error: ${response.status}`);
+  }
+
+  // Check for session token in response headers and update if present
+  const newSessionToken = response.headers.get('X-Session-Token');
+  if (newSessionToken) {
+    setSessionToken(newSessionToken);
   }
 
   return response.json();
@@ -466,4 +500,11 @@ export const getUserInfo = (): User => {
     name: 'nghodki',
     email: 'nghodki@cisco.com',
   };
+};
+
+// Export session token management functions
+export const sessionManager = {
+  getSessionToken,
+  setSessionToken,
+  clearSessionToken
 };
