@@ -141,6 +141,7 @@ export interface OIDCAuthResult {
   success: boolean;
   user?: User;
   error?: string;
+  sessionToken?: string;
 }
 
 // New interface for namespace issues
