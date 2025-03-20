@@ -8,6 +8,13 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, isLoading } = useAuth();
+  
+  // For local testing, bypass authentication checks
+  const isLocalTesting = process.env.NODE_ENV === 'development';
+  
+  if (isLocalTesting) {
+    return <>{children}</>;
+  }
 
   // Show loading indicator while checking auth status
   if (isLoading) {
