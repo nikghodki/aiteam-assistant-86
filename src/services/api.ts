@@ -1,4 +1,3 @@
-
 // API base URL should be configured in your environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -460,6 +459,22 @@ export const kubernetesApi = {
     return apiCall<NamespaceIssue[]>(`/kubernetes/namespace-issues`, {
       method: 'POST',
       body: JSON.stringify({ clusterArn, namespace }),
+    });
+  },
+  
+  /**
+   * Download a file from S3
+   * @param filePath The S3 path of the file to download
+   * @returns The file content
+   */
+  downloadS3File: (filePath: string): Promise<string> => {
+    if (!filePath) {
+      return Promise.reject(new Error('File path is required'));
+    }
+    
+    return apiCall<string>(`/kubernetes/s3-file`, {
+      method: 'POST',
+      body: JSON.stringify({ filePath }),
     });
   }
 };

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Check, Copy, Download, X } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -14,6 +13,7 @@ import { Alert, AlertDescription } from '../ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { kubernetesApi } from '@/services/api';
+import { downloadS3File, isS3Path } from '@/utils/s3FileHandler';
 
 interface KubernetesDebugDrawerProps {
   isOpen: boolean;
@@ -51,22 +51,28 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     if (debugFilePath && isOpen) {
       setIsLoadingFile(true);
       
-      const timer = setTimeout(() => {
-        fetch(debugFilePath)
-          .then(response => response.text())
-          .then(content => {
-            setDebugFileContent(content);
-            setIsLoadingFile(false);
-          })
-          .catch(error => {
-            console.error('Error loading debug file:', error);
-            setIsLoadingFile(false);
-            toast({
-              title: "Error",
-              description: "Failed to load debugging information",
-              variant: "destructive"
-            });
+      const timer = setTimeout(async () => {
+        try {
+          let content = '';
+          
+          if (isS3Path(debugFilePath)) {
+            content = await downloadS3File(debugFilePath);
+          } else {
+            const response = await fetch(debugFilePath);
+            content = await response.text();
+          }
+          
+          setDebugFileContent(content);
+          setIsLoadingFile(false);
+        } catch (error) {
+          console.error('Error loading debug file:', error);
+          setIsLoadingFile(false);
+          toast({
+            title: "Error",
+            description: "Failed to load debugging information",
+            variant: "destructive"
           });
+        }
       }, 500);
       
       return () => clearTimeout(timer);
@@ -99,7 +105,6 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     
     try {
       if (debugSession?.id) {
-        // Download using API if debugSession exists
         const response = await kubernetesApi.downloadDebugFile(debugSession.id);
         
         const link = document.createElement('a');
@@ -109,13 +114,15 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
         link.click();
         document.body.removeChild(link);
       } else if (debugFileContent) {
-        // Download the debug file content if available
         const blob = new Blob([debugFileContent], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         
         const link = document.createElement('a');
         link.href = url;
-        link.download = `debug-file-${new Date().getTime()}.txt`;
+        const fileName = debugFilePath 
+          ? `${debugFilePath.split('/').pop() || 'debug-file'}-${new Date().getTime()}.txt`
+          : `debug-file-${new Date().getTime()}.txt`;
+        link.download = fileName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

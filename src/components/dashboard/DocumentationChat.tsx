@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, RefreshCw, XCircle } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,8 +6,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+import { isS3Path } from '@/utils/s3FileHandler';
 
-// Define the ChatResponse type to match what the API returns
 interface ChatResponse {
   response: string;
   filePath?: string;
@@ -36,20 +35,16 @@ interface DocumentationChatProps {
   showInline?: boolean;
 }
 
-// Function to extract file path from assistant's response
 const extractFilePath = (message: string): string | null => {
   const filePathRegex = /\[View File\]\((.*?)\)/;
   const match = message.match(filePathRegex);
   return match ? match[1] : null;
 };
 
-// Function to get simplified content without file references
 const getSimplifiedContent = (message: string): string => {
-  // Remove file reference syntax
   return message.replace(/\[View File\]\(.*?\)/g, '');
 };
 
-// Function to format code blocks in the message
 const formatMessage = (message: string): JSX.Element => {
   const parts = message.split(/(```[\s\S]*?```)/g);
   
@@ -86,7 +81,6 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath, 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Maintain scroll position when new messages arrive
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -126,10 +120,8 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath, 
     setIsLoading(true);
     
     try {
-      // Get the response from the documentation assistant
       const chatResponse: ChatResponse = await docsApi.chatWithAssistant(inputMessage);
       
-      // Extract file path from response if present
       const filePath = chatResponse.filePath || extractFilePath(chatResponse.response);
       if (filePath) {
         setDebugFilePath(filePath);
@@ -145,13 +137,10 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath, 
       
       setMessages(prev => [...prev, assistantMessage]);
       
-      // If debug file path is available and there's a callback to handle it
-      if (debugFilePath && onDebugFilePath) {
-        onDebugFilePath(debugFilePath);
+      if (filePath && onDebugFilePath) {
+        onDebugFilePath(filePath);
       }
 
-      // Invalidate the doc-history query to refresh the dashboard stats
-      // This ensures the documentation queries count is updated in the dashboard
       console.log("Invalidating doc-history query to update counter...");
       await queryClient.invalidateQueries({ queryKey: ['doc-history'] });
       console.log("Documentation query count updated after chat message");
@@ -168,7 +157,6 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath, 
     }
   };
 
-  // If showing inline (in the Documentation page), render a different layout
   if (showInline) {
     return (
       <div className="h-full flex flex-col">
@@ -225,7 +213,6 @@ const DocumentationChat: React.FC<DocumentationChatProps> = ({ onDebugFilePath, 
     );
   }
 
-  // Original floating chat UI for the dashboard
   return (
     <div className={cn("fixed bottom-6 right-6 z-50 rounded-md shadow-lg overflow-hidden transition-all duration-300 ease-in-out",
       minimized ? "w-96 h-12 hover:h-64" : "w-96 h-64"
