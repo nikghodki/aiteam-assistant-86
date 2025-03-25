@@ -1,3 +1,4 @@
+
 // API base URL should be configured in your environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -211,7 +212,7 @@ const parseJwt = (token: string): any => {
 };
 
 // Helper function for API calls
-const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
+export const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
   
   const defaultHeaders: HeadersInit = {
