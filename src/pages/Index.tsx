@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Terminal, Database, Server, Search, ArrowRight } from 'lucide-react';
@@ -73,7 +74,7 @@ const Index = () => {
               <div className="flex flex-col sm:flex-row gap-4 pt-4 animate-fade-in" style={{ animationDelay: '300ms' }}>
                 <button 
                   onClick={() => navigate('/dashboard')}
-                  className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale flex items-center"
+                  className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover:scale-105 flex items-center"
                 >
                   <span>Get Started</span>
                   <ArrowRight size={16} className="ml-2" />
@@ -128,7 +129,7 @@ const Index = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <GlassMorphicCard key={index} className={`p-6 animate-fade-in delay-${feature.delay}`}>
+              <GlassMorphicCard key={index} className="p-6 animate-fade-in" style={{ animationDelay: `${feature.delay}ms` }}>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <feature.icon size={24} className="text-primary" />
                 </div>
@@ -168,7 +169,7 @@ const Index = () => {
                 <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '200ms' }}>
                   <button 
                     onClick={() => navigate('/dashboard')}
-                    className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale"
+                    className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover:scale-105"
                   >
                     Get Started Now
                   </button>

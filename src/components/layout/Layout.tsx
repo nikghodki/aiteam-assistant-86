@@ -41,7 +41,7 @@ export const Layout = ({ children, showDocChat = false }: LayoutProps) => {
           isMobileMenuOpen={isMobileMenuOpen} 
         />
         
-        <main className="flex-1 px-4 py-6 bg-gradient-to-br from-white to-professional-gray-light/50 dark:from-gray-900 dark:to-gray-800">
+        <main className="flex-1 px-4 py-6 bg-gradient-to-br from-white to-gray-100/50 dark:from-gray-900 dark:to-gray-800">
           {children}
         </main>
         
