@@ -1,4 +1,3 @@
-
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,35 +35,35 @@ const Sidebar = () => {
       href: "/access",
       icon: Users,
       requiresAuth: true,
-      requiredPermission: { resource: "access", action: "read" },
+      requiredPermission: { resource: "access" as "access", action: "read" as "read" },
     },
     {
       name: "Kubernetes Debug",
       href: "/kubernetes",
       icon: Terminal,
       requiresAuth: true,
-      requiredPermission: { resource: "kubernetes", action: "read" },
+      requiredPermission: { resource: "kubernetes" as "kubernetes", action: "read" as "read" },
     },
     {
       name: "Documentation",
       href: "/docs",
       icon: FileText,
       requiresAuth: true,
-      requiredPermission: { resource: "documentation", action: "read" },
+      requiredPermission: { resource: "documentation" as "documentation", action: "read" as "read" },
     },
     {
       name: "Jira",
       href: "/jira",
       icon: Link,
       requiresAuth: true,
-      requiredPermission: { resource: "jira", action: "read" },
+      requiredPermission: { resource: "jira" as "jira", action: "read" as "read" },
     },
     {
       name: "Role Management",
       href: "/roles",
       icon: ShieldCheck,
       requiresAuth: true,
-      requiredPermission: { resource: "settings", action: "admin" },
+      requiredPermission: { resource: "settings" as "settings", action: "admin" as "admin" },
     },
     {
       name: "Sandbox Orchestration",
@@ -92,7 +91,7 @@ const Sidebar = () => {
       href: "/settings",
       icon: Settings,
       requiresAuth: true,
-      requiredPermission: { resource: "settings", action: "read" },
+      requiredPermission: { resource: "settings" as "settings", action: "read" as "read" },
     },
   ];
 
