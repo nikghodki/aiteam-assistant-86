@@ -1,8 +1,9 @@
-
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Terminal, Database, Server, Search, ArrowRight } from 'lucide-react';
-import { Layout } from '@/components/layout/Layout';
+import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import GlassMorphicCard from '@/components/ui/GlassMorphicCard';
+import { Layout } from '@/components/layout/Layout';
 
 const features = [
   {
@@ -27,6 +28,21 @@ const features = [
 
 const Index = () => {
   const navigate = useNavigate();
+
+  // Adding subtle background scroll effect for depth
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollValue = window.scrollY;
+      const heroElement = document.getElementById('hero-bg');
+      
+      if (heroElement) {
+        heroElement.style.transform = `translateY(${scrollValue * 0.15}px)`;
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
     <Layout>
@@ -57,7 +73,7 @@ const Index = () => {
               <div className="flex flex-col sm:flex-row gap-4 pt-4 animate-fade-in" style={{ animationDelay: '300ms' }}>
                 <button 
                   onClick={() => navigate('/dashboard')}
-                  className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover:scale-105 flex items-center"
+                  className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale flex items-center"
                 >
                   <span>Get Started</span>
                   <ArrowRight size={16} className="ml-2" />
@@ -77,8 +93,22 @@ const Index = () => {
                     alt="SRE Assistant Dashboard"
                     className="w-full h-full object-cover opacity-90"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-gray-900 to-transparent opacity-60"></div>
+                  <div className="absolute bottom-0 left-0 right-0 p-6">
+                    <div className="text-white font-medium mb-2">Terminal Output</div>
+                    <div className="bg-black/70 backdrop-blur-sm p-3 rounded text-xs text-green-400 font-mono">
+                      $ kubectl get pods -n monitoring<br />
+                      NAME                 READY   STATUS    RESTARTS   AGE<br />
+                      prometheus-0         1/1     Running   0          24h<br />
+                      grafana-7df4f85b85   1/1     Running   0          24h
+                    </div>
+                  </div>
                 </div>
               </div>
+              
+              {/* Floating elements for visual interest */}
+              <div className="absolute -top-6 -right-6 w-20 h-20 bg-primary/10 rounded-full blur-2xl"></div>
+              <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-primary/20 rounded-full blur-xl"></div>
             </div>
           </div>
         </div>
@@ -98,7 +128,7 @@ const Index = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <GlassMorphicCard key={index} className="p-6 animate-fade-in" style={{ animationDelay: `${feature.delay}ms` }}>
+              <GlassMorphicCard key={index} className={`p-6 animate-fade-in delay-${feature.delay}`}>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <feature.icon size={24} className="text-primary" />
                 </div>
@@ -116,6 +146,40 @@ const Index = () => {
               </GlassMorphicCard>
             ))}
           </div>
+        </div>
+      </section>
+      
+      {/* CTA Section */}
+      <section className="py-16 md:py-24 px-6">
+        <div className="max-w-7xl mx-auto">
+          <GlassMorphicCard className="bg-primary/5 overflow-hidden">
+            <div className="relative p-8 md:p-12">
+              <div className="absolute top-0 right-0 -mt-20 -mr-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl"></div>
+              <div className="absolute bottom-0 left-0 -mb-32 -ml-32 w-80 h-80 bg-primary/10 rounded-full blur-3xl"></div>
+              
+              <div className="relative max-w-3xl mx-auto text-center">
+                <h2 className="text-3xl md:text-4xl font-bold mb-4 animate-fade-in">
+                  Ready to streamline your infrastructure management?
+                </h2>
+                <p className="text-muted-foreground mb-8 animate-fade-in" style={{ animationDelay: '100ms' }}>
+                  Join other SRE teams who have reduced debugging time by 70% and improved access management security with SRE Assistant.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '200ms' }}>
+                  <button 
+                    onClick={() => navigate('/dashboard')}
+                    className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale"
+                  >
+                    Get Started Now
+                  </button>
+                  
+                  <button className="px-6 py-3 border border-input rounded-md font-medium hover:bg-muted transition-colors">
+                    View Documentation
+                  </button>
+                </div>
+              </div>
+            </div>
+          </GlassMorphicCard>
         </div>
       </section>
     </Layout>

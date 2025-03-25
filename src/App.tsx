@@ -19,8 +19,6 @@ import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import JiraTicket from "./pages/JiraTicket";
 import RoleManagement from "./pages/RoleManagement";
-import SandboxOrchestration from "./pages/SandboxOrchestration";
-import ReleaseDeployment from "./pages/ReleaseDeployment";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 // Create a client
@@ -84,16 +82,6 @@ const App = () => (
               <Route path="/roles" element={
                 <ProtectedRoute>
                   <RoleManagement />
-                </ProtectedRoute>
-              } />
-              <Route path="/sandbox" element={
-                <ProtectedRoute>
-                  <SandboxOrchestration />
-                </ProtectedRoute>
-              } />
-              <Route path="/release" element={
-                <ProtectedRoute>
-                  <ReleaseDeployment />
                 </ProtectedRoute>
               } />
               {/* Catch all route for 404 errors */}

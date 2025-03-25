@@ -1,7 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { OIDCConfig } from '@/services/api';
-import { sessionManager } from '@/services/api';
 
 // Simplified user model with authentication support
 export interface User {
@@ -28,8 +26,6 @@ interface AuthContextType {
   loginWithGithub: () => Promise<void>;
   logout: () => void;
   saveOIDCConfig: (provider: string, config: OIDCConfig) => void;
-  sessionToken: string | null;
-  refreshSessionToken: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,25 +33,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User>(mockUser);
   const [isLoading, setIsLoading] = useState(true);
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     // Check if user is already authenticated (e.g., from localStorage)
     const checkAuth = () => {
       const storedUser = localStorage.getItem('user');
-      const token = sessionManager.getSessionToken();
-      
-      if (storedUser && token) {
+      if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
           setUser({ ...parsedUser, authenticated: true });
-          setSessionToken(token);
         } catch (error) {
           console.error('Failed to parse stored user:', error);
           // Clear invalid storage
           localStorage.removeItem('user');
-          sessionManager.clearSessionToken();
         }
       }
       setIsLoading(false);
@@ -63,39 +54,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     checkAuth();
   }, []);
-
-  // New function to refresh the session token
-  const refreshSessionToken = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`
-        },
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to refresh token');
-      }
-      
-      const data = await response.json();
-      
-      if (data.success && data.sessionToken) {
-        sessionManager.setSessionToken(data.sessionToken);
-        setSessionToken(data.sessionToken);
-        return;
-      }
-      
-      throw new Error('Invalid response from server');
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      // If token refresh fails, log the user out
-      logout();
-      throw error;
-    }
-  };
 
   const login = async (email: string, password: string) => {
     // Use the backend API for authentication
@@ -122,12 +80,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const authenticatedUser = { ...data.user, authenticated: true };
         setUser(authenticatedUser);
         localStorage.setItem('user', JSON.stringify(authenticatedUser));
-        
-        // Store JWT token if provided
-        if (data.token) {
-          sessionManager.setSessionToken(data.token);
-          setSessionToken(data.token);
-        }
       } else {
         throw new Error('Invalid response from server');
       }
@@ -172,9 +124,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          Authorization: `Bearer ${sessionToken}`
-        }
       });
     } catch (error) {
       console.error('Logout API call failed:', error);
@@ -182,8 +131,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setUser({ ...mockUser, authenticated: false });
     localStorage.removeItem('user');
-    sessionManager.clearSessionToken();
-    setSessionToken(null);
     setIsLoading(false);
   };
 
@@ -201,9 +148,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       loginWithGoogle,
       loginWithGithub,
       logout,
-      saveOIDCConfig,
-      sessionToken,
-      refreshSessionToken
+      saveOIDCConfig
     }}>
       {children}
     </AuthContext.Provider>

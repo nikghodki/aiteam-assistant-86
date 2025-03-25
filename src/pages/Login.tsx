@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -15,30 +15,10 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Check for local testing mode
-  const isLocalTesting = process.env.NODE_ENV === 'development';
-  
-  useEffect(() => {
-    // Auto-navigate to dashboard in local testing mode
-    if (isLocalTesting) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [isLocalTesting, navigate]);
-
   // If user is already authenticated, redirect to dashboard
   if (user.authenticated) {
     navigate('/dashboard', { replace: true });
     return null;
-  }
-
-  // If in local testing mode, show loading until redirect
-  if (isLocalTesting) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="ml-3">Bypassing login for local testing...</p>
-      </div>
-    );
   }
 
   const handleLogin = async (e: React.FormEvent) => {

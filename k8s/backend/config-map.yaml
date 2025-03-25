@@ -9,8 +9,6 @@ data:
   FLASK_DEBUG: "0"
   HTTPS_ENABLED: "0"  # Disable HTTPS for the Flask app
   FLASK_SECRET_KEY: "secure-random-secret-key-for-session-management"
-  JWT_SECRET: "change-me-to-a-secure-random-key-in-production"
-  JWT_EXPIRATION: "86400"  # Token valid for 24 hours
   SSL_CERT_PATH: "/app/cert.pem"
   SSL_KEY_PATH: "/app/key.pem"
   FRONTEND_URL: "http://localhost:5173"

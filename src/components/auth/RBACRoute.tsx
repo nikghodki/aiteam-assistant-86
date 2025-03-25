@@ -21,13 +21,6 @@ const RBACRoute: React.FC<RBACRouteProps> = ({
   const { user } = useAuth();
   const { hasPermission } = useRBAC();
   
-  // For local testing, bypass authentication and RBAC checks
-  const isLocalTesting = process.env.NODE_ENV === 'development';
-  
-  if (isLocalTesting) {
-    return <>{children}</>;
-  }
-  
   // If no resource is specified, just check if the user is authenticated
   if (!resource && !user) {
     return <Navigate to="/login" replace />;

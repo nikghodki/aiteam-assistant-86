@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, redirect, session, url_for, make_response, g
+from flask import Flask, request, jsonify, redirect, session, url_for, make_response
 from flask_cors import CORS
 import time
 import random
@@ -12,9 +12,6 @@ import requests
 import signal
 import sys
 import atexit
-import jwt
-from datetime import datetime, timedelta
-from functools import wraps
 
 # Conditionally import SAML libraries - will fail gracefully if not installed
 try:
@@ -29,10 +26,8 @@ except ImportError:
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=['*'], allow_headers=['Content-Type', 'Authorization'])
 
-# Set a secret key for sessions and JWT
+# Set a secret key for sessions
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', str(uuid.uuid4()))
-JWT_SECRET = os.environ.get('JWT_SECRET', str(uuid.uuid4()))
-JWT_EXPIRATION = int(os.environ.get('JWT_EXPIRATION', 86400))  # 24 hours in seconds
 
 # Google OAuth configuration (would use real values in production)
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'your-google-client-id')
@@ -96,97 +91,6 @@ users = {
         "authenticated": False
     }
 }
-
-# Valid session storage - in production this would be Redis or a database
-# Format: {"session_token": {"user_id": "user_id", "expires": timestamp}}
-valid_sessions = {}
-
-# Function to generate a JWT token
-def generate_jwt_token(user_id):
-    payload = {
-        'user_id': user_id,
-        'exp': datetime.utcnow() + timedelta(seconds=JWT_EXPIRATION),
-        'iat': datetime.utcnow(),
-        'jti': str(uuid.uuid4())  # Unique token ID
-    }
-    token = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
-    # Store in valid sessions
-    valid_sessions[token] = {
-        'user_id': user_id,
-        'expires': payload['exp'].timestamp()
-    }
-    return token
-
-# Function to validate a JWT token
-def validate_jwt_token(token):
-    # Check if token exists in valid sessions
-    if token not in valid_sessions:
-        return None
-    
-    # Check if token is expired in our valid_sessions store
-    if datetime.utcnow().timestamp() > valid_sessions[token]['expires']:
-        # Token expired, remove from valid sessions
-        del valid_sessions[token]
-        return None
-    
-    try:
-        # Verify the token with JWT library as well
-        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
-        return payload
-    except jwt.ExpiredSignatureError:
-        # Token expired, remove from valid sessions
-        if token in valid_sessions:
-            del valid_sessions[token]
-        return None
-    except jwt.InvalidTokenError:
-        return None
-
-# Decorator to require authentication with JWT
-def require_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        # Skip auth for login, logout, and auth callback endpoints
-        if request.path.startswith('/api/auth') and not request.path.endswith('/session'):
-            return f(*args, **kwargs)
-            
-        auth_header = request.headers.get('Authorization')
-        token = None
-        
-        if auth_header:
-            # Expected format: "Bearer {token}"
-            parts = auth_header.split()
-            if len(parts) == 2 and parts[0].lower() == 'bearer':
-                token = parts[1]
-        
-        if not token:
-            return jsonify({"error": "Authentication required", "authenticated": False}), 401
-            
-        payload = validate_jwt_token(token)
-        if not payload:
-            return jsonify({"error": "Invalid or expired token", "authenticated": False}), 401
-            
-        # Store user_id in flask.g for the current request
-        g.user_id = payload['user_id']
-        return f(*args, **kwargs)
-    
-    return decorated
-
-# Clean up expired sessions periodically
-def cleanup_expired_sessions():
-    current_time = datetime.utcnow().timestamp()
-    expired_tokens = [token for token, data in valid_sessions.items() 
-                     if current_time > data['expires']]
-    
-    for token in expired_tokens:
-        del valid_sessions[token]
-    
-    print(f"Cleaned up {len(expired_tokens)} expired sessions")
-
-# Schedule session cleanup
-def schedule_session_cleanup():
-    cleanup_expired_sessions()
-    # Schedule the next cleanup in 1 hour
-    app.after_request_funcs.setdefault(None, []).append(lambda r: schedule_session_cleanup())
 
 # Function to gracefully shut down the app
 def graceful_shutdown(signal_num=None, frame=None):
@@ -263,33 +167,6 @@ def init_saml_auth(req):
     auth = OneLogin_Saml2_Auth(req, saml_settings)
     return auth
 
-# Apply the require_auth decorator to all routes
-@app.before_request
-def authenticate_request():
-    # Skip auth for login, logout, and auth callback endpoints
-    if request.path.startswith('/api/auth') and not request.path.endswith('/session'):
-        return None
-        
-    auth_header = request.headers.get('Authorization')
-    token = None
-    
-    if auth_header:
-        # Expected format: "Bearer {token}"
-        parts = auth_header.split()
-        if len(parts) == 2 and parts[0].lower() == 'bearer':
-            token = parts[1]
-    
-    if not token:
-        return jsonify({"error": "Authentication required", "authenticated": False}), 401
-        
-    payload = validate_jwt_token(token)
-    if not payload:
-        return jsonify({"error": "Invalid or expired token", "authenticated": False}), 401
-        
-    # Store user_id in flask.g for the current request
-    g.user_id = payload['user_id']
-    return None
-
 # Authentication endpoints
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -303,12 +180,11 @@ def login():
     
     # In production, use proper password hashing and verification
     if email in users and users[email]['password'] == password:
-        # Create user session with JWT
-        user_id = users[email]['id']
-        token = generate_jwt_token(user_id)
+        # Create user session
+        session['user_id'] = users[email]['id']
         users[email]['authenticated'] = True
         
-        # Return user info with session token
+        # Return user info
         user_data = {
             "id": users[email]['id'],
             "name": users[email]['name'],
@@ -316,9 +192,7 @@ def login():
             "authenticated": True
         }
         
-        response = jsonify({"success": True, "user": user_data})
-        response.headers['X-Session-Token'] = token
-        return response
+        return jsonify({"success": True, "user": user_data})
     
     return jsonify({"error": "Invalid email or password"}), 401
 
@@ -379,17 +253,13 @@ def google_callback():
     session['user_id'] = users[google_email]['id']
     users[google_email]['authenticated'] = True
     
-    # Generate a JWT token
-    token = generate_jwt_token(users[google_email]['id'])
-    
-    # Include the session token in the encoded user data
+    # Return user info by redirecting to the frontend with user data
     user_data = {
         "id": users[google_email]['id'],
         "name": users[google_email]['name'],
         "email": google_email,
         "photoUrl": users[google_email].get('photoUrl'),
-        "authenticated": True,
-        "sessionToken": token  # Add the token to the user data
+        "authenticated": True
     }
     
     # Encode user data for URL
@@ -515,17 +385,13 @@ def github_callback():
         session['user_id'] = users[primary_email]['id']
         users[primary_email]['authenticated'] = True
         
-        # Generate a JWT token
-        token = generate_jwt_token(users[primary_email]['id'])
-        
-        # Include the session token in the encoded user data
+        # Return user info by redirecting to the frontend with user data
         user_info = {
             "id": users[primary_email]['id'],
             "name": users[primary_email]['name'],
             "email": primary_email,
             "photoUrl": users[primary_email].get('photoUrl'),
-            "authenticated": True,
-            "sessionToken": token  # Add the token to the user data
+            "authenticated": True
         }
         
         # Encode user data for URL
@@ -654,56 +520,36 @@ def access_chat():
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():
     """Handle user logout"""
-    auth_header = request.headers.get('Authorization')
-    if auth_header:
-        # Expected format: "Bearer {token}"
-        parts = auth_header.split()
-        if len(parts) == 2 and parts[0].lower() == 'bearer':
-            token = parts[1]
-            # Remove token from valid sessions
-            if token in valid_sessions:
-                user_id = valid_sessions[token]['user_id']
-                del valid_sessions[token]
-                
-                # Find user by ID and set authenticated to false
-                for email, user in users.items():
-                    if user['id'] == user_id:
-                        user['authenticated'] = False
-                        break
+    if 'user_id' in session:
+        user_id = session['user_id']
+        # Find user by ID and set authenticated to false
+        for email, user in users.items():
+            if user['id'] == user_id:
+                user['authenticated'] = False
+                break
+        
+        # Clear session
+        session.clear()
     
     return jsonify({"success": True})
 
 @app.route('/api/auth/session', methods=['GET'])
 def check_session():
     """Check if user is authenticated"""
-    auth_header = request.headers.get('Authorization')
-    if not auth_header:
-        return jsonify({"authenticated": False})
-    
-    # Expected format: "Bearer {token}"
-    parts = auth_header.split()
-    if len(parts) != 2 or parts[0].lower() != 'bearer':
-        return jsonify({"authenticated": False})
-    
-    token = parts[1]
-    payload = validate_jwt_token(token)
-    
-    if not payload:
-        return jsonify({"authenticated": False})
-    
-    user_id = payload['user_id']
-    
-    # Find user by ID
-    for email, user in users.items():
-        if user['id'] == user_id:
-            user_data = {
-                "id": user['id'],
-                "name": user['name'],
-                "email": user['email'],
-                "photoUrl": user.get('photoUrl'),
-                "authenticated": True
-            }
-            return jsonify({"authenticated": True, "user": user_data})
+    if 'user_id' in session:
+        user_id = session['user_id']
+        
+        # Find user by ID
+        for email, user in users.items():
+            if user['id'] == user_id and user['authenticated']:
+                user_data = {
+                    "id": user['id'],
+                    "name": user['name'],
+                    "email": user['email'],
+                    "photoUrl": user.get('photoUrl'),
+                    "authenticated": True
+                }
+                return jsonify({"authenticated": True, "user": user_data})
     
     return jsonify({"authenticated": False})
 
@@ -821,9 +667,6 @@ def get_namespace_issues():
         return jsonify([]), 400
 
 if __name__ == '__main__':
-    # Start session cleanup
-    cleanup_expired_sessions()
-    
     # Set up proper connection and socket handling for Gunicorn
     from werkzeug.serving import WSGIRequestHandler
     WSGIRequestHandler.protocol_version = "HTTP/1.1"

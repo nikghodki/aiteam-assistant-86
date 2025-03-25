@@ -1,4 +1,3 @@
-
 // API base URL should be configured in your environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -142,7 +141,6 @@ export interface OIDCAuthResult {
   success: boolean;
   user?: User;
   error?: string;
-  sessionToken?: string;
 }
 
 // New interface for namespace issues
@@ -155,150 +153,28 @@ export interface NamespaceIssue {
   timestamp: string;
 }
 
-// Authentication token management
-const TOKEN_STORAGE_KEY = 'jwt_token';
-const TOKEN_EXPIRY_KEY = 'jwt_token_expiry';
-
-// Get token with expiry check
-const getSessionToken = (): string | null => {
-  const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-  const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-  
-  // If we have both token and expiry
-  if (token && expiry) {
-    // Check if token has expired
-    const expiryTime = parseInt(expiry, 10);
-    if (Date.now() < expiryTime) {
-      return token;
-    } else {
-      // Token expired, clear it
-      clearSessionToken();
-      // Could trigger a refresh here
-      console.warn('JWT token expired');
-    }
-  }
-  
-  return null;
-};
-
-// Set token with expiry
-const setSessionToken = (token: string, expiryInSeconds = 86400): void => {
-  localStorage.setItem(TOKEN_STORAGE_KEY, token);
-  const expiryTime = Date.now() + (expiryInSeconds * 1000);
-  localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
-};
-
-const clearSessionToken = (): void => {
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
-  localStorage.removeItem(TOKEN_EXPIRY_KEY);
-};
-
-// Parse the JWT token to get expiry time
-const parseJwt = (token: string): any => {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (error) {
-    console.error('Error parsing JWT:', error);
-    return null;
-  }
-};
-
 // Helper function for API calls
-export const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
+const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
   
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
   };
 
-  // Add JWT token to headers if available
-  const sessionToken = getSessionToken();
-  if (sessionToken) {
-    defaultHeaders['Authorization'] = `Bearer ${sessionToken}`;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `API error: ${response.status}`);
   }
 
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...defaultHeaders,
-        ...options.headers,
-      },
-      credentials: 'include', // Include cookies in cross-origin requests
-    });
-
-    if (!response.ok) {
-      // Handle 401 Unauthorized specifically for token expiration
-      if (response.status === 401) {
-        clearSessionToken();
-        // Attempt to refresh token before redirecting
-        try {
-          const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-            method: 'POST',
-            credentials: 'include',
-          });
-          
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json();
-            if (refreshData.token) {
-              // If token refresh is successful, store the new token
-              setSessionToken(refreshData.token, refreshData.expiresIn || 86400);
-              
-              // Retry the original request with the new token
-              const retryOptions = {
-                ...options,
-                headers: {
-                  ...defaultHeaders,
-                  'Authorization': `Bearer ${refreshData.token}`,
-                  ...options.headers,
-                }
-              };
-              
-              const retryResponse = await fetch(url, retryOptions);
-              
-              if (retryResponse.ok) {
-                return retryResponse.json();
-              }
-            }
-          }
-        } catch (refreshError) {
-          console.error('Token refresh failed:', refreshError);
-        }
-        
-        // If we reach here, refresh failed or retry failed
-        window.location.href = '/login';
-        throw new Error('Session expired. Please login again.');
-      }
-      
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `API error: ${response.status}`);
-    }
-
-    // Check for JWT token in response headers and update if present
-    const newJwtToken = response.headers.get('X-JWT-Token');
-    if (newJwtToken) {
-      // Parse token to get expiry
-      const tokenData = parseJwt(newJwtToken);
-      const expiresIn = tokenData && tokenData.exp ? 
-        (tokenData.exp * 1000 - Date.now()) / 1000 : 
-        86400; // Default to 24 hours
-      
-      setSessionToken(newJwtToken, expiresIn);
-    }
-
-    return response.json();
-  } catch (error) {
-    console.error('API call failed:', error);
-    throw error;
-  }
+  return response.json();
 };
 
 // Access Management API
@@ -461,22 +337,6 @@ export const kubernetesApi = {
       method: 'POST',
       body: JSON.stringify({ clusterArn, namespace }),
     });
-  },
-  
-  /**
-   * Download a file from S3
-   * @param filePath The S3 path of the file to download
-   * @returns The file content
-   */
-  downloadS3File: (filePath: string): Promise<string> => {
-    if (!filePath) {
-      return Promise.reject(new Error('File path is required'));
-    }
-    
-    return apiCall<string>(`/kubernetes/s3-file`, {
-      method: 'POST',
-      body: JSON.stringify({ filePath }),
-    });
   }
 };
 
@@ -606,12 +466,4 @@ export const getUserInfo = (): User => {
     name: 'nghodki',
     email: 'nghodki@cisco.com',
   };
-};
-
-// Export session token management functions
-export const sessionManager = {
-  getSessionToken,
-  setSessionToken,
-  clearSessionToken,
-  parseJwt
 };
