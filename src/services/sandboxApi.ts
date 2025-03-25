@@ -32,37 +32,37 @@ export interface SandboxUpdateData {
 
 // Sandbox API functions
 export const getSandboxes = (): Promise<Sandbox[]> => {
-  return apiCall('/sandbox/list', { method: 'GET' });
+  return apiCall<Sandbox[]>('/sandbox/list', { method: 'GET' });
 };
 
 export const getSandboxById = (id: string): Promise<Sandbox> => {
-  return apiCall(`/sandbox/${id}`, { method: 'GET' });
+  return apiCall<Sandbox>(`/sandbox/${id}`, { method: 'GET' });
 };
 
 export const createSandbox = (data: SandboxUpdateData): Promise<Sandbox> => {
-  return apiCall('/sandbox/create', {
+  return apiCall<Sandbox>('/sandbox/create', {
     method: 'POST',
     body: JSON.stringify(data),
   });
 };
 
 export const updateSandbox = (id: string, data: SandboxUpdateData): Promise<Sandbox> => {
-  return apiCall(`/sandbox/${id}/update`, {
+  return apiCall<Sandbox>(`/sandbox/${id}/update`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 };
 
 export const deleteSandbox = (id: string): Promise<{ success: boolean }> => {
-  return apiCall(`/sandbox/${id}/delete`, { method: 'DELETE' });
+  return apiCall<{ success: boolean }>(`/sandbox/${id}/delete`, { method: 'DELETE' });
 };
 
 export const refreshSandbox = (id: string): Promise<Sandbox> => {
-  return apiCall(`/sandbox/${id}/refresh`, { method: 'POST' });
+  return apiCall<Sandbox>(`/sandbox/${id}/refresh`, { method: 'POST' });
 };
 
 export const chatWithSandboxAssistant = (message: string): Promise<SandboxChatResponse> => {
-  return apiCall('/sandbox/chat', {
+  return apiCall<SandboxChatResponse>('/sandbox/chat', {
     method: 'POST',
     body: JSON.stringify({ message }),
   });

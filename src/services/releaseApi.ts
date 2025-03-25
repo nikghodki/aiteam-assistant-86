@@ -25,37 +25,37 @@ export interface ReleaseCreateData {
 
 // Release API functions
 export const getReleases = (): Promise<Release[]> => {
-  return apiCall('/release/list', { method: 'GET' });
+  return apiCall<Release[]>('/release/list', { method: 'GET' });
 };
 
 export const getReleaseById = (id: string): Promise<Release> => {
-  return apiCall(`/release/${id}`, { method: 'GET' });
+  return apiCall<Release>(`/release/${id}`, { method: 'GET' });
 };
 
 export const createRelease = (data: ReleaseCreateData): Promise<Release> => {
-  return apiCall('/release/create', {
+  return apiCall<Release>('/release/create', {
     method: 'POST',
     body: JSON.stringify(data),
   });
 };
 
 export const updateRelease = (id: string, data: Partial<ReleaseCreateData>): Promise<Release> => {
-  return apiCall(`/release/${id}/update`, {
+  return apiCall<Release>(`/release/${id}/update`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 };
 
 export const cancelRelease = (id: string): Promise<{ success: boolean }> => {
-  return apiCall(`/release/${id}/cancel`, { method: 'POST' });
+  return apiCall<{ success: boolean }>(`/release/${id}/cancel`, { method: 'POST' });
 };
 
 export const startRelease = (id: string): Promise<Release> => {
-  return apiCall(`/release/${id}/start`, { method: 'POST' });
+  return apiCall<Release>(`/release/${id}/start`, { method: 'POST' });
 };
 
 export const chatWithReleaseAssistant = (message: string): Promise<ReleaseChatResponse> => {
-  return apiCall('/release/chat', {
+  return apiCall<ReleaseChatResponse>('/release/chat', {
     method: 'POST',
     body: JSON.stringify({ message }),
   });
