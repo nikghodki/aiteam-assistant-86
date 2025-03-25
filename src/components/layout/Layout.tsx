@@ -15,7 +15,7 @@ export const Layout = ({ children, showDocChat = false }: LayoutProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex min-h-screen bg-background">
       {/* Sidebar - Hidden on mobile by default */}
       <div className="hidden md:block">
         <Sidebar />
@@ -35,13 +35,13 @@ export const Layout = ({ children, showDocChat = false }: LayoutProps) => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col w-full md:pl-64"> {/* Leave space for the sidebar */}
+      <div className="flex-1 flex flex-col w-full md:pl-64"> 
         <Header 
           onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
           isMobileMenuOpen={isMobileMenuOpen} 
         />
         
-        <main className="flex-1 px-4 py-6 bg-gradient-to-br from-white to-gray-100/50 dark:from-gray-900 dark:to-gray-800">
+        <main className="flex-1 px-4 py-6">
           {children}
         </main>
         
