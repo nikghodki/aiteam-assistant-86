@@ -66,6 +66,24 @@ const Login = () => {
     }
   };
 
+  // Bypass login for testing purposes
+  const handleBypassLogin = () => {
+    localStorage.setItem('user', JSON.stringify({
+      id: 'test-user-id',
+      name: 'Test User',
+      email: 'test@example.com',
+      authenticated: true
+    }));
+    
+    // Reload the page to apply the changes from localStorage
+    window.location.href = '/dashboard';
+    
+    toast({
+      title: "Bypassed login",
+      description: "You've bypassed the login for testing purposes.",
+    });
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-professional-gray-light/50">
       <Card className="w-[400px] shadow-lg bg-gradient-professional">
@@ -158,6 +176,23 @@ const Login = () => {
               )}
             </Button>
           </form>
+          
+          {/* Test bypass login button - only for development */}
+          {import.meta.env.DEV && (
+            <div className="mt-4">
+              <Button 
+                type="button" 
+                variant="secondary" 
+                className="w-full" 
+                onClick={handleBypassLogin}
+              >
+                Bypass Login (Testing Only)
+              </Button>
+              <p className="text-xs text-muted-foreground mt-1 text-center">
+                This button only appears in development mode
+              </p>
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex justify-center">
           <p className="text-sm text-muted-foreground">
