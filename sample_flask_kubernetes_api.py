@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify, redirect, session, url_for, make_response
 from flask_cors import CORS
 import time
@@ -171,7 +170,6 @@ def init_saml_auth(req):
 # Authentication endpoints
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    # ... keep existing code (login function)
     """Handle email/password login"""
     data = request.json
     if not data or 'email' not in data or 'password' not in data:
@@ -201,7 +199,6 @@ def login():
 # Google OAuth routes
 @app.route('/api/auth/google', methods=['GET'])
 def google_login():
-    # ... keep existing code (google_login function)
     """Initiate Google OAuth login flow"""
     # In a real implementation, this would redirect to Google's OAuth endpoint
     # For this demo, we'll simulate the process by directly creating a user
@@ -219,7 +216,6 @@ def google_login():
 
 @app.route('/api/auth/google/callback', methods=['GET'])
 def google_callback():
-    # ... keep existing code (google_callback function)
     """Handle Google OAuth callback"""
     # Get the authorization code and state from the query parameters
     code = request.args.get('code')
@@ -275,7 +271,6 @@ def google_callback():
 
 @app.route('/api/auth/github', methods=['GET'])
 def github_login():
-    # ... keep existing code (github_login function)
     """Initiate GitHub OAuth login flow"""
     # Generate a random state for security
     state = str(uuid.uuid4())
@@ -415,7 +410,113 @@ def github_callback():
             token_session.close()
         return jsonify({"error": f"GitHub authentication failed: {str(e)}"}), 500
 
-# ... keep existing code (all other endpoints)
+# Access management endpoints
+@app.route('/api/access/groups', methods=['POST'])
+def get_user_groups():
+    """Get groups for a user"""
+    data = request.json
+    if not data or 'userEmail' not in data:
+        return jsonify({"error": "User email is required"}), 400
+    
+    user_email = data.get('userEmail')
+    
+    # In a real application, you would query your database for the groups this user belongs to
+    # For this example, we'll return mock data
+    groups = [
+        {
+            "id": 1,
+            "name": "DevOps Team",
+            "description": "Team responsible for CI/CD and operations",
+            "status": "member",
+            "members": 12
+        },
+        {
+            "id": 2,
+            "name": "Platform Engineers",
+            "description": "Team responsible for platform infrastructure",
+            "status": "pending",
+            "members": 8
+        },
+        {
+            "id": 3,
+            "name": "Security Team",
+            "description": "Team responsible for security and compliance",
+            "status": "none",
+            "members": 5
+        }
+    ]
+    
+    return jsonify(groups)
+
+@app.route('/api/access/groups/request', methods=['POST'])
+def request_group_access():
+    """Request access to a group"""
+    data = request.json
+    if not data or 'groupId' not in data or 'reason' not in data or 'userEmail' not in data:
+        return jsonify({"error": "Group ID, reason, and user email are required"}), 400
+    
+    group_id = data.get('groupId')
+    reason = data.get('reason')
+    user_email = data.get('userEmail')
+    
+    # In a real application, you would:
+    # 1. Create a record in your database for this access request
+    # 2. Create a Jira ticket for approval
+    # 3. Notify approvers
+    
+    # For this example, we'll simulate creating a Jira ticket
+    ticket = {
+        "key": f"ACCESS-{random.randint(1000, 9999)}",
+        "url": f"https://jira.example.com/browse/ACCESS-{random.randint(1000, 9999)}",
+        "summary": f"Access request for group {group_id}",
+        "description": reason,
+        "status": "Open",
+        "reporter": user_email
+    }
+    
+    return jsonify(ticket)
+
+@app.route('/api/access/groups/leave', methods=['POST'])
+def leave_group():
+    """Leave a group"""
+    data = request.json
+    if not data or 'groupName' not in data or 'userEmail' not in data:
+        return jsonify({"error": "Group name and user email are required"}), 400
+    
+    group_name = data.get('groupName')
+    user_email = data.get('userEmail')
+    
+    # In a real application, you would remove the user from the group in your database
+    # For this example, we'll simulate a successful operation
+    
+    return jsonify({"success": True, "message": f"User {user_email} removed from group {group_name}"})
+
+@app.route('/api/access/chat', methods=['POST'])
+def access_chat():
+    """Chat with the access management assistant"""
+    data = request.json
+    if not data or 'message' not in data or 'userEmail' not in data:
+        return jsonify({"error": "Message and user email are required"}), 400
+    
+    message = data.get('message')
+    user_email = data.get('userEmail')
+    
+    # In a real application, you would:
+    # 1. Process the message with an LLM or other AI assistant
+    # 2. Return a helpful response
+    
+    # For this example, we'll simulate responses
+    responses = [
+        f"I can help you with access management, {user_email}. What specific access do you need?",
+        "To request access to a group, you can use the group membership dashboard.",
+        "Your access request will be reviewed by the group administrators.",
+        "I see you're requesting information about group permissions. Let me check that for you."
+    ]
+    
+    response = random.choice(responses)
+    return jsonify({"response": response})
+
+# Logout endpoint
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():
     """Handle user logout"""
@@ -593,4 +694,3 @@ if __name__ == '__main__':
     else:
         print("Starting Flask application in HTTP mode...")
         app.run(host='0.0.0.0', port=8000, debug=True)
-
