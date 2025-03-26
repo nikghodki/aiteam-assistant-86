@@ -8,7 +8,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { RBACProvider } from "@/contexts/RBACContext";
 
 import Index from "./pages/Index";
-import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import AccessControl from "./pages/AccessControl";
 import KubernetesDebug from "./pages/KubernetesDebug";
@@ -49,53 +48,18 @@ const App = () => (
               <Route path="/*/auth/callback" element={<AuthCallback />} />
               
               <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
+              {/* Redirect login to dashboard for testing */}
+              <Route path="/login" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/access" element={
-                <ProtectedRoute>
-                  <AccessControl />
-                </ProtectedRoute>
-              } />
-              <Route path="/kubernetes" element={
-                <ProtectedRoute>
-                  <KubernetesDebug />
-                </ProtectedRoute>
-              } />
-              <Route path="/docs" element={
-                <ProtectedRoute>
-                  <Documentation />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } />
-              <Route path="/jira" element={
-                <ProtectedRoute>
-                  <JiraTicket />
-                </ProtectedRoute>
-              } />
-              <Route path="/roles" element={
-                <ProtectedRoute>
-                  <RoleManagement />
-                </ProtectedRoute>
-              } />
-              <Route path="/sandbox" element={
-                <ProtectedRoute>
-                  <SandboxOrchestration />
-                </ProtectedRoute>
-              } />
-              <Route path="/release" element={
-                <ProtectedRoute>
-                  <ReleaseDeployment />
-                </ProtectedRoute>
-              } />
+              <Route path="/access" element={<AccessControl />} />
+              <Route path="/kubernetes" element={<KubernetesDebug />} />
+              <Route path="/docs" element={<Documentation />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/jira" element={<JiraTicket />} />
+              <Route path="/roles" element={<RoleManagement />} />
+              <Route path="/sandbox" element={<SandboxOrchestration />} />
+              <Route path="/release" element={<ReleaseDeployment />} />
               {/* Catch all route for 404 errors */}
               <Route path="*" element={<NotFound />} />
             </Routes>
