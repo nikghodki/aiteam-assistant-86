@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify, redirect, session, url_for, make_response
 from flask_cors import CORS
 import time
@@ -13,13 +12,80 @@ import requests
 import signal
 import sys
 import atexit
+import jwt
+from functools import wraps
+from datetime import datetime, timedelta
 
-# ... keep existing code (imports and conditionally import SAML libraries)
+try:
+    from urllib.parse import urlparse, urljoin
+    from xml.dom.minidom import parseString
+    from onelogin.saml2.auth import OneLogin_Saml2_Auth
+    from onelogin.saml2.utils import OneLogin_Saml2_Utils
+    SAML_ENABLED = True
+except ImportError:
+    SAML_ENABLED = False
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=['*'], allow_headers=['Content-Type', 'Authorization'])
 
-# ... keep existing code (session secret key, OAuth configs, mock data)
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'test-secret-key-for-development-only')
+JWT_ALGORITHM = 'HS256'
+JWT_ACCESS_TOKEN_EXPIRES = 3600  # 1 hour
+
+app.secret_key = os.environ.get('FLASK_SESSION_SECRET', 'your-super-secret-key')
+
+# OAuth 2.0 Configuration (replace with your actual values)
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'your-google-client-id')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', 'your-google-client-secret')
+GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', 'your-github-client-id')
+GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', 'your-github-client-secret')
+OIDC_PROVIDERS = {}
+
+# Mock user data (replace with a real database)
+USERS = {
+    "test@example.com": {"id": "1", "name": "Test User", "email": "test@example.com", "password": "password"},
+    "nghodki@cisco.com": {"id": "2", "name": "Niket Ghodki", "email": "nghodki@cisco.com", "password": "password"}
+}
+
+# Mock Kubernetes clusters data (replace with a real API)
+CLUSTERS = [
+    {"arn": "arn:aws:eks:us-west-2:111122223333:cluster/prod-cluster", "name": "prod-cluster", "environment": "production", "status": "healthy", "version": "1.28", "nodeCount": 12},
+    {"arn": "arn:aws:eks:us-west-2:111122223333:cluster/staging-cluster", "name": "staging-cluster", "environment": "staging", "status": "warning", "version": "1.27", "nodeCount": 4},
+    {"arn": "arn:aws:eks:us-west-2:111122223333:cluster/dev-cluster", "name": "dev-cluster", "environment": "qa", "status": "error", "version": "1.26", "nodeCount": 2}
+]
+
+# Mock Jira projects and issue types
+JIRA_PROJECTS = [
+    {"id": "10000", "key": "DEMO", "name": "Demo Project"},
+    {"id": "10001", "key": "TEST", "name": "Test Project"}
+]
+
+JIRA_ISSUE_TYPES = {
+    "10000": [
+        {"id": "10002", "name": "Bug", "description": "A problem which impairs or prevents the functions of the product."},
+        {"id": "10003", "name": "Task", "description": "A small, distinct piece of work."}
+    ],
+    "10001": [
+        {"id": "10004", "name": "Story", "description": "A user story."},
+        {"id": "10005", "name": "Epic", "description": "A large user story."}
+    ]
+}
+
+# Mock RBAC data
+ROLES = [
+    {"id": "admin", "name": "Administrator", "description": "Full access to all resources", "isSystem": True, "permissions": [{"resource": "all", "action": "all"}], "createdAt": "2024-01-01T00:00:00Z", "updatedAt": "2024-01-01T00:00:00Z"},
+    {"id": "viewer", "name": "Viewer", "description": "Read-only access to all resources", "isSystem": True, "permissions": [{"resource": "all", "action": "read"}], "createdAt": "2024-01-01T00:00:00Z", "updatedAt": "2024-01-01T00:00:00Z"}
+]
+
+USER_ROLES = {
+    "1": [{"userId": "1", "roleId": "admin", "roleName": "Administrator"}],
+    "2": [{"userId": "2", "roleId": "viewer", "roleName": "Viewer"}]
+}
+
+USER_PERMISSIONS = {
+    "1": [{"userId": "1", "permission": {"resource": "all", "action": "all"}}],
+    "2": [{"userId": "2", "permission": {"resource": "all", "action": "read"}}]
+}
 
 # Mock sandbox data
 sandboxes = [
@@ -169,457 +235,490 @@ releases = [
     }
 ]
 
-# ... keep existing code (User storage, graceful shutdown function, SAML configuration)
+user_storage = {}
 
-# ... keep existing code (Authentication endpoints, Google OAuth routes, GitHub callback)
+def graceful_shutdown(signal, frame):
+    print('Received signal to stop. Shutting down...')
+    sys.exit(0)
 
-# ... keep existing code (Access management endpoints, Logout endpoint, Auth session check)
+atexit.register(lambda: print("Exiting application"))
 
-# ... keep existing code (About API endpoints, Kubernetes endpoints, etc.)
+signal.signal(signal.SIGINT, graceful_shutdown)
+signal.signal(signal.SIGTERM, graceful_shutdown)
 
-# Sandbox Orchestration API endpoints
-@app.route('/api/sandbox/list', methods=['GET'])
-def get_sandboxes():
-    """Return list of sandboxes for the current user"""
-    # In a real app, filter by the authenticated user
-    # For demo, we'll return all sandboxes
-    return jsonify(sandboxes)
+def init_saml_auth(req):
+    auth = OneLogin_Saml2_Auth(req, custom_base_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'saml'))
+    return auth
 
-@app.route('/api/sandbox/<sandbox_id>', methods=['GET'])
-def get_sandbox_details(sandbox_id):
-    """Return details for a specific sandbox"""
-    sandbox = next((s for s in sandboxes if s['id'] == sandbox_id), None)
-    if not sandbox:
-        return jsonify({"error": "Sandbox not found"}), 404
-    return jsonify(sandbox)
-
-@app.route('/api/sandbox/create', methods=['POST'])
-def create_sandbox():
-    """Create a new sandbox"""
-    data = request.json
-    if not data or 'name' not in data or 'services' not in data:
-        return jsonify({"error": "Name and services are required"}), 400
-    
-    # Create new sandbox
-    new_sandbox = {
-        "id": f"sb-{str(uuid.uuid4())[:8]}",
-        "name": data['name'],
-        "description": data.get('description', ''),
-        "status": "creating",
-        "services": [],
-        "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "createdBy": "nghodki@cisco.com",  # In a real app, use the authenticated user
-        "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+def prepare_flask_request(request):
+    url_data = urlparse(request.url)
+    return {
+        'https': 'on' if request.scheme == 'https' else 'off',
+        'http_host': request.host,
+        'script_name': request.path,
+        'get_data': request.query_string.decode('utf-8'),
+        'post_data': request.form.to_dict(flat=True),
+        'query_string': request.query_string.decode('utf-8'),
+        'request_uri': request.url,
+        'path_info': request.path,
+        'remote_addr': request.remote_addr
     }
-    
-    # Add services
-    for service_data in data['services']:
-        new_service = {
-            "id": f"svc-{str(uuid.uuid4())[:8]}",
-            "sandboxId": new_sandbox["id"],
-            "name": service_data['name'],
-            "image": service_data['image'],
-            "tag": service_data['tag'],
-            "status": "running",
-            "environmentVariables": service_data.get('environmentVariables', {}),
-            "port": service_data.get('port')
-        }
-        new_sandbox["services"].append(new_service)
-    
-    # Update sandbox status based on services
-    new_sandbox["status"] = "running" if new_sandbox["services"] else "creating"
-    
-    # Add to sandboxes list
-    sandboxes.append(new_sandbox)
-    
-    return jsonify(new_sandbox)
 
-@app.route('/api/sandbox/<sandbox_id>', methods=['PUT'])
-def update_sandbox(sandbox_id):
-    """Update sandbox details"""
-    data = request.json
-    sandbox = next((s for s in sandboxes if s['id'] == sandbox_id), None)
-    if not sandbox:
-        return jsonify({"error": "Sandbox not found"}), 404
-    
-    # Update fields
-    if 'name' in data:
-        sandbox['name'] = data['name']
-    if 'description' in data:
-        sandbox['description'] = data['description']
-    
-    # Update timestamp
-    sandbox['updatedAt'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    
-    return jsonify(sandbox)
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    if not data or 'email' not in data or 'password' not in data:
+        return jsonify({'message': 'Missing email or password'}), 400
 
-@app.route('/api/sandbox/<sandbox_id>', methods=['DELETE'])
-def delete_sandbox(sandbox_id):
-    """Delete a sandbox"""
-    global sandboxes
-    sandbox = next((s for s in sandboxes if s['id'] == sandbox_id), None)
-    if not sandbox:
-        return jsonify({"error": "Sandbox not found"}), 404
+    user = USERS.get(data['email'])
+    if not user or user['password'] != data['password']:
+        return jsonify({'message': 'Invalid credentials'}), 401
     
-    # Remove from list
-    sandboxes = [s for s in sandboxes if s['id'] != sandbox_id]
-    
-    return jsonify({"success": True})
+    session['user'] = user
+    return jsonify({'message': 'Logged in successfully', 'user': user})
 
-@app.route('/api/sandbox/<sandbox_id>/start', methods=['POST'])
-def start_sandbox(sandbox_id):
-    """Start a sandbox"""
-    sandbox = next((s for s in sandboxes if s['id'] == sandbox_id), None)
-    if not sandbox:
-        return jsonify({"error": "Sandbox not found"}), 404
-    
-    # Update status
-    sandbox['status'] = "running"
-    for service in sandbox['services']:
-        service['status'] = "running"
-    
-    # Update timestamp
-    sandbox['updatedAt'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    
-    return jsonify(sandbox)
+@app.route('/api/auth/google/login', methods=['GET'])
+def google_login():
+    # Redirect the user to Google's OAuth endpoint
+    redirect_uri = url_for('google_callback', _external=True)
+    google_oauth_url = f'https://accounts.google.com/o/oauth2/v2/auth?client_id={GOOGLE_CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope=openid%20email%20profile'
+    return redirect(google_oauth_url)
 
-@app.route('/api/sandbox/<sandbox_id>/stop', methods=['POST'])
-def stop_sandbox(sandbox_id):
-    """Stop a sandbox"""
-    sandbox = next((s for s in sandboxes if s['id'] == sandbox_id), None)
-    if not sandbox:
-        return jsonify({"error": "Sandbox not found"}), 404
-    
-    # Update status
-    sandbox['status'] = "stopped"
-    for service in sandbox['services']:
-        service['status'] = "stopped"
-    
-    # Update timestamp
-    sandbox['updatedAt'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    
-    return jsonify(sandbox)
+@app.route('/api/auth/google/callback', methods=['GET'])
+def google_callback():
+    code = request.args.get('code')
+    if not code:
+        return jsonify({'message': 'Missing authorization code'}), 400
 
-@app.route('/api/sandbox/<sandbox_id>/service', methods=['POST'])
-def add_service(sandbox_id):
-    """Add a service to a sandbox"""
-    data = request.json
-    if not data or 'name' not in data or 'image' not in data or 'tag' not in data:
-        return jsonify({"error": "Name, image, and tag are required"}), 400
-    
-    sandbox = next((s for s in sandboxes if s['id'] == sandbox_id), None)
-    if not sandbox:
-        return jsonify({"error": "Sandbox not found"}), 404
-    
-    # Create new service
-    new_service = {
-        "id": f"svc-{str(uuid.uuid4())[:8]}",
-        "sandboxId": sandbox_id,
-        "name": data['name'],
-        "image": data['image'],
-        "tag": data['tag'],
-        "status": "running",
-        "environmentVariables": data.get('environmentVariables', {}),
-        "port": data.get('port')
+    # Exchange the code for an access token
+    token_url = 'https://oauth2.googleapis.com/token'
+    data = {
+        'code': code,
+        'client_id': GOOGLE_CLIENT_ID,
+        'client_secret': GOOGLE_CLIENT_SECRET,
+        'redirect_uri': url_for('google_callback', _external=True),
+        'grant_type': 'authorization_code'
     }
-    
-    # Add to sandbox
-    sandbox['services'].append(new_service)
-    
-    # Update timestamp
-    sandbox['updatedAt'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    
-    return jsonify(new_service)
+    response = requests.post(token_url, data=data)
+    if response.status_code != 200:
+        return jsonify({'message': 'Failed to retrieve access token'}), 400
 
-@app.route('/api/sandbox/<sandbox_id>/service/<service_id>', methods=['PUT'])
-def update_service(sandbox_id, service_id):
-    """Update a service in a sandbox"""
-    data = request.json
-    sandbox = next((s for s in sandboxes if s['id'] == sandbox_id), None)
-    if not sandbox:
-        return jsonify({"error": "Sandbox not found"}), 404
-    
-    service = next((s for s in sandbox['services'] if s['id'] == service_id), None)
-    if not service:
-        return jsonify({"error": "Service not found"}), 404
-    
-    # Update fields
-    if 'image' in data:
-        service['image'] = data['image']
-    if 'tag' in data:
-        service['tag'] = data['tag']
-    if 'environmentVariables' in data:
-        service['environmentVariables'] = data['environmentVariables']
-    
-    # Update timestamp
-    sandbox['updatedAt'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    
-    return jsonify(service)
+    access_token = response.json().get('access_token')
+    if not access_token:
+        return jsonify({'message': 'Access token not found'}), 400
 
-@app.route('/api/sandbox/<sandbox_id>/service/<service_id>', methods=['DELETE'])
-def remove_service(sandbox_id, service_id):
-    """Remove a service from a sandbox"""
-    sandbox = next((s for s in sandboxes if s['id'] == sandbox_id), None)
-    if not sandbox:
-        return jsonify({"error": "Sandbox not found"}), 404
-    
-    # Check if service exists
-    service = next((s for s in sandbox['services'] if s['id'] == service_id), None)
-    if not service:
-        return jsonify({"error": "Service not found"}), 404
-    
-    # Remove from list
-    sandbox['services'] = [s for s in sandbox['services'] if s['id'] != service_id]
-    
-    # Update timestamp
-    sandbox['updatedAt'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    
-    return jsonify({"success": True})
+    # Use the access token to retrieve user information
+    user_info_url = 'https://www.googleapis.com/oauth2/v3/userinfo'
+    headers = {'Authorization': f'Bearer {access_token}'}
+    user_info_response = requests.get(user_info_url, headers=headers)
+    if user_info_response.status_code != 200:
+        return jsonify({'message': 'Failed to retrieve user info'}), 400
 
-@app.route('/api/sandbox/chat', methods=['POST'])
-def sandbox_chat():
-    """Chat with the sandbox orchestration assistant"""
-    data = request.json
-    if not data or 'message' not in data:
-        return jsonify({"error": "Message is required"}), 400
+    user_info = user_info_response.json()
+    email = user_info.get('email')
+    name = user_info.get('name')
+    if not email or not name:
+        return jsonify({'message': 'Email or name not found'}), 400
+
+    # Check if the user exists in your database, otherwise create a new user
+    user = USERS.get(email)
+    if not user:
+        user = {'id': str(uuid.uuid4()), 'name': name, 'email': email}
+        USERS[email] = user
     
-    message = data.get('message')
-    context = data.get('context', {})
+    session['user'] = user
+    return jsonify({'message': 'Logged in successfully', 'user': user})
+
+@app.route('/api/auth/github/login', methods=['GET'])
+def github_login():
+    # Redirect the user to GitHub's OAuth endpoint
+    github_oauth_url = f'https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&redirect_uri={GITHUB_REDIRECT_URI}'
+    return redirect(github_oauth_url)
+
+@app.route('/api/auth/github/callback', methods=['GET'])
+def github_callback():
+    code = request.args.get('code')
+    if not code:
+        return jsonify({'message': 'Missing authorization code'}), 400
+
+    # Exchange the code for an access token
+    token_url = 'https://github.com/login/oauth/access_token'
+    headers = {'Accept': 'application/json'}
+    data = {
+        'code': code,
+        'client_id': GITHUB_CLIENT_ID,
+        'client_secret': GITHUB_CLIENT_SECRET,
+        'redirect_uri': GITHUB_REDIRECT_URI
+    }
+    response = requests.post(token_url, headers=headers, data=data)
+    if response.status_code != 200:
+        return jsonify({'message': 'Failed to retrieve access token'}), 400
+
+    access_token = response.json().get('access_token')
+    if not access_token:
+        return jsonify({'message': 'Access token not found'}), 400
+
+    # Use the access token to retrieve user information
+    user_info_url = 'https://api.github.com/user'
+    headers = {'Authorization': f'token {access_token}', 'Accept': 'application/json'}
+    user_info_response = requests.get(user_info_url, headers=headers)
+    if user_info_response.status_code != 200:
+        return jsonify({'message': 'Failed to retrieve user info'}), 400
+
+    user_info = user_info_response.json()
+    email = user_info.get('email')
+    name = user_info.get('login')  # GitHub doesn't always provide a name
+    if not email or not name:
+        return jsonify({'message': 'Email or name not found'}), 400
+
+    # Check if the user exists in your database, otherwise create a new user
+    user = USERS.get(email)
+    if not user:
+        user = {'id': str(uuid.uuid4()), 'name': name, 'email': email}
+        USERS[email] = user
     
-    # In a real application, process the message with an LLM
-    # For this demo, provide canned responses
+    session['user'] = user
+    return jsonify({'message': 'Logged in successfully', 'user': user})
+
+def is_safe_url(target):
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
+
+@app.route('/api/access/groups', methods=['POST'])
+def get_user_groups():
+    data = request.get_json()
+    user_email = data.get('userEmail')
     
-    responses = [
-        "I can help you manage your sandboxes. What would you like to do?",
-        "To create a new sandbox, please provide a name and the services you want to include.",
-        "Your sandbox is being created. It should be running shortly.",
-        "I've updated your sandbox configuration. The changes will take effect momentarily."
+    # Mock response
+    groups = [
+        {"id": 1, "name": "K8s-prod-cluster-admins", "role": "Admin"},
+        {"id": 2, "name": "AWS-account-auditors", "role": "Auditor"},
+        {"id": 3, "name": "Jira-project-leads", "role": "Lead"}
     ]
     
-    # If context includes a sandbox, add more specific responses
-    if 'sandboxId' in context:
-        sandbox_id = context['sandboxId']
-        sandbox = next((s for s in sandboxes if s['id'] == sandbox_id), None)
-        
-        if sandbox:
-            sandbox_specific = [
-                f"Your sandbox '{sandbox['name']}' is currently {sandbox['status']}.",
-                f"There are {len(sandbox['services'])} services in this sandbox.",
-                "Would you like to add more services to this sandbox?",
-                "I can help you troubleshoot issues with your sandbox services."
-            ]
-            responses.extend(sandbox_specific)
+    return jsonify(groups)
+
+@app.route('/api/access/groups/request', methods=['POST'])
+def request_group_access():
+    data = request.get_json()
+    group_id = data.get('groupId')
+    reason = data.get('reason')
+    user_email = data.get('userEmail')
     
-    response = random.choice(responses)
+    # Mock Jira ticket creation
+    ticket = {
+        "key": "DEMO-123",
+        "url": "https://example.jira.com/browse/DEMO-123",
+        "summary": f"Request access to group {group_id} for {user_email}",
+        "description": f"User {user_email} requested access to group {group_id} with reason: {reason}",
+        "status": "Open",
+        "priority": "Medium",
+        "created": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
+        "reporter": user_email,
+        "project": "DEMO",
+        "issueType": "Access Request"
+    }
+    
+    return jsonify(ticket)
+
+@app.route('/api/access/groups/leave', methods=['POST'])
+def leave_group():
+    data = request.get_json()
+    group_name = data.get('groupName')
+    user_email = data.get('userEmail')
+    
+    # Mock success response
+    return jsonify({"success": True})
+
+@app.route('/api/access/chat', methods=['POST'])
+def access_chat():
+    data = request.get_json()
+    message = data.get('message')
+    user_email = data.get('userEmail')
+    
+    # Mock response
+    response = f"Hello {user_email}, I am a demo assistant. You said: {message}"
     return jsonify({"response": response})
 
-# Release Deployment API endpoints
-@app.route('/api/release/list', methods=['GET'])
-def get_releases():
-    """Return list of releases"""
-    # Filter by environment if provided
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    session.pop('user', None)
+    return jsonify({'message': 'Logged out successfully'})
+
+@app.route('/api/auth/session', methods=['GET'])
+def check_auth_session():
+    if 'user' in session:
+        return jsonify({'user': session['user'], 'authenticated': True})
+    else:
+        return jsonify({'user': None, 'authenticated': False})
+
+@app.route('/api/about', methods=['GET'])
+def about():
+    return jsonify({
+        "version": "0.1.0",
+        "description": "AI Assistant API",
+        "endpoints": [
+            "/api/kubernetes/clusters",
+            "/api/kubernetes/command",
+            "/api/docs/search",
+            "/api/jira/ticket",
+            "/api/rbac/roles"
+        ]
+    })
+
+@app.route('/api/kubernetes/clusters', methods=['GET'])
+@jwt_required
+def get_clusters():
+    """Return list of k8s clusters"""
     environment = request.args.get('environment')
+    
     if environment:
-        filtered_releases = [r for r in releases if r['environment'] == environment]
-        return jsonify(filtered_releases)
+        filtered_clusters = [c for c in CLUSTERS if c.get('environment') == environment]
+        return jsonify(filtered_clusters)
     
-    return jsonify(releases)
+    return jsonify(CLUSTERS)
 
-@app.route('/api/release/<release_id>', methods=['GET'])
-def get_release_details(release_id):
-    """Return details for a specific release"""
-    release = next((r for r in releases if r['id'] == release_id), None)
-    if not release:
-        return jsonify({"error": "Release not found"}), 404
-    return jsonify(release)
-
-@app.route('/api/release/create', methods=['POST'])
-def create_release():
-    """Create a new release"""
-    data = request.json
-    if not data or 'name' not in data or 'version' not in data or 'environment' not in data or 'scheduledDate' not in data:
-        return jsonify({"error": "Name, version, environment, and scheduledDate are required"}), 400
+@app.route('/api/kubernetes/command', methods=['POST'])
+@jwt_required
+def run_kubectl_command():
+    data = request.get_json()
+    cluster_arn = data.get('clusterArn')
+    command = data.get('command')
+    namespace = data.get('namespace')
+    jira_ticket_key = data.get('jiraTicketKey')
     
-    # Create new release
-    new_release = {
-        "id": f"r-{str(uuid.uuid4())[:8]}",
-        "name": data['name'],
-        "version": data['version'],
-        "status": "planned",
-        "environment": data['environment'],
-        "scheduledDate": data['scheduledDate'],
-        "events": [
-            {
-                "id": f"e-{str(uuid.uuid4())[:8]}",
-                "releaseId": f"r-{str(uuid.uuid4())[:8]}",
-                "type": "approval",
-                "status": "pending",
-                "description": "Awaiting approval for deployment",
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            }
+    # Mock command result
+    result = {
+        "output": f"kubectl command '{command}' executed successfully on cluster {cluster_arn} in namespace {namespace}",
+        "error": None,
+        "exitCode": 0
+    }
+    
+    return jsonify(result)
+
+@app.route('/api/kubernetes/chat', methods=['POST'])
+@jwt_required
+def kubernetes_chat():
+    data = request.get_json()
+    cluster_arn = data.get('clusterArn')
+    message = data.get('message')
+    namespace = data.get('namespace')
+    
+    # Mock response
+    response = f"Hello, I am a demo Kubernetes assistant for cluster {cluster_arn} in namespace {namespace}. You said: {message}"
+    return jsonify({"response": response})
+
+@app.route('/api/kubernetes/sessions', methods=['GET'])
+@jwt_required
+def get_debug_sessions():
+    # Mock response
+    sessions = [
+        {"id": "session-1", "cluster": "prod-cluster", "description": "Investigating high CPU usage"},
+        {"id": "session-2", "cluster": "staging-cluster", "description": "Troubleshooting deployment issues"}
+    ]
+    
+    return jsonify(sessions)
+
+@app.route('/api/kubernetes/sessions/<session_id>', methods=['GET'])
+@jwt_required
+def get_session_details(session_id):
+    # Mock response
+    details = {
+        "id": session_id,
+        "cluster": "prod-cluster",
+        "description": "Investigating high CPU usage",
+        "commands": [
+            {"command": "kubectl top node", "output": "...", "timestamp": "2024-01-01T12:00:00Z"},
+            {"command": "kubectl describe node", "output": "...", "timestamp": "2024-01-01T12:05:00Z"}
         ]
     }
     
-    # Add to releases list
-    releases.append(new_release)
-    
-    return jsonify(new_release)
+    return jsonify(details)
 
-@app.route('/api/release/<release_id>', methods=['PUT'])
-def update_release(release_id):
-    """Update release details"""
-    data = request.json
-    release = next((r for r in releases if r['id'] == release_id), None)
-    if not release:
-        return jsonify({"error": "Release not found"}), 404
-    
-    # Update fields
-    if 'status' in data:
-        release['status'] = data['status']
-    if 'scheduledDate' in data:
-        release['scheduledDate'] = data['scheduledDate']
-    
-    return jsonify(release)
-
-@app.route('/api/release/<release_id>/deploy', methods=['POST'])
-def deploy_release(release_id):
-    """Deploy a release"""
-    release = next((r for r in releases if r['id'] == release_id), None)
-    if not release:
-        return jsonify({"error": "Release not found"}), 404
-    
-    # Update status
-    release['status'] = "in-progress"
-    
-    # Add deployment event
-    new_event = {
-        "id": f"e-{str(uuid.uuid4())[:8]}",
-        "releaseId": release_id,
-        "type": "deployment",
-        "status": "in-progress",
-        "description": f"Deployment to {release['environment']} started",
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    }
-    release['events'].append(new_event)
-    
-    # Simulate successful deployment after a delay
-    # In a real application, this would be handled asynchronously
-    # For demo purposes, we'll just set a random success/failure
-    if random.random() > 0.2:  # 80% chance of success
-        release['status'] = "deployed"
-        release['deployedDate'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        
-        # Add success event
-        success_event = {
-            "id": f"e-{str(uuid.uuid4())[:8]}",
-            "releaseId": release_id,
-            "type": "deployment",
-            "status": "success",
-            "description": f"Successfully deployed to {release['environment']}",
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        }
-        release['events'].append(success_event)
-    else:
-        release['status'] = "failed"
-        
-        # Add failure event
-        failure_event = {
-            "id": f"e-{str(uuid.uuid4())[:8]}",
-            "releaseId": release_id,
-            "type": "deployment",
-            "status": "failure",
-            "description": "Deployment failed: Service health check timeout",
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        }
-        release['events'].append(failure_event)
-    
-    return jsonify(release)
-
-@app.route('/api/release/<release_id>/rollback', methods=['POST'])
-def rollback_release(release_id):
-    """Rollback a release"""
-    release = next((r for r in releases if r['id'] == release_id), None)
-    if not release:
-        return jsonify({"error": "Release not found"}), 404
-    
-    # Update status
-    release['status'] = "rolled-back"
-    
-    # Add rollback event
-    new_event = {
-        "id": f"e-{str(uuid.uuid4())[:8]}",
-        "releaseId": release_id,
-        "type": "rollback",
-        "status": "success",
-        "description": "Rolled back to previous version",
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    }
-    release['events'].append(new_event)
-    
-    return jsonify(release)
-
-@app.route('/api/release/<release_id>/event', methods=['POST'])
-def add_release_event(release_id):
-    """Add an event to a release"""
-    data = request.json
-    if not data or 'type' not in data or 'status' not in data or 'description' not in data:
-        return jsonify({"error": "Type, status, and description are required"}), 400
-    
-    release = next((r for r in releases if r['id'] == release_id), None)
-    if not release:
-        return jsonify({"error": "Release not found"}), 404
-    
-    # Create new event
-    new_event = {
-        "id": f"e-{str(uuid.uuid4())[:8]}",
-        "releaseId": release_id,
-        "type": data['type'],
-        "status": data['status'],
-        "description": data['description'],
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+@app.route('/api/kubernetes/health/<cluster>', methods=['GET'])
+@jwt_required
+def get_cluster_health(cluster):
+    # Mock response
+    health = {
+        "cluster": cluster,
+        "status": "healthy",
+        "nodes": 12,
+        "cpuUsage": "60%",
+        "memoryUsage": "70%"
     }
     
-    # Add to release events
-    release['events'].append(new_event)
-    
-    return jsonify(new_event)
+    return jsonify(health)
 
-@app.route('/api/release/chat', methods=['POST'])
-def release_chat():
-    """Chat with the release deployment assistant"""
-    data = request.json
-    if not data or 'message' not in data:
-        return jsonify({"error": "Message is required"}), 400
+@app.route('/api/kubernetes/debug-file/<session_id>', methods=['GET'])
+@jwt_required
+def download_debug_file(session_id):
+    # Mock response
+    return jsonify({"url": "https://example.com/debug-file.zip"})
+
+@app.route('/api/kubernetes/namespaces', methods=['POST'])
+@jwt_required
+def get_namespaces():
+    data = request.get_json()
+    cluster_arn = data.get('clusterArn')
     
-    message = data.get('message')
-    context = data.get('context', {})
+    # Mock response
+    namespaces = ["default", "kube-system", "monitoring"]
+    return jsonify(namespaces)
+
+@app.route('/api/kubernetes/namespace-issues', methods=['POST'])
+@jwt_required
+def get_namespace_issues():
+    data = request.get_json()
+    cluster_arn = data.get('clusterArn')
+    namespace = data.get('namespace')
     
-    # In a real application, process the message with an LLM
-    # For this demo, provide canned responses
+    # Mock response
+    issues = [
+        {"id": "issue-1", "severity": "critical", "kind": "Pod", "name": "failing-pod", "message": "Pod is crashing", "timestamp": "2024-01-01T12:00:00Z"},
+        {"id": "issue-2", "severity": "warning", "kind": "Service", "name": "unhealthy-service", "message": "Service is not responding", "timestamp": "2024-01-01T12:05:00Z"}
+    ]
+    return jsonify(issues)
+
+@app.route('/api/docs/search', methods=['POST'])
+@jwt_required
+def search_documentation():
+    data = request.get_json()
+    query = data.get('query')
     
-    responses = [
-        "I can help you manage your releases. What would you like to do?",
-        "To schedule a new release, please provide the name, version, environment, and desired deployment date.",
-        "Your release has been scheduled. It will be deployed on the specified date.",
-        "I've updated your release configuration. The changes have been saved."
+    # Mock response
+    results = [
+        {"id": 1, "title": "Kubernetes Pods", "excerpt": "Learn about Kubernetes Pods", "content": "...", "url": "https://example.com/docs/pods", "category": "Kubernetes"},
+        {"id": 2, "title": "AWS EC2 Instances", "excerpt": "Learn about AWS EC2 Instances", "content": "...", "url": "https://example.com/docs/ec2", "category": "AWS"}
     ]
     
-    # If context includes a release, add more specific responses
-    if 'releaseId' in context:
-        release_id = context['releaseId']
-        release = next((r for r in releases if r['id'] == release_id), None)
-        
-        if release:
-            release_specific = [
-                f"Release '{release['name']}' version {release['version']} is currently {release['status']}.",
-                f"This release is scheduled for deployment to {release['environment']} on {release['scheduledDate']}.",
-                "Would you like to deploy this release now?",
-                "I can help you troubleshoot issues with your release deployment."
-            ]
-            responses.extend(release_specific)
+    return jsonify(results)
+
+@app.route('/api/docs/<int:document_id>', methods=['GET'])
+@jwt_required
+def get_document_by_id(document_id):
+    # Mock response
+    document = {
+        "id": document_id,
+        "title": "Kubernetes Pods",
+        "excerpt": "Learn about Kubernetes Pods",
+        "content": "...",
+        "url": "https://example.com/docs/pods",
+        "category": "Kubernetes"
+    }
     
-    response = random.choice(responses)
+    return jsonify(document)
+
+@app.route('/api/docs/feedback', methods=['POST'])
+@jwt_required
+def submit_feedback():
+    data = request.get_json()
+    document_id = data.get('documentId')
+    helpful = data.get('helpful')
+    
+    # Mock success response
+    return jsonify({"success": True})
+
+@app.route('/api/docs/chat', methods=['POST'])
+@jwt_required
+def docs_chat():
+    data = request.get_json()
+    message = data.get('message')
+    context = data.get('context')
+    history = data.get('history')
+    
+    # Mock response
+    response = f"Hello, I am a demo documentation assistant. You said: {message}"
     return jsonify({"response": response})
 
-if __name__ == '__main__':
-    # ... keep existing code (Set up proper connection and socket handling for Gunicorn, etc.)
+@app.route('/api/docs/chat/history', methods=['GET'])
+@jwt_required
+def get_chat_history():
+    # Mock response
+    history = [
+        {"id": "1", "role": "user", "content": "What is a Kubernetes Pod?", "timestamp": "2024-01-01T12:00:00Z"},
+        {"id": "2", "role": "assistant", "content": "A Pod is the smallest deployable unit in Kubernetes.", "timestamp": "2024-01-01T12:01:00Z"}
+    ]
+    
+    return jsonify(history)
+
+@app.route('/api/docs/history', methods=['GET'])
+@jwt_required
+def get_query_history():
+    # Mock response
+    history = [
+        {"id": 1, "query": "Kubernetes Pods", "timestamp": "2024-01-01T12:00:00Z"},
+        {"id": 2, "query": "AWS EC2 Instances", "timestamp": "2024-01-01T12:05:00Z"}
+    ]
+    
+    return jsonify(history)
+
+@app.route('/api/docs/chat/clear', methods=['POST'])
+@jwt_required
+def clear_chat_history():
+    # Mock success response
+    return jsonify({"success": True})
+
+@app.route('/api/jira/ticket', methods=['POST'])
+@jwt_required
+def create_jira_ticket():
+    data = request.get_json()
+    summary = data.get('summary')
+    description = data.get('description')
+    priority = data.get('priority')
+    project = data.get('project')
+    issue_type = data.get('issueType')
+    
+    # Mock Jira ticket creation
+    ticket = {
+        "key": "DEMO-123",
+        "url": "https://example.jira.com/browse/DEMO-123",
+        "summary": summary,
+        "description": description,
+        "status": "Open",
+        "priority": priority,
+        "created": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
+        "reporter": session.get('user', {}).get('email', 'test@example.com'),
+        "project": project,
+        "issueType": issue_type
+    }
+    
+    return jsonify(ticket)
+
+@app.route('/api/jira/tickets', methods=['GET'])
+@jwt_required
+def get_user_tickets():
+    reporter = request.args.get('reporter')
+    status = request.args.get('status')
+    
+    # Mock response
+    tickets = [
+        {"key": "DEMO-123", "url": "https://example.jira.com/browse/DEMO-123", "summary": "Fix bug in login page", "status": "Open", "priority": "High", "created": "2024-01-01T12:00:00Z", "reporter": "test@example.com", "project": "DEMO", "issueType": "Bug"},
+        {"key": "DEMO-124", "url": "https://example.jira.com/browse/DEMO-124", "summary": "Implement new feature", "status": "In Progress", "priority": "Medium", "created": "2024-01-02T12:00:00Z", "reporter": "test@example.com", "project": "DEMO", "issueType": "Task"}
+    ]
+    
+    return jsonify(tickets)
+
+@app.route('/api/jira/tickets/reported-by-me', methods=['GET'])
+@jwt_required
+def get_user_reported_tickets():
+    # Mock response
+    tickets = [
+        {"key": "DEMO-123", "url": "https://example.jira.com/browse/DEMO-123", "summary": "Fix bug in login page", "status": "Open", "priority": "High", "created": "2024-01-01T12:00:00Z", "reporter": "test@example.com", "project": "DEMO", "issueType": "Bug"},
+        {"key": "DEMO-124", "url": "https://example.jira.com/browse/DEMO-124", "summary": "Implement new feature", "status": "In Progress", "priority": "Medium", "created": "2024-01-02T12:00:00Z", "reporter": "test@example.com", "project": "DEMO", "issueType": "Task"}
+    ]
+    
+    return jsonify(tickets)
+
+@app.route('/api/jira/tickets/<ticket_key>', methods=['GET'])
+@jwt_required
+def get_ticket_details(ticket_key):
+    # Mock response
+    ticket = {
+        "key": ticket_key,
+        "url": f"https://example.jira.com/browse/{ticket_key}",
+        "summary": "Fix bug in login page",
+        "description": "Detailed description of the bug",
+        "status": "Open",
+        "priority": "High",
+        "created": "2024

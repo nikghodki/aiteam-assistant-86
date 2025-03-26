@@ -1,6 +1,9 @@
 // API base URL should be configured in your environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
+// Import our auth hook to get JWT tokens
+import { useAuth } from '@/contexts/AuthContext';
+
 // Define interfaces for API responses
 export interface UserAccess {
   id: number;
@@ -226,12 +229,30 @@ export interface UpdateReleaseRequest {
   scheduledDate?: string;
 }
 
-// Helper function for API calls
+// Helper function for API calls with JWT authentication
 const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
   
+  // Get the auth header with JWT token
+  let authHeader = {};
+  
+  // Try to get the token from localStorage as a fallback
+  // This is needed because we can't use the useAuth hook directly in this function
+  try {
+    const tokenString = localStorage.getItem('auth_tokens');
+    if (tokenString) {
+      const tokens = JSON.parse(tokenString);
+      if (tokens && tokens.accessToken) {
+        authHeader = { Authorization: `Bearer ${tokens.accessToken}` };
+      }
+    }
+  } catch (e) {
+    console.error('Error retrieving auth token:', e);
+  }
+  
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
+    ...authHeader
   };
 
   const response = await fetch(url, {
@@ -248,6 +269,39 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   return response.json();
+};
+
+// Export a custom hook that includes the auth token
+export const useApiWithAuth = () => {
+  const { getAuthHeader } = useAuth();
+  
+  const apiCallWithAuth = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
+    const url = `${API_BASE_URL}${endpoint}`;
+    
+    const authHeader = getAuthHeader();
+    
+    const defaultHeaders: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...authHeader
+    };
+
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `API error: ${response.status}`);
+    }
+
+    return response.json();
+  };
+  
+  return { apiCallWithAuth };
 };
 
 // Access Management API
