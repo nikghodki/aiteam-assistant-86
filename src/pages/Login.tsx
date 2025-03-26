@@ -1,25 +1,25 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
-import { Github, LogIn, Mail } from 'lucide-react';
+import { Github, LogIn, Mail, AlertTriangle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, loginWithGoogle, loginWithGithub, isLoading, user } = useAuth();
+  const { login, loginWithGoogle, loginWithGithub, isLoading, user, bypassAuthForTesting, toggleBypassAuth } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // If user is already authenticated, redirect to dashboard
-  if (user.authenticated) {
-    navigate('/dashboard', { replace: true });
-    return null;
-  }
+  useEffect(() => {
+    if (bypassAuthForTesting || user.authenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [bypassAuthForTesting, user.authenticated, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +43,6 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     try {
       await loginWithGoogle();
-      // Note: The actual redirect will be handled by the Google auth flow
     } catch (error) {
       toast({
         title: "Google login failed",
@@ -56,7 +55,6 @@ const Login = () => {
   const handleGithubLogin = async () => {
     try {
       await loginWithGithub();
-      // Note: The actual redirect will be handled by the GitHub auth flow
     } catch (error) {
       toast({
         title: "GitHub login failed",
@@ -66,7 +64,6 @@ const Login = () => {
     }
   };
 
-  // Bypass login for testing purposes
   const handleBypassLogin = () => {
     localStorage.setItem('user', JSON.stringify({
       id: 'test-user-id',
@@ -75,12 +72,21 @@ const Login = () => {
       authenticated: true
     }));
     
-    // Reload the page to apply the changes from localStorage
     window.location.href = '/dashboard';
     
     toast({
       title: "Bypassed login",
       description: "You've bypassed the login for testing purposes.",
+    });
+  };
+
+  const handleToggleBypass = () => {
+    toggleBypassAuth();
+    toast({
+      title: bypassAuthForTesting ? "Authentication enabled" : "Authentication bypassed",
+      description: bypassAuthForTesting 
+        ? "Normal authentication is now required" 
+        : "You can now access all protected routes without authentication",
     });
   };
 
@@ -94,13 +100,35 @@ const Login = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Google Sign-In Button */}
+          {import.meta.env.DEV && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md mb-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-medium text-amber-800">Development Mode</h4>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Toggle this switch to completely bypass authentication for all protected routes.
+                  </p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs font-medium text-amber-700">
+                      {bypassAuthForTesting ? "Auth bypass enabled" : "Auth bypass disabled"}
+                    </span>
+                    <Switch 
+                      checked={bypassAuthForTesting} 
+                      onCheckedChange={handleToggleBypass}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <Button 
             type="button" 
             variant="outline" 
             className="w-full flex items-center justify-center gap-2" 
             onClick={handleGoogleLogin}
-            disabled={isLoading}
+            disabled={isLoading || bypassAuthForTesting}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24">
               <path
@@ -123,13 +151,12 @@ const Login = () => {
             <span>Sign in with Google</span>
           </Button>
 
-          {/* GitHub Sign-In Button */}
           <Button 
             type="button" 
             variant="outline" 
             className="w-full flex items-center justify-center gap-2" 
             onClick={handleGithubLogin}
-            disabled={isLoading}
+            disabled={isLoading || bypassAuthForTesting}
           >
             <Github className="h-4 w-4" />
             <span>Sign in with GitHub</span>
@@ -149,7 +176,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || bypassAuthForTesting}
               />
             </div>
             <div className="space-y-2">
@@ -159,10 +186,14 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || bypassAuthForTesting}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isLoading || bypassAuthForTesting}
+            >
               {isLoading ? (
                 <div className="flex items-center justify-center">
                   <div className="w-5 h-5 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
@@ -177,8 +208,7 @@ const Login = () => {
             </Button>
           </form>
           
-          {/* Test bypass login button - only for development */}
-          {import.meta.env.DEV && (
+          {import.meta.env.DEV && !bypassAuthForTesting && (
             <div className="mt-4">
               <Button 
                 type="button" 

@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, bypassAuthForTesting } = useAuth();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   useEffect(() => {
@@ -29,6 +29,11 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     
     checkLocalStorage();
   }, []);
+
+  // If bypass is enabled, allow access to all protected routes
+  if (bypassAuthForTesting) {
+    return <>{children}</>;
+  }
 
   // Show loading indicator while checking auth status
   if (isLoading && !isAuthenticated) {

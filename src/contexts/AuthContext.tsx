@@ -21,6 +21,8 @@ const mockUser: User = {
 interface AuthContextType {
   user: User;
   isLoading: boolean;
+  bypassAuthForTesting: boolean;
+  toggleBypassAuth: () => void;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithGithub: () => Promise<void>;
@@ -33,6 +35,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User>(mockUser);
   const [isLoading, setIsLoading] = useState(true);
+  const [bypassAuthForTesting, setBypassAuthForTesting] = useState(false);
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
@@ -49,11 +52,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           localStorage.removeItem('user');
         }
       }
+      
+      // Check if auth bypass is enabled
+      const bypassAuth = localStorage.getItem('bypassAuthForTesting');
+      if (bypassAuth === 'true') {
+        setBypassAuthForTesting(true);
+      }
+      
       setIsLoading(false);
     };
 
     checkAuth();
   }, []);
+
+  const toggleBypassAuth = () => {
+    const newBypassState = !bypassAuthForTesting;
+    setBypassAuthForTesting(newBypassState);
+    localStorage.setItem('bypassAuthForTesting', newBypassState.toString());
+    
+    if (newBypassState) {
+      // If enabling bypass, save a test user to localStorage
+      const testUser = {
+        id: 'test-user-id',
+        name: 'Test User',
+        email: 'test@example.com',
+        authenticated: true
+      };
+      localStorage.setItem('user', JSON.stringify(testUser));
+      setUser(testUser);
+    }
+  };
 
   const login = async (email: string, password: string) => {
     // Use the backend API for authentication
@@ -144,6 +172,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider value={{ 
       user, 
       isLoading, 
+      bypassAuthForTesting,
+      toggleBypassAuth,
       login, 
       loginWithGoogle,
       loginWithGithub,
