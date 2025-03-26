@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Check, Copy, Download, X } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -185,6 +186,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   };
 
   const logToUse = localDebugFileContent || debugFileContent || (debugSession ? debugSession.debugLog : '');
+  const formattedLog = formatDebugLog(logToUse);
   
   const getTimeStamp = () => {
     const now = new Date();
@@ -312,21 +314,21 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                 </Alert>
               ) : null}
               
-              {request && (
+              {formattedLog.request && (
                 <div className="flex justify-start mb-4">
                   <div className={cn("rounded-lg p-3 max-w-[85%] shadow-sm", getRequestBubbleStyle())}>
                     <div className="text-sm">
                       <p className="font-semibold text-professional-purple dark:text-professional-purple-light mb-1">You</p>
-                      <p className="whitespace-pre-wrap break-words">{request}</p>
+                      <p className="whitespace-pre-wrap break-words">{formattedLog.request}</p>
                       <p className="text-xs text-muted-foreground mt-1 text-right">{getTimeStamp()}</p>
                     </div>
                   </div>
                 </div>
               )}
               
-              {sections.length > 0 ? (
+              {formattedLog.sections.length > 0 ? (
                 <div className="space-y-4">
-                  {sections.map((section, index) => (
+                  {formattedLog.sections.map((section, index) => (
                     <div key={index} className={`flex ${section.type === 'text' ? 'justify-end' : 'justify-start'} mb-2`}>
                       {section.type === 'text' ? (
                         <div className={cn("rounded-lg p-3 max-w-[85%] shadow-sm", getChatBubbleStyle(section.type))}>
@@ -363,7 +365,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                   ))}
                 </div>
               ) : (
-                !request && !showMainLoadingState && (
+                !formattedLog.request && !showMainLoadingState && (
                   <Alert className="border-professional-purple-light/30 dark:border-professional-purple-dark/30">
                     <AlertDescription>
                       No debugging information is available. Please start a debugging session by selecting an issue or asking a question in the Kubernetes Assistant.
