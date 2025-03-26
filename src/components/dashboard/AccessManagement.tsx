@@ -31,13 +31,13 @@ const AccessManagement = () => {
 
   // Fetch groups data for the current user
   const { data: groups, isLoading: isLoadingGroups, refetch } = useQuery({
-    queryKey: ['user-groups', user.email],
-    queryFn: () => accessApi.getUserGroups(user.email),
+    queryKey: ['user-groups', user.name],
+    queryFn: () => accessApi.getUserGroups(user.name),
   });
 
   // Chat mutation
   const chatMutation = useMutation({
-    mutationFn: (message: string) => accessApi.chatWithAssistant(message, user.email),
+    mutationFn: (message: string) => accessApi.chatWithAssistant(message, user.name),
     onSuccess: (data) => {
       setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
     },
@@ -58,7 +58,7 @@ const AccessManagement = () => {
   // Leave group mutation
   const leaveGroupMutation = useMutation({
     mutationFn: (groupName: string) => {
-      return accessApi.leaveGroup(groupName, user.email);
+      return accessApi.leaveGroup(groupName, user.name);
     },
     onSuccess: () => {
       toast({
@@ -108,6 +108,7 @@ const AccessManagement = () => {
     setAutoRefresh(prev => !prev);
   };
 
+  // Set up auto-refresh
   useEffect(() => {
     if (autoRefresh) {
       refreshTimerRef.current = window.setInterval(() => {
@@ -126,6 +127,7 @@ const AccessManagement = () => {
     };
   }, [autoRefresh, refetch]);
 
+  // Filter groups based on search query
   const filteredGroups = groups?.filter(group => 
     group.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     group.description.toLowerCase().includes(searchQuery.toLowerCase())

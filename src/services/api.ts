@@ -32,7 +32,7 @@ export interface JiraTicket {
 export interface AccessRequest {
   groupId: number;
   reason: string;
-  userEmail: string;
+  userName: string;
 }
 
 export interface CommandResult {
@@ -180,31 +180,31 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
 // Access Management API
 export const accessApi = {
   // Get user groups
-  getUserGroups: (userEmail: string) => 
+  getUserGroups: (userName: string) => 
     apiCall<any[]>('/access/groups', {
       method: 'POST',
-      body: JSON.stringify({ userEmail }),
+      body: JSON.stringify({ userName }),
     }),
 
   // Request access to a group
-  requestGroupAccess: (groupId: number, reason: string, userEmail: string) => 
+  requestGroupAccess: (groupId: number, reason: string, userName: string) => 
     apiCall<JiraTicket>('/access/groups/request', {
       method: 'POST',
-      body: JSON.stringify({ groupId, reason, userEmail }),
+      body: JSON.stringify({ groupId, reason, userName }),
     }),
 
   // Leave a group
-  leaveGroup: (groupName: string, userEmail: string) =>
+  leaveGroup: (groupName: string, userName: string) =>
     apiCall<{ success: boolean }>('/access/groups/leave', {
       method: 'POST',
-      body: JSON.stringify({ groupName, userEmail }),
+      body: JSON.stringify({ groupName, userName }),
     }),
 
   // Chat with the assistant
-  chatWithAssistant: (message: string, userEmail: string) => 
+  chatWithAssistant: (message: string, userName: string) => 
     apiCall<ChatResponse>('/access/chat', {
       method: 'POST',
-      body: JSON.stringify({ message, userEmail }),
+      body: JSON.stringify({ message, userName }),
     }),
 };
 
