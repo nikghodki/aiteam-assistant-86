@@ -10,7 +10,7 @@ import { RBACProvider } from "@/contexts/RBACContext";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import AccessControl from "./pages/AccessControl";
-import KubernetesDebug from "./pages/KubernetesDebug";
+import Kubernetes from "./pages/Kubernetes";
 import Documentation from "./pages/Documentation";
 import NotFound from "./pages/NotFound";
 import AuthCallback from "./pages/AuthCallback";
@@ -54,7 +54,7 @@ const App = () => (
               {/* Protected routes */}
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/access" element={<ProtectedRoute><AccessControl /></ProtectedRoute>} />
-              <Route path="/kubernetes" element={<ProtectedRoute><KubernetesDebug /></ProtectedRoute>} />
+              <Route path="/kubernetes" element={<ProtectedRoute><Kubernetes /></ProtectedRoute>} />
               <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

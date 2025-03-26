@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Check, Copy, Download, X } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -14,6 +13,7 @@ import { Alert, AlertDescription } from '../ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { kubernetesApi } from '@/services/api';
+import { fetchFileFromS3 } from '@/utils/s3';
 
 interface KubernetesDebugDrawerProps {
   isOpen: boolean;
@@ -30,6 +30,7 @@ interface KubernetesDebugDrawerProps {
     namespace: string;
   };
   debugFilePath?: string;
+  debugFileContent?: string;
   isLoading?: boolean;
 }
 
@@ -39,39 +40,52 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   debugSession,
   issue,
   debugFilePath,
+  debugFileContent = '',
   isLoading = false,
 }) => {
   const { toast } = useToast();
   const [copying, setCopying] = useState<string | null>(null);
-  const [debugFileContent, setDebugFileContent] = useState<string>('');
+  const [localDebugFileContent, setLocalDebugFileContent] = useState<string>('');
   const [isLoadingFile, setIsLoadingFile] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   useEffect(() => {
-    if (debugFilePath && isOpen) {
+    if (debugFileContent) {
+      setLocalDebugFileContent(debugFileContent);
+      setIsLoadingFile(false);
+      return;
+    }
+    
+    if (debugFilePath && isOpen && !debugFileContent) {
       setIsLoadingFile(true);
       
-      const timer = setTimeout(() => {
-        fetch(debugFilePath)
-          .then(response => response.text())
-          .then(content => {
-            setDebugFileContent(content);
-            setIsLoadingFile(false);
-          })
-          .catch(error => {
-            console.error('Error loading debug file:', error);
-            setIsLoadingFile(false);
+      const timer = setTimeout(async () => {
+        try {
+          const content = await fetchFileFromS3(debugFilePath);
+          setLocalDebugFileContent(content);
+        } catch (s3Error) {
+          console.error('Error loading from S3, falling back to direct fetch:', s3Error);
+          
+          try {
+            const response = await fetch(debugFilePath);
+            const content = await response.text();
+            setLocalDebugFileContent(content);
+          } catch (fetchError) {
+            console.error('Error loading debug file:', fetchError);
             toast({
               title: "Error",
               description: "Failed to load debugging information",
               variant: "destructive"
             });
-          });
+          }
+        } finally {
+          setIsLoadingFile(false);
+        }
       }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [debugFilePath, isOpen, toast]);
+  }, [debugFilePath, debugFileContent, isOpen, toast]);
 
   const copyToClipboard = (text: string, identifier: string) => {
     navigator.clipboard.writeText(text);
@@ -86,7 +100,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   };
 
   const handleDownload = async () => {
-    if (!debugSession?.id && !debugFileContent) {
+    if (!debugSession?.id && !localDebugFileContent) {
       toast({
         title: "Error",
         description: "No debugging information available to download",
@@ -99,7 +113,6 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     
     try {
       if (debugSession?.id) {
-        // Download using API if debugSession exists
         const response = await kubernetesApi.downloadDebugFile(debugSession.id);
         
         const link = document.createElement('a');
@@ -108,9 +121,8 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-      } else if (debugFileContent) {
-        // Download the debug file content if available
-        const blob = new Blob([debugFileContent], { type: 'text/plain' });
+      } else if (localDebugFileContent) {
+        const blob = new Blob([localDebugFileContent], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         
         const link = document.createElement('a');
@@ -172,10 +184,8 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     return { request, response: responseRaw, sections };
   };
 
-  const logToUse = debugFileContent || (debugSession ? debugSession.debugLog : '');
+  const logToUse = localDebugFileContent || debugFileContent || (debugSession ? debugSession.debugLog : '');
   
-  const { request, sections } = formatDebugLog(logToUse);
-
   const getTimeStamp = () => {
     const now = new Date();
     return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -216,7 +226,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
           <div className="flex justify-between items-center">
             <SheetTitle className="text-xl">Kubernetes Troubleshooting</SheetTitle>
             <div className="flex gap-2">
-              {(debugSession?.id || debugFileContent) && (
+              {(debugSession?.id || localDebugFileContent) && (
                 <Button 
                   variant="outline" 
                   size="icon" 
