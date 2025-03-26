@@ -8,4 +8,3 @@ pyOpenSSL==23.2.0
 cryptography>=41.0.0
 requests>=2.28.0
 PyJWT==2.6.0
-

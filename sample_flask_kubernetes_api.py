@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify, redirect, session, url_for, make_response
 from flask_cors import CORS
 import time
@@ -264,6 +265,58 @@ def prepare_flask_request(request):
         'remote_addr': request.remote_addr
     }
 
+# JWT token helper functions
+def generate_jwt_token(user_id, expiry=JWT_ACCESS_TOKEN_EXPIRES):
+    """Generate a new JWT token for the given user"""
+    payload = {
+        'sub': user_id,
+        'iat': datetime.utcnow(),
+        'exp': datetime.utcnow() + timedelta(seconds=expiry)
+    }
+    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+def decode_jwt_token(token):
+    """Decode and validate the JWT token"""
+    try:
+        return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+# JWT authentication decorator
+def jwt_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # For testing purposes, you might want to bypass JWT validation in some cases
+        bypass_auth = request.headers.get('X-Bypass-Auth', 'false').lower() == 'true'
+        if bypass_auth:
+            # For testing only - assume a default user
+            request.current_user = USERS.get("test@example.com")
+            return f(*args, **kwargs)
+            
+        # Get the token from the Authorization header
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'message': 'Missing or invalid Authorization header'}), 401
+            
+        token = auth_header.split(' ')[1]
+        payload = decode_jwt_token(token)
+        
+        if not payload:
+            return jsonify({'message': 'Invalid or expired token'}), 401
+            
+        user_id = payload.get('sub')
+        user = next((user for user in USERS.values() if user['id'] == user_id), None)
+        
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+            
+        # Store the user in the request context
+        request.current_user = user
+        return f(*args, **kwargs)
+    return decorated
+
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -274,8 +327,49 @@ def login():
     if not user or user['password'] != data['password']:
         return jsonify({'message': 'Invalid credentials'}), 401
     
+    # Generate a JWT token for the user
+    access_token = generate_jwt_token(user['id'])
+    refresh_token = generate_jwt_token(user['id'], expiry=86400)  # 24 hours
+    
     session['user'] = user
-    return jsonify({'message': 'Logged in successfully', 'user': user})
+    return jsonify({
+        'message': 'Logged in successfully', 
+        'user': user,
+        'tokens': {
+            'accessToken': access_token,
+            'refreshToken': refresh_token,
+            'expiresAt': (datetime.utcnow() + timedelta(seconds=JWT_ACCESS_TOKEN_EXPIRES)).timestamp() * 1000
+        }
+    })
+
+@app.route('/api/auth/token/refresh', methods=['POST'])
+def refresh_token():
+    data = request.get_json()
+    if not data or 'refreshToken' not in data:
+        return jsonify({'message': 'Missing refresh token'}), 400
+        
+    payload = decode_jwt_token(data['refreshToken'])
+    if not payload:
+        return jsonify({'message': 'Invalid or expired refresh token'}), 401
+        
+    user_id = payload.get('sub')
+    user = next((user for user in USERS.values() if user['id'] == user_id), None)
+    
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+        
+    # Generate new tokens
+    access_token = generate_jwt_token(user['id'])
+    refresh_token = generate_jwt_token(user['id'], expiry=86400)  # 24 hours
+    
+    return jsonify({
+        'message': 'Token refreshed successfully',
+        'tokens': {
+            'accessToken': access_token,
+            'refreshToken': refresh_token,
+            'expiresAt': (datetime.utcnow() + timedelta(seconds=JWT_ACCESS_TOKEN_EXPIRES)).timestamp() * 1000
+        }
+    })
 
 @app.route('/api/auth/google/login', methods=['GET'])
 def google_login():
@@ -323,16 +417,29 @@ def google_callback():
     # Check if the user exists in your database, otherwise create a new user
     user = USERS.get(email)
     if not user:
-        user = {'id': str(uuid.uuid4()), 'name': name, 'email': email}
+        user_id = str(uuid.uuid4())
+        user = {'id': user_id, 'name': name, 'email': email, 'password': str(uuid.uuid4())}
         USERS[email] = user
     
+    # Generate a JWT token for the user
+    access_token = generate_jwt_token(user['id'])
+    refresh_token = generate_jwt_token(user['id'], expiry=86400)  # 24 hours
+    
     session['user'] = user
-    return jsonify({'message': 'Logged in successfully', 'user': user})
+    return jsonify({
+        'message': 'Logged in successfully', 
+        'user': user,
+        'tokens': {
+            'accessToken': access_token,
+            'refreshToken': refresh_token,
+            'expiresAt': (datetime.utcnow() + timedelta(seconds=JWT_ACCESS_TOKEN_EXPIRES)).timestamp() * 1000
+        }
+    })
 
 @app.route('/api/auth/github/login', methods=['GET'])
 def github_login():
     # Redirect the user to GitHub's OAuth endpoint
-    github_oauth_url = f'https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&redirect_uri={GITHUB_REDIRECT_URI}'
+    github_oauth_url = f'https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&redirect_uri={os.environ.get("GITHUB_REDIRECT_URI", "http://localhost:8000/api/auth/github/callback")}'
     return redirect(github_oauth_url)
 
 @app.route('/api/auth/github/callback', methods=['GET'])
@@ -348,7 +455,7 @@ def github_callback():
         'code': code,
         'client_id': GITHUB_CLIENT_ID,
         'client_secret': GITHUB_CLIENT_SECRET,
-        'redirect_uri': GITHUB_REDIRECT_URI
+        'redirect_uri': os.environ.get('GITHUB_REDIRECT_URI', 'http://localhost:8000/api/auth/github/callback')
     }
     response = requests.post(token_url, headers=headers, data=data)
     if response.status_code != 200:
@@ -366,19 +473,46 @@ def github_callback():
         return jsonify({'message': 'Failed to retrieve user info'}), 400
 
     user_info = user_info_response.json()
-    email = user_info.get('email')
-    name = user_info.get('login')  # GitHub doesn't always provide a name
-    if not email or not name:
-        return jsonify({'message': 'Email or name not found'}), 400
-
+    
+    # Get email (GitHub doesn't always provide it in the main user info)
+    email_url = 'https://api.github.com/user/emails'
+    headers = {'Authorization': f'token {access_token}', 'Accept': 'application/json'}
+    email_response = requests.get(email_url, headers=headers)
+    
+    email = None
+    if email_response.status_code == 200:
+        emails = email_response.json()
+        primary_email = next((e for e in emails if e.get('primary')), None)
+        if primary_email:
+            email = primary_email.get('email')
+    
+    # If no email found, use the login as fallback
+    if not email:
+        email = f"{user_info.get('login')}@github.com"
+    
+    name = user_info.get('name') or user_info.get('login')
+    
     # Check if the user exists in your database, otherwise create a new user
     user = USERS.get(email)
     if not user:
-        user = {'id': str(uuid.uuid4()), 'name': name, 'email': email}
+        user_id = str(uuid.uuid4())
+        user = {'id': user_id, 'name': name, 'email': email, 'password': str(uuid.uuid4())}
         USERS[email] = user
     
+    # Generate a JWT token for the user
+    access_token = generate_jwt_token(user['id'])
+    refresh_token = generate_jwt_token(user['id'], expiry=86400)  # 24 hours
+    
     session['user'] = user
-    return jsonify({'message': 'Logged in successfully', 'user': user})
+    return jsonify({
+        'message': 'Logged in successfully', 
+        'user': user,
+        'tokens': {
+            'accessToken': access_token,
+            'refreshToken': refresh_token,
+            'expiresAt': (datetime.utcnow() + timedelta(seconds=JWT_ACCESS_TOKEN_EXPIRES)).timestamp() * 1000
+        }
+    })
 
 def is_safe_url(target):
     ref_url = urlparse(request.host_url)
@@ -386,6 +520,7 @@ def is_safe_url(target):
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
 @app.route('/api/access/groups', methods=['POST'])
+@jwt_required
 def get_user_groups():
     data = request.get_json()
     user_email = data.get('userEmail')
@@ -400,6 +535,7 @@ def get_user_groups():
     return jsonify(groups)
 
 @app.route('/api/access/groups/request', methods=['POST'])
+@jwt_required
 def request_group_access():
     data = request.get_json()
     group_id = data.get('groupId')
@@ -423,6 +559,7 @@ def request_group_access():
     return jsonify(ticket)
 
 @app.route('/api/access/groups/leave', methods=['POST'])
+@jwt_required
 def leave_group():
     data = request.get_json()
     group_name = data.get('groupName')
@@ -432,6 +569,7 @@ def leave_group():
     return jsonify({"success": True})
 
 @app.route('/api/access/chat', methods=['POST'])
+@jwt_required
 def access_chat():
     data = request.get_json()
     message = data.get('message')
@@ -442,13 +580,17 @@ def access_chat():
     return jsonify({"response": response})
 
 @app.route('/api/auth/logout', methods=['POST'])
+@jwt_required
 def logout():
     session.pop('user', None)
     return jsonify({'message': 'Logged out successfully'})
 
 @app.route('/api/auth/session', methods=['GET'])
+@jwt_required
 def check_auth_session():
-    if 'user' in session:
+    if 'current_user' in request.__dict__:
+        return jsonify({'user': request.current_user, 'authenticated': True})
+    elif 'user' in session:
         return jsonify({'user': session['user'], 'authenticated': True})
     else:
         return jsonify({'user': None, 'authenticated': False})
@@ -678,7 +820,7 @@ def create_jira_ticket():
         "status": "Open",
         "priority": priority,
         "created": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
-        "reporter": session.get('user', {}).get('email', 'test@example.com'),
+        "reporter": request.current_user.get('email', 'test@example.com'),
         "project": project,
         "issueType": issue_type
     }
@@ -721,4 +863,272 @@ def get_ticket_details(ticket_key):
         "description": "Detailed description of the bug",
         "status": "Open",
         "priority": "High",
-        "created": "2024
+        "created": "2024-01-01T12:00:00Z",
+        "reporter": "test@example.com",
+        "project": "DEMO",
+        "issueType": "Bug"
+    }
+    
+    return jsonify(ticket)
+
+@app.route('/api/jira/projects', methods=['GET'])
+@jwt_required
+def get_jira_projects():
+    # Mock response
+    return jsonify(JIRA_PROJECTS)
+
+@app.route('/api/jira/issue-types', methods=['GET'])
+@jwt_required
+def get_jira_issue_types():
+    project_id = request.args.get('projectId', '10000')
+    
+    # Mock response
+    return jsonify(JIRA_ISSUE_TYPES.get(project_id, []))
+
+@app.route('/api/jira/chat', methods=['POST'])
+@jwt_required
+def jira_chat():
+    data = request.get_json()
+    message = data.get('message')
+    context = data.get('context', {})
+    ticket_key = context.get('ticketKey')
+    
+    # Mock response
+    response = f"Hello, I am a demo Jira assistant. You asked about ticket {ticket_key if ticket_key else 'unknown'}: {message}"
+    return jsonify({"response": response})
+
+@app.route('/api/rbac/roles', methods=['GET'])
+@jwt_required
+def get_roles():
+    # Mock response
+    return jsonify(ROLES)
+
+@app.route('/api/rbac/roles/<role_id>', methods=['GET'])
+@jwt_required
+def get_role(role_id):
+    # Mock response
+    role = next((r for r in ROLES if r['id'] == role_id), None)
+    if not role:
+        return jsonify({'message': 'Role not found'}), 404
+    
+    return jsonify(role)
+
+@app.route('/api/rbac/roles', methods=['POST'])
+@jwt_required
+def create_role():
+    data = request.get_json()
+    # Mock role creation
+    new_role = {
+        "id": str(uuid.uuid4()),
+        "name": data.get('name'),
+        "description": data.get('description', ''),
+        "isSystem": False,
+        "permissions": data.get('permissions', []),
+        "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    }
+    
+    ROLES.append(new_role)
+    return jsonify(new_role)
+
+@app.route('/api/rbac/roles/<role_id>', methods=['PUT'])
+@jwt_required
+def update_role(role_id):
+    data = request.get_json()
+    role = next((r for r in ROLES if r['id'] == role_id), None)
+    if not role:
+        return jsonify({'message': 'Role not found'}), 404
+    
+    if role['isSystem']:
+        return jsonify({'message': 'Cannot modify a system role'}), 403
+    
+    role['name'] = data.get('name', role['name'])
+    role['description'] = data.get('description', role['description'])
+    role['permissions'] = data.get('permissions', role['permissions'])
+    role['updatedAt'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    
+    return jsonify(role)
+
+@app.route('/api/rbac/roles/<role_id>', methods=['DELETE'])
+@jwt_required
+def delete_role(role_id):
+    role = next((r for r in ROLES if r['id'] == role_id), None)
+    if not role:
+        return jsonify({'message': 'Role not found'}), 404
+    
+    if role['isSystem']:
+        return jsonify({'message': 'Cannot delete a system role'}), 403
+    
+    ROLES.remove(role)
+    return jsonify({'success': True})
+
+@app.route('/api/rbac/users/<user_id>/roles', methods=['GET'])
+@jwt_required
+def get_user_roles(user_id):
+    # Mock response
+    roles = USER_ROLES.get(user_id, [])
+    return jsonify(roles)
+
+@app.route('/api/rbac/users/<user_id>/roles', methods=['POST'])
+@jwt_required
+def assign_role_to_user(user_id):
+    data = request.get_json()
+    role_id = data.get('roleId')
+    
+    role = next((r for r in ROLES if r['id'] == role_id), None)
+    if not role:
+        return jsonify({'message': 'Role not found'}), 404
+    
+    user_roles = USER_ROLES.get(user_id, [])
+    
+    # Check if role is already assigned
+    if any(ur['roleId'] == role_id for ur in user_roles):
+        return jsonify({'message': 'Role already assigned to user'}), 400
+    
+    new_user_role = {
+        'userId': user_id,
+        'roleId': role_id,
+        'roleName': role['name']
+    }
+    
+    user_roles.append(new_user_role)
+    USER_ROLES[user_id] = user_roles
+    
+    return jsonify({'success': True})
+
+@app.route('/api/rbac/users/<user_id>/roles/<role_id>', methods=['DELETE'])
+@jwt_required
+def remove_role_from_user(user_id, role_id):
+    user_roles = USER_ROLES.get(user_id, [])
+    
+    # Filter out the role to be removed
+    updated_roles = [ur for ur in user_roles if ur['roleId'] != role_id]
+    
+    if len(updated_roles) == len(user_roles):
+        return jsonify({'message': 'Role not assigned to user'}), 404
+    
+    USER_ROLES[user_id] = updated_roles
+    return jsonify({'success': True})
+
+@app.route('/api/rbac/users/<user_id>/permissions', methods=['GET'])
+@jwt_required
+def get_user_permissions(user_id):
+    # Mock response
+    permissions = USER_PERMISSIONS.get(user_id, [])
+    return jsonify(permissions)
+
+@app.route('/api/sandbox/list', methods=['GET'])
+@jwt_required
+def list_sandboxes():
+    # Return all sandboxes
+    return jsonify(sandboxes)
+
+@app.route('/api/sandbox/<sandbox_id>', methods=['GET'])
+@jwt_required
+def get_sandbox(sandbox_id):
+    # Find the sandbox by ID
+    sandbox = next((s for s in sandboxes if s['id'] == sandbox_id), None)
+    if not sandbox:
+        return jsonify({'message': 'Sandbox not found'}), 404
+    
+    return jsonify(sandbox)
+
+@app.route('/api/sandbox/create', methods=['POST'])
+@jwt_required
+def create_sandbox():
+    data = request.get_json()
+    
+    # Create a new sandbox
+    new_sandbox = {
+        'id': f'sb-{len(sandboxes) + 1}',
+        'name': data.get('name'),
+        'description': data.get('description', ''),
+        'status': 'creating',
+        'services': [],
+        'createdAt': time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        'createdBy': request.current_user.get('email', 'test@example.com'),
+        'updatedAt': time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    }
+    
+    # Add services
+    for service_data in data.get('services', []):
+        new_service = {
+            'id': f'svc-{len(new_sandbox["services"]) + 1}',
+            'sandboxId': new_sandbox['id'],
+            'name': service_data.get('name'),
+            'image': service_data.get('image'),
+            'tag': service_data.get('tag'),
+            'status': 'running',
+            'environmentVariables': service_data.get('environmentVariables', {}),
+            'port': service_data.get('port')
+        }
+        new_sandbox['services'].append(new_service)
+    
+    # Add to sandboxes list
+    sandboxes.append(new_sandbox)
+    
+    return jsonify(new_sandbox)
+
+@app.route('/api/release/list', methods=['GET'])
+@jwt_required
+def list_releases():
+    environment = request.args.get('environment')
+    
+    if environment:
+        filtered_releases = [r for r in releases if r.get('environment') == environment]
+        return jsonify(filtered_releases)
+    
+    return jsonify(releases)
+
+@app.route('/api/release/<release_id>', methods=['GET'])
+@jwt_required
+def get_release(release_id):
+    # Find the release by ID
+    release = next((r for r in releases if r['id'] == release_id), None)
+    if not release:
+        return jsonify({'message': 'Release not found'}), 404
+    
+    return jsonify(release)
+
+@app.route('/api/release/create', methods=['POST'])
+@jwt_required
+def create_release():
+    data = request.get_json()
+    
+    # Create a new release
+    new_release = {
+        'id': f'r-{len(releases) + 1}',
+        'name': data.get('name'),
+        'version': data.get('version'),
+        'status': 'planned',
+        'environment': data.get('environment'),
+        'scheduledDate': data.get('scheduledDate'),
+        'events': [],
+    }
+    
+    # Add initial event
+    event = {
+        'id': f'e-{len(new_release["events"]) + 1}',
+        'releaseId': new_release['id'],
+        'type': 'approval',
+        'status': 'pending',
+        'description': f'Release {new_release["version"]} created and pending approval',
+        'timestamp': time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    }
+    new_release['events'].append(event)
+    
+    # Add to releases list
+    releases.append(new_release)
+    
+    return jsonify(new_release)
+
+if __name__ == '__main__':
+    # Configure SSL if enabled
+    https_enabled = os.environ.get('HTTPS_ENABLED', '0') == '1'
+    
+    if https_enabled:
+        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
+        app.run(host='0.0.0.0', port=8000, ssl_context=context, debug=True)
+    else:
+        app.run(host='0.0.0.0', port=8000, debug=True)
