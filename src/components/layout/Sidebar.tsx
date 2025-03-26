@@ -12,9 +12,7 @@ import {
   ChevronLeft, 
   ChevronRight,
   ShieldCheck,
-  LogOut,
-  Boxes,
-  GitMerge
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -68,18 +66,6 @@ export const Sidebar = () => {
       href: '/jira', 
       icon: Ticket,
       visible: hasPermission('jira', 'read') 
-    },
-    { 
-      name: 'Sandbox Orchestration', 
-      href: '/sandbox', 
-      icon: Boxes,
-      visible: hasPermission('kubernetes', 'read') 
-    },
-    { 
-      name: 'Release Deployment', 
-      href: '/release', 
-      icon: GitMerge,
-      visible: hasPermission('kubernetes', 'read') 
     },
     { 
       name: 'Role Management', 
