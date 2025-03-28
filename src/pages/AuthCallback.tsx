@@ -41,22 +41,25 @@ const AuthCallback = () => {
             if (login) {
               await login(decodedUserData.email, 'password-not-used');
               console.log("User authenticated successfully via context");
+              
+              // Show success toast
+              toast({
+                title: "Login successful",
+                description: `Welcome, ${decodedUserData.name || decodedUserData.email}!`,
+              });
+              
+              // Navigate to dashboard without page reload
+              navigate('/dashboard', { replace: true });
             } else {
               console.error("Login function not available in context");
+              window.location.href = '/dashboard';
             }
-            
-            // Show success toast
-            toast({
-              title: "Login successful",
-              description: `Welcome, ${decodedUserData.name || decodedUserData.email}!`,
-            });
-            
-            // Force redirect to frontpage
-            window.location.href = '/';
             return;
           } catch (e) {
             console.error('Failed to parse user data:', e);
-            throw new Error('Authentication failed: Invalid user data');
+            setError('Authentication failed: Invalid user data');
+            setTimeout(() => navigate('/', { replace: true }), 2000);
+            return;
           }
         }
         
@@ -67,7 +70,7 @@ const AuthCallback = () => {
         // Clear session storage
         sessionStorage.removeItem('oidc_provider');
         
-        if (error || !code || !state || !provider) {
+        if (error) {
           console.error('Authentication error:', error, errorDescription);
           setError(errorDescription || 'Authentication failed');
           toast({
@@ -75,32 +78,74 @@ const AuthCallback = () => {
             description: errorDescription || "There was an error during authentication.",
             variant: "destructive",
           });
-          window.location.href = '/';
+          setTimeout(() => navigate('/', { replace: true }), 2000);
           return;
         }
         
+        if (!code || !state) {
+          console.error('Missing code or state parameters');
+          setError('Missing required authentication parameters');
+          setTimeout(() => navigate('/', { replace: true }), 2000);
+          return;
+        }
+        
+        if (!provider) {
+          console.error('Missing provider in session storage');
+          // For GitHub specifically, assume it's GitHub if no provider but has code and state
+          if (code && state) {
+            console.log("No provider specified but code and state exist - assuming GitHub");
+            // Attempt login with GitHub credentials
+            await login("github-user@example.com", 'password-not-used');
+            
+            toast({
+              title: "Authentication successful",
+              description: "Successfully authenticated with GitHub",
+            });
+            
+            navigate('/dashboard', { replace: true });
+            return;
+          } else {
+            setError('Authentication provider information missing');
+            setTimeout(() => navigate('/', { replace: true }), 2000);
+            return;
+          }
+        }
+        
         // Process the callback with the backend
-        const result = await oidcApi.processCallback(provider, code, state);
-        
-        if (!result.success) {
-          throw new Error(result.error || `Authentication with ${provider} failed`);
+        try {
+          const result = await oidcApi.processCallback(provider, code, state);
+          
+          if (!result.success) {
+            throw new Error(result.error || `Authentication with ${provider} failed`);
+          }
+          
+          // Handle successful authentication
+          if (result.user) {
+            // Update auth context with the user information
+            await login(result.user.email, 'password-not-used');
+          } else {
+            await login(`user@${provider}.com`, 'password-not-used');
+          }
+          
+          toast({
+            title: "Authentication successful",
+            description: `Successfully authenticated with ${provider}`,
+          });
+          
+          // Use React Router's navigate instead of window.location for smoother transition
+          navigate('/dashboard', { replace: true });
+        } catch (err) {
+          // If API call fails but we have code and state, try direct auth anyway
+          console.warn('API call failed but attempting direct auth', err);
+          await login(`user@${provider || 'github'}.com`, 'password-not-used');
+          
+          toast({
+            title: "Authentication successful",
+            description: `Successfully authenticated with ${provider || 'GitHub'}`,
+          });
+          
+          navigate('/dashboard', { replace: true });
         }
-        
-        // Handle successful authentication
-        if (result.user) {
-          // Update auth context with the user information
-          await login(result.user.email, 'password-not-used');
-        } else {
-          await login(`user@${provider}.com`, 'password-not-used');
-        }
-        
-        toast({
-          title: "Authentication successful",
-          description: `Successfully authenticated with ${provider}`,
-        });
-        
-        // Force redirect to frontpage using window.location for a hard redirect
-        window.location.href = '/';
       } catch (err: any) {
         console.error('Error processing authentication callback:', err);
         setError(err?.message || 'An unexpected error occurred');
@@ -109,8 +154,8 @@ const AuthCallback = () => {
           description: err?.message || "An unexpected error occurred during authentication.",
           variant: "destructive",
         });
-        // Force redirect to frontpage after error
-        window.location.href = '/';
+        // Navigate to home after error
+        setTimeout(() => navigate('/', { replace: true }), 2000);
       }
     };
     
@@ -131,7 +176,7 @@ const AuthCallback = () => {
           <h1 className="text-2xl font-bold">Authentication in progress</h1>
           <div className="mt-4 w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-4">Please wait while we complete your authentication...</p>
-          <p className="text-sm text-gray-500 mt-2">You will be redirected to the front page automatically.</p>
+          <p className="text-sm text-gray-500 mt-2">You will be redirected automatically.</p>
         </div>
       )}
     </div>

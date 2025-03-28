@@ -21,6 +21,7 @@ import RoleManagement from "./pages/RoleManagement";
 import SandboxOrchestration from "./pages/SandboxOrchestration";
 import ReleaseDeployment from "./pages/ReleaseDeployment";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import Login from "./pages/Login";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -48,8 +49,8 @@ const App = () => (
               <Route path="/*/auth/callback" element={<AuthCallback />} />
               
               <Route path="/" element={<Index />} />
-              {/* Redirect login to dashboard for testing */}
-              <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+              {/* Enable login route */}
+              <Route path="/login" element={<Login />} />
               
               {/* Protected routes */}
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
