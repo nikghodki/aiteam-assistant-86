@@ -11,9 +11,9 @@ from urllib.parse import quote
 import base64
 import requests
 import uuid
-import jwt
 import datetime
 import boto3  # Import boto3 for S3 functionality
+import jwt as pyjwt  # Rename the import to avoid confusion
 from functools import wraps
 
 logging.basicConfig(level=logging.INFO)
@@ -68,14 +68,14 @@ def jwt_required(f):
             return jsonify({'message': 'Authentication token is missing'}), 401
 
         try:
-            # Verify the token
-            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            # Verify the token using PyJWT
+            payload = pyjwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
             # Store user info in request context for later use
             request.user = payload
             return f(*args, **kwargs)
-        except jwt.ExpiredSignatureError:
+        except pyjwt.exceptions.ExpiredSignatureError:
             return jsonify({'message': 'Token has expired'}), 401
-        except jwt.InvalidTokenError:
+        except pyjwt.exceptions.InvalidTokenError:
             return jsonify({'message': 'Invalid token'}), 401
 
     return decorated
@@ -86,7 +86,6 @@ GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', 'your-github-clien
 GITHUB_REDIRECT_URI = os.environ.get('GITHUB_REDIRECT_URI', 'http://localhost:8000/api/auth/github/callback')
 users ={}
 kubernetes_clusters = aws_eks_agent.list_eks_clusters_with_arns()
-#aws_kubeconfig.update_kubeconfig_for_clusters([cluster['arn'] for cluster in kubernetes_clusters])
 
 # Access Management API routes
 @app.route('/api/access/groups', methods=['POST'])
@@ -314,8 +313,8 @@ def github_callback():
             'exp': refresh_token_expiry
         }
         
-        access_token = jwt.encode(access_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-        refresh_token = jwt.encode(refresh_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+        access_token = pyjwt.encode(access_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+        refresh_token = pyjwt.encode(refresh_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
         # Redirect to frontend with tokens as query parameters
         # The frontend should extract these tokens and store them
@@ -360,8 +359,8 @@ def login():
         'exp': refresh_token_expiry
     }
     
-    access_token = jwt.encode(access_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-    refresh_token = jwt.encode(refresh_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    access_token = pyjwt.encode(access_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    refresh_token = pyjwt.encode(refresh_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     
     return jsonify({
         'accessToken': access_token,
@@ -386,7 +385,7 @@ def refresh_token():
         
     try:
         # Verify the refresh token
-        payload = jwt.decode(refresh_token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        payload = pyjwt.decode(refresh_token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         
         # Find user by ID
         user_id = payload['sub']
@@ -412,15 +411,15 @@ def refresh_token():
             'exp': access_token_expiry
         }
         
-        new_access_token = jwt.encode(access_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+        new_access_token = pyjwt.encode(access_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
         
         return jsonify({
             'accessToken': new_access_token,
             'expiresAt': int(access_token_expiry.timestamp() * 1000)
         })
-    except jwt.ExpiredSignatureError:
+    except pyjwt.exceptions.ExpiredSignatureError:
         return jsonify({'message': 'Refresh token has expired'}), 401
-    except jwt.InvalidTokenError:
+    except pyjwt.exceptions.InvalidTokenError:
         return jsonify({'message': 'Invalid refresh token'}), 401
 
 @app.route('/api/auth/logout', methods=['POST'])
