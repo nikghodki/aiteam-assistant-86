@@ -42,17 +42,17 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Auth callback - need to catch ALL variations */}
+              {/* Public routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              
+              {/* Auth callback routes - need to catch ALL variations */}
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="auth/callback" element={<AuthCallback />} />
               <Route path="*/auth/callback" element={<AuthCallback />} />
               <Route path="/*/auth/callback" element={<AuthCallback />} />
               
-              <Route path="/" element={<Index />} />
-              {/* Enable login route */}
-              <Route path="/login" element={<Login />} />
-              
-              {/* Protected routes */}
+              {/* Protected routes - all require authentication */}
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/access" element={<ProtectedRoute><AccessControl /></ProtectedRoute>} />
               <Route path="/kubernetes" element={<ProtectedRoute><Kubernetes /></ProtectedRoute>} />

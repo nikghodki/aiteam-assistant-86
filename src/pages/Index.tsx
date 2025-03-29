@@ -1,9 +1,12 @@
+
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Terminal, Database, Server, Search, ArrowRight } from 'lucide-react';
+import { Terminal, Database, Server, Search, ArrowRight, Github } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import GlassMorphicCard from '@/components/ui/GlassMorphicCard';
 import { Layout } from '@/components/layout/Layout';
+import { Button } from '@/components/ui/button';
 
 const features = [
   {
@@ -28,6 +31,7 @@ const features = [
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user, loginWithGithub } = useAuth();
 
   // Adding subtle background scroll effect for depth
   useEffect(() => {
@@ -44,16 +48,56 @@ const Index = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const handleGithubLogin = async () => {
+    try {
+      await loginWithGithub();
+    } catch (error) {
+      console.error("GitHub login failed:", error);
+    }
+  };
+
+  const handleGetStarted = () => {
+    if (user?.authenticated) {
+      navigate('/dashboard');
+    } else {
+      navigate('/login');
+    }
+  };
+
   return (
-    <Layout>
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-primary/5 to-transparent">
+      {/* Header with Login Button */}
+      <header className="w-full py-4 px-6">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center">
+            <Terminal size={24} className="text-primary mr-2" />
+            <span className="font-medium text-lg">SRE Assistant</span>
+          </div>
+          
+          <div>
+            {user?.authenticated ? (
+              <Button onClick={() => navigate('/dashboard')} variant="outline" className="flex items-center gap-2">
+                Go to Dashboard
+                <ArrowRight size={16} />
+              </Button>
+            ) : (
+              <Button onClick={handleGithubLogin} variant="outline" className="flex items-center gap-2">
+                <Github size={16} />
+                Login with GitHub
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
+      
       {/* Hero Section */}
-      <section className="pt-8 pb-16 md:pt-12 md:pb-24 relative overflow-hidden">
+      <section className="pt-8 pb-16 md:pt-12 md:pb-24 relative overflow-hidden flex-grow">
         <div 
           id="hero-bg" 
           className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent -z-10"
         ></div>
         
-        <div className="max-w-7xl mx-auto relative z-0">
+        <div className="max-w-7xl mx-auto relative z-0 px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="flex flex-col items-start space-y-6">
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-2 animate-fade-in">
@@ -72,7 +116,7 @@ const Index = () => {
               
               <div className="flex flex-col sm:flex-row gap-4 pt-4 animate-fade-in" style={{ animationDelay: '300ms' }}>
                 <button 
-                  onClick={() => navigate('/dashboard')}
+                  onClick={handleGetStarted}
                   className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale flex items-center"
                 >
                   <span>Get Started</span>
@@ -137,7 +181,7 @@ const Index = () => {
                 <p className="text-muted-foreground text-sm">{feature.description}</p>
                 
                 <button 
-                  onClick={() => navigate('/dashboard')}
+                  onClick={handleGetStarted}
                   className="mt-6 text-primary text-sm font-medium flex items-center hover:text-primary/80 transition-colors"
                 >
                   <span>Learn more</span>
@@ -167,7 +211,7 @@ const Index = () => {
                 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '200ms' }}>
                   <button 
-                    onClick={() => navigate('/dashboard')}
+                    onClick={handleGetStarted}
                     className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale"
                   >
                     Get Started Now
@@ -182,7 +226,11 @@ const Index = () => {
           </GlassMorphicCard>
         </div>
       </section>
-    </Layout>
+      
+      <footer className="py-6 px-6 text-center text-sm text-muted-foreground">
+        <p>© {new Date().getFullYear()} SRE Assistant. All rights reserved.</p>
+      </footer>
+    </div>
   );
 };
 

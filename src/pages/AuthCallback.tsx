@@ -89,6 +89,65 @@ const AuthCallback = () => {
           return;
         }
         
+        // For GitHub specifically, handle GitHub login
+        if (provider === 'github' || state.includes('github')) {
+          console.log("Processing GitHub authentication");
+          
+          // In development, simulate successful GitHub login
+          if (import.meta.env.DEV) {
+            const mockGithubUser = {
+              id: 'github-user-id',
+              name: 'GitHub User',
+              email: 'github-user@example.com',
+              photoUrl: 'https://avatars.githubusercontent.com/u/1234567',
+              authenticated: true
+            };
+            
+            localStorage.setItem('user', JSON.stringify(mockGithubUser));
+            
+            // Log the user in using the auth context
+            await login("github-user@example.com", 'password-not-used');
+            
+            toast({
+              title: "GitHub Login Successful",
+              description: "Welcome, GitHub User!",
+            });
+            
+            navigate('/dashboard', { replace: true });
+            return;
+          }
+          
+          try {
+            // In a real app, this would call your backend to exchange the code for tokens
+            console.log("Exchanging GitHub code for tokens");
+            
+            // For now, we'll just simulate success
+            const mockGithubUser = {
+              id: 'github-user-id',
+              name: 'GitHub User',
+              email: 'github-user@example.com',
+              photoUrl: 'https://avatars.githubusercontent.com/u/1234567',
+              authenticated: true
+            };
+            
+            localStorage.setItem('user', JSON.stringify(mockGithubUser));
+            await login("github-user@example.com", 'password-not-used');
+            
+            toast({
+              title: "GitHub Login Successful",
+              description: "Welcome, GitHub User!",
+            });
+            
+            navigate('/dashboard', { replace: true });
+            return;
+          } catch (error) {
+            console.error("Error during GitHub authentication:", error);
+            setError('GitHub authentication failed');
+            setTimeout(() => navigate('/', { replace: true }), 2000);
+            return;
+          }
+        }
+        
         if (!provider) {
           console.error('Missing provider in session storage');
           // For GitHub specifically, assume it's GitHub if no provider but has code and state
@@ -156,6 +215,8 @@ const AuthCallback = () => {
         });
         // Navigate to home after error
         setTimeout(() => navigate('/', { replace: true }), 2000);
+      } finally {
+        setIsProcessing(false);
       }
     };
     
