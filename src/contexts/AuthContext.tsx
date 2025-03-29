@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { OIDCConfig } from '@/services/api';
 import { toast } from '@/components/ui/use-toast';
@@ -46,6 +45,7 @@ interface AuthContextType {
   logout: () => void;
   saveOIDCConfig: (provider: string, config: OIDCConfig) => void;
   getAuthHeader: () => { Authorization: string } | {};
+  refreshAccessToken: (refreshToken: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -100,6 +100,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+
+  // Add refreshAccessToken function
+  const refreshAccessToken = async (refreshToken: string): Promise<boolean> => {
+    try {
+      console.log('Attempting to refresh access token');
+      
+      // For testing purposes in development mode
+      if (import.meta.env.DEV) {
+        // Update the test tokens with a new expiry
+        const updatedTestTokens = {
+          ...testTokens,
+          expiresAt: Date.now() + 3600000 // extend by 1 hour
+        };
+        
+        setTokens(updatedTestTokens);
+        localStorage.setItem('auth_tokens', JSON.stringify(updatedTestTokens));
+        
+        return true;
+      }
+      
+      // In production, make an actual API call to refresh the token
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+      
+      const data = await response.json();
+      
+      if (data.accessToken) {
+        // Update tokens with the new access token
+        const updatedTokens = {
+          ...tokens,
+          accessToken: data.accessToken,
+          expiresAt: data.expiresAt
+        };
+        
+        setTokens(updatedTokens);
+        localStorage.setItem('auth_tokens', JSON.stringify(updatedTokens));
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      return false;
+    }
+  };
 
   // Login function
   const login = async (email: string, password: string) => {
@@ -272,7 +327,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       loginWithGithub,
       logout,
       saveOIDCConfig,
-      getAuthHeader
+      getAuthHeader,
+      refreshAccessToken
     }}>
       {children}
     </AuthContext.Provider>
