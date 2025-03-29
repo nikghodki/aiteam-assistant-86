@@ -1,22 +1,37 @@
-
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, redirect, session
 from flask_cors import CORS
-import json
-import os
-import datetime
+import random
+import logging
+import subprocess
+import json, os
+import myid_agent
+import access_management_agent
+import doc_agent, k8s_debugger_agent, aws_eks_agent
+from urllib.parse import quote
+import base64
+import requests
 import uuid
 import jwt
-import boto3
+import datetime
+import boto3  # Import boto3 for S3 functionality
 from functools import wraps
 
+logging.basicConfig(level=logging.INFO)
+url_myid = os.environ.get("MYID_URL")
+token = myid_agent.get_token()
+headers = {'Authorization ': f'Bearer {token}', 'Accept': 'application/vnd.api+json'}
 app = Flask(__name__)
-CORS(app)
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your_flask_secret_key_for_development')  # Add secret key for session
+CORS(app, supports_credentials=True, origins=['*'], allow_headers=['Content-Type', 'Authorization'])
 
 # JWT Configuration
 JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your_jwt_secret_key_for_development')
 JWT_ALGORITHM = 'HS256'
 JWT_ACCESS_TOKEN_EXPIRES = datetime.timedelta(hours=1)
 JWT_REFRESH_TOKEN_EXPIRES = datetime.timedelta(days=30)
+
+# Frontend URL for redirects
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
 # S3 Configuration
 S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME', 'your-debug-logs-bucket')
@@ -42,16 +57,16 @@ def jwt_required(f):
         test_bypass = request.headers.get('X-Test-Bypass-Auth')
         if test_bypass == 'true':
             return f(*args, **kwargs)
-            
+
         token = None
         auth_header = request.headers.get('Authorization')
-        
+
         if auth_header and auth_header.startswith('Bearer '):
             token = auth_header.split(' ')[1]
-            
+
         if not token:
             return jsonify({'message': 'Authentication token is missing'}), 401
-            
+
         try:
             # Verify the token
             payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
@@ -62,30 +77,286 @@ def jwt_required(f):
             return jsonify({'message': 'Token has expired'}), 401
         except jwt.InvalidTokenError:
             return jsonify({'message': 'Invalid token'}), 401
-            
+
     return decorated
 
-# Login endpoint that returns a JWT token
+# GitHub OAuth configuration
+GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', 'your-github-client-id')
+GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', 'your-github-client-secret')
+GITHUB_REDIRECT_URI = os.environ.get('GITHUB_REDIRECT_URI', 'http://localhost:8000/api/auth/github/callback')
+users ={}
+kubernetes_clusters = aws_eks_agent.list_eks_clusters_with_arns()
+#aws_kubeconfig.update_kubeconfig_for_clusters([cluster['arn'] for cluster in kubernetes_clusters])
+
+# Access Management API routes
+@app.route('/api/access/groups', methods=['POST'])
+@jwt_required
+def get_user_groups():
+    data = request.json
+    user_email = data.get('userEmail', 'Anonymous User')
+    user_id = myid_agent.get_user_id(url_myid, user_email, headers)
+    groups = myid_agent.get_user_membership(url_myid, user_id, headers)
+    id = 0
+    out_group = []
+
+    for group in groups:
+        group1 = {}
+        id = id + 1
+        group1['id'] = id
+        group1['status'] = 'member'
+        group1['name'] = group
+        group1['description'] = group
+        # adding random number of members to the group
+        group1['members'] = random.randint(1, 10)
+        out_group.append(group1)
+    logging.info(f"Getting user groups: {out_group}")
+    return jsonify(out_group)
+
+@app.route('/api/access/groups/leave', methods=['POST'])
+@jwt_required
+def leave_groups():
+    data = request.json
+    logging.info(f"Leaving group: {data.get('groupName')}")
+    return myid_agent.remove_user_from_group_click(url_myid, data.get('userEmail', 'Anonymous User'), data.get('groupName'))
+
+@app.route('/api/docs/chat', methods=['POST'])
+@jwt_required
+def doc_chat():
+    data = request.json
+    logging.info(f"Doc chat: {data.get('message')}")
+    return jsonify({"response": doc_agent.doc_qna_prompt(data.get('message'), data.get('history'))})
+
+@app.route('/api/access/chat', methods=['POST'])
+@jwt_required
+def access_chat():
+    data = request.json
+    logging.info(f"Access chat: {data.get('message')}")
+    return jsonify({"response": access_management_agent.access_management_function_calling(data.get('message'), data.get('userEmail'))})
+
+# Kubernetes Debugger API
+@app.route('/api/kubernetes/chat', methods=['POST'])
+@jwt_required
+def kubernetes_chat():
+    data = request.json
+    response, file_name = k8s_debugger_agent.debug(data.get('message'), data.get('clusterArn'), False, "NEVER", 100)
+    logging.info(f"Kubernetes chat: {response}")
+    logging.info(f"File name: {file_name}")
+    return jsonify({"response": response, "file_name": f"/backend/{file_name}"})
+
+@app.route('/api/kubernetes/command', methods=['POST'])
+@jwt_required
+def kubernetes_command():
+    data = request.json
+    logging.info(f"Kubernetes command: {data.get('command')}")
+    command = f"{data.get('command')} -n {data.get('namespace')} --context {data.get('clusterArn')}"
+    response = subprocess.run(command, shell=True, capture_output=True, text=True)
+    logging.info(f"Kubernetes command response: {response.stdout}")
+    return jsonify({"output": response.stdout})
+
+@app.route('/api/kubernetes/namespaces', methods=['POST'])
+@jwt_required
+def kubernetes_namespace():
+    data = request.json
+    command = f"kubectl get ns --context {data.get('clusterArn')}"
+    logging.info(f"Kubernetes namespaces command: {command}")
+    response = subprocess.run(command, shell=True, capture_output=True, text=True)
+    logging.info(f"Kubernetes namespaces response: {response.stdout}")
+    lines = response.stdout.split("\n")[1:]
+    names = [line.split()[0] for line in lines if line.strip()]
+    logging.info(f"Kubernetes namespaces: {names}")
+    return jsonify(names)
+
+@app.route('/api/kubernetes/clusters', methods=['GET'])
+@jwt_required
+def get_clusters():
+    environment = request.args.get('environment')
+    kubernetes_clusters = aws_eks_agent.list_eks_clusters_with_arns()
+    if environment == "staging":
+        return [cluster for cluster in kubernetes_clusters if "stg" in cluster["name"]]
+    elif environment == "production":
+        return [cluster for cluster in kubernetes_clusters if "prod" in cluster["name"]]
+    elif environment == "qa":
+        return [cluster for cluster in kubernetes_clusters if "stg" not in cluster["name"]]
+    return kubernetes_clusters
+
+@app.route('/api/kubernetes/namespace-issues', methods=['POST'])
+@jwt_required
+def get_namespace_issues():
+    data = request.json
+    logging.info(f"Kubernetes namespace issues: {data}")
+    if not data or 'clusterArn' not in data or 'namespace' not in data:
+        return jsonify({"error": "clusterArn and namespace are required"}), 400
+    k8sgpt_output = k8s_debugger_agent.analyse(data.get('namespace'), data.get('clusterArn'))
+    logging.info(f"Kubernetes namespace issues: {k8sgpt_output}")
+    return jsonify(k8sgpt_output)
+
+@app.route('/api/auth/github', methods=['GET'])
+def github_login():
+    """Start GitHub OAuth flow"""
+    state = str(uuid.uuid4())
+    session['oauth_state'] = state
+    github_auth_url = "https://github.com/login/oauth/authorize"
+    params = {
+        'client_id': GITHUB_CLIENT_ID,
+        'redirect_uri': GITHUB_REDIRECT_URI,
+        'scope': 'user:email',
+        'state': state
+    }
+    auth_url = f"{github_auth_url}?{'&'.join([f'{k}={v}' for k, v in params.items()])}"
+    return redirect(auth_url)
+
+@app.route('/api/auth/github/callback', methods=['GET'])
+def github_callback():
+    """Handle GitHub OAuth callback"""
+    try:
+        # Get the authorization code and state from the query parameters
+        code = request.args.get('code')
+        state = request.args.get('state')
+
+        # Verify the state to prevent CSRF attacks
+        stored_state = session.get('oauth_state')
+        if not stored_state or stored_state != state:
+            return redirect(f"{FRONTEND_URL}?error=invalid_state")
+
+        # Clear the state from the session
+        session.pop('oauth_state', None)
+
+        # Create a session for the token request
+        token_session = requests.Session()
+
+        # Exchange the authorization code for an access token
+        token_url = "https://github.com/login/oauth/access_token"
+        token_payload = {
+            'client_id': GITHUB_CLIENT_ID,
+            'client_secret': GITHUB_CLIENT_SECRET,
+            'code': code,
+            'redirect_uri': GITHUB_REDIRECT_URI
+        }
+
+        # Make POST request to get access token
+        token_response = token_session.post(token_url, data=token_payload, headers={'Accept': 'application/json'})
+
+        # Check if the token request was successful
+        if token_response.status_code != 200:
+            return redirect(f"{FRONTEND_URL}?error=token_error")
+
+        token_data = token_response.json()
+        github_access_token = token_data.get('access_token')
+
+        # Use the access token to get user information
+        user_url = "https://api.github.com/user"
+        user_emails_url = "https://api.github.com/user/emails"
+
+        headers = {
+            'Authorization': f"token {github_access_token}",
+            'Accept': 'application/json'
+        }
+
+        # Get user profile
+        user_response = token_session.get(user_url, headers=headers)
+        if user_response.status_code != 200:
+            return redirect(f"{FRONTEND_URL}?error=user_error")
+
+        user_data = user_response.json()
+
+        # Get user emails (to ensure we have the primary email)
+        emails_response = token_session.get(user_emails_url, headers=headers)
+        if emails_response.status_code != 200:
+            return redirect(f"{FRONTEND_URL}?error=email_error")
+
+        emails_data = emails_response.json()
+
+        # Find the primary email
+        primary_email = None
+        for email in emails_data:
+            if email.get('primary'):
+                primary_email = email.get('email')
+                break
+
+        if not primary_email:
+            # If no primary email is found, use the first one
+            primary_email = emails_data[0].get('email') if emails_data else user_data.get('email')
+
+        # Close the session to prevent resource leaks
+        token_session.close()
+
+        # Check if this GitHub user exists in our user database
+        if primary_email not in users:
+            # Create a new user
+            user_id = str(uuid.uuid4())
+            users[primary_email] = {
+                "id": user_id,
+                "name": user_data.get('name') or user_data.get('login'),
+                "email": primary_email,
+                "password": None,  # GitHub users don't need a password
+                "photoUrl": user_data.get('avatar_url'),
+                "authenticated": True
+            }
+
+        # Create user session
+        session['user_id'] = users[primary_email]['id']
+        users[primary_email]['authenticated'] = True
+
+        # Generate JWT tokens
+        # Access token with shorter expiry
+        access_token_expiry = datetime.datetime.utcnow() + JWT_ACCESS_TOKEN_EXPIRES
+        access_token_payload = {
+            'sub': users[primary_email]['id'],
+            'name': users[primary_email]['name'],
+            'email': primary_email,
+            'exp': access_token_expiry
+        }
+        
+        # Refresh token with longer expiry
+        refresh_token_expiry = datetime.datetime.utcnow() + JWT_REFRESH_TOKEN_EXPIRES
+        refresh_token_payload = {
+            'sub': users[primary_email]['id'],
+            'exp': refresh_token_expiry
+        }
+        
+        access_token = jwt.encode(access_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+        refresh_token = jwt.encode(refresh_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+        # Redirect to frontend with tokens as query parameters
+        # The frontend should extract these tokens and store them
+        return redirect(f"{FRONTEND_URL}/auth/callback?accessToken={access_token}&refreshToken={refresh_token}&expiresAt={int(access_token_expiry.timestamp() * 1000)}")
+
+    except Exception as e:
+        print(f"Error in GitHub callback: {e}")
+        # Ensure we close any open resources
+        if 'token_session' in locals():
+            token_session.close()
+        return redirect(f"{FRONTEND_URL}?error=server_error")
+
 @app.route('/api/auth/login', methods=['POST'])
 def login():
+    """Direct login with email and password, returns JWT tokens"""
     data = request.json
-    # In a real app, validate credentials against a database
-    # For demo purposes, accept any login
-    email = data.get('email', 'test@example.com')
+    email = data.get('email', '')
+    
+    # For demo purposes, create a new user if it doesn't exist
+    if email not in users:
+        user_id = str(uuid.uuid4())
+        users[email] = {
+            "id": user_id,
+            "name": email.split('@')[0],
+            "email": email,
+            "authenticated": True
+        }
     
     # Create JWT tokens
     access_token_expiry = datetime.datetime.utcnow() + JWT_ACCESS_TOKEN_EXPIRES
     refresh_token_expiry = datetime.datetime.utcnow() + JWT_REFRESH_TOKEN_EXPIRES
     
     access_token_payload = {
-        'sub': str(uuid.uuid4()),
-        'name': email.split('@')[0],
+        'sub': users[email]['id'],
+        'name': users[email]['name'],
         'email': email,
         'exp': access_token_expiry
     }
     
     refresh_token_payload = {
-        'sub': access_token_payload['sub'],
+        'sub': users[email]['id'],
         'exp': refresh_token_expiry
     }
     
@@ -97,16 +368,16 @@ def login():
         'refreshToken': refresh_token,
         'expiresAt': int(access_token_expiry.timestamp() * 1000),
         'user': {
-            'id': access_token_payload['sub'],
-            'name': access_token_payload['name'],
-            'email': access_token_payload['email'],
+            'id': users[email]['id'],
+            'name': users[email]['name'],
+            'email': email,
             'authenticated': True
         }
     })
 
-# Refresh token endpoint
 @app.route('/api/auth/refresh', methods=['POST'])
 def refresh_token():
+    """Refresh the access token using the refresh token"""
     data = request.json
     refresh_token = data.get('refreshToken')
     
@@ -117,15 +388,27 @@ def refresh_token():
         # Verify the refresh token
         payload = jwt.decode(refresh_token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         
+        # Find user by ID
+        user_id = payload['sub']
+        user_email = None
+        user_name = None
+        
+        for email, user in users.items():
+            if user['id'] == user_id:
+                user_email = email
+                user_name = user['name']
+                break
+                
+        if not user_email:
+            return jsonify({'message': 'User not found'}), 401
+        
         # Generate new access token
         access_token_expiry = datetime.datetime.utcnow() + JWT_ACCESS_TOKEN_EXPIRES
         
-        # In a real app, fetch user details from database using payload['sub']
-        # For demo, we'll use placeholder values
         access_token_payload = {
-            'sub': payload['sub'],
-            'name': 'refreshed_user',
-            'email': 'refreshed@example.com',
+            'sub': user_id,
+            'name': user_name,
+            'email': user_email,
             'exp': access_token_expiry
         }
         
@@ -140,369 +423,40 @@ def refresh_token():
     except jwt.InvalidTokenError:
         return jsonify({'message': 'Invalid refresh token'}), 401
 
-# Helper function to upload file to S3 and return URL
-def upload_to_s3(content, file_name=None):
-    if s3_client is None:
-        print("S3 client not initialized. Skipping S3 upload.")
-        return None
-        
-    if file_name is None:
-        file_name = f"debug-log-{str(uuid.uuid4())}.txt"
-        
-    try:
-        s3_client.put_object(
-            Bucket=S3_BUCKET_NAME,
-            Key=file_name,
-            Body=content,
-            ContentType='text/plain'
-        )
-        
-        # Generate a URL for the uploaded file
-        # For public buckets, use this format
-        url = f"https://{S3_BUCKET_NAME}.s3.{S3_REGION}.amazonaws.com/{file_name}"
-        
-        # For private buckets, generate a pre-signed URL
-        # url = s3_client.generate_presigned_url(
-        #     'get_object',
-        #     Params={'Bucket': S3_BUCKET_NAME, 'Key': file_name},
-        #     ExpiresIn=3600  # URL valid for 1 hour
-        # )
-        
-        return url
-    except Exception as e:
-        print(f"Error uploading to S3: {str(e)}")
-        return None
-
-# Kubernetes API routes
-@app.route('/api/kubernetes/clusters', methods=['GET'])
+@app.route('/api/auth/logout', methods=['POST'])
 @jwt_required
-def get_clusters():
-    # For demo purposes, return mock data
-    environment = request.args.get('environment', 'qa')
+def logout():
+    if 'user_id' in session:
+        user_id = session['user_id']
+        # Find user by ID and set authenticated to false
+        for email, user in users.items():
+            if user['id'] == user_id:
+                user['authenticated'] = False
+                break
+        session.clear()
+    return jsonify({"success": True})
+
+@app.route('/api/auth/session', methods=['GET'])
+@jwt_required
+def check_session():
+    """Check if user is authenticated using JWT token"""
+    # The jwt_required decorator already verified the token
+    # and stored the user info in request.user
+    user_info = request.user
     
-    clusters = [
-        {
-            "arn": "arn:aws:eks:us-west-2:123456789012:cluster/production-cluster-1",
-            "name": "production-cluster-1", 
-            "status": "healthy", 
-            "version": "1.26", 
-            "environment": "production",
-            "nodeCount": 5
-        },
-        {
-            "arn": "arn:aws:eks:us-west-2:123456789012:cluster/production-cluster-2", 
-            "name": "production-cluster-2", 
-            "status": "warning", 
-            "version": "1.25", 
-            "environment": "production",
-            "nodeCount": 3
-        },
-        {
-            "arn": "arn:aws:eks:us-east-1:123456789012:cluster/qa-cluster-1", 
-            "name": "qa-cluster-1", 
-            "status": "healthy", 
-            "version": "1.24", 
-            "environment": "qa",
-            "nodeCount": 2
-        },
-        {
-            "arn": "arn:aws:eks:us-east-1:123456789012:cluster/qa-cluster-2", 
-            "name": "qa-cluster-2", 
-            "status": "error", 
-            "version": "1.24", 
-            "environment": "qa",
-            "nodeCount": 2
-        },
-        {
-            "arn": "arn:aws:eks:us-east-1:123456789012:cluster/staging-cluster-1", 
-            "name": "staging-cluster-1", 
-            "status": "healthy", 
-            "version": "1.27", 
-            "environment": "staging",
-            "nodeCount": 2
+    return jsonify({
+        "authenticated": True,
+        "user": {
+            "id": user_info.get('sub'),
+            "name": user_info.get('name'),
+            "email": user_info.get('email'),
+            "authenticated": True
         }
-    ]
-    
-    # Filter by environment if specified
-    if environment:
-        clusters = [c for c in clusters if c.get('environment') == environment]
-    
-    return jsonify(clusters)
-
-@app.route('/api/kubernetes/namespaces', methods=['POST'])
-@jwt_required
-def get_namespaces():
-    data = request.json
-    cluster_arn = data.get('clusterArn')
-    
-    if not cluster_arn:
-        return jsonify({"error": "clusterArn is required"}), 400
-    
-    # For demo purposes, return mock namespaces
-    namespaces = ["default", "kube-system", "monitoring", "ingress-nginx", "cert-manager", "app-team-1", "app-team-2"]
-    
-    return jsonify(namespaces)
-
-@app.route('/api/kubernetes/namespace-issues', methods=['POST'])
-@jwt_required
-def get_namespace_issues():
-    data = request.json
-    cluster_arn = data.get('clusterArn')
-    namespace = data.get('namespace')
-    
-    if not cluster_arn:
-        return jsonify({"error": "clusterArn is required"}), 400
-    if not namespace:
-        return jsonify({"error": "namespace is required"}), 400
-    
-    # For demo purposes, return mock issues for default namespace
-    if namespace == "default":
-        issues = [
-            {
-                "id": "issue-1",
-                "severity": "high",
-                "kind": "Deployment",
-                "name": "frontend-app",
-                "message": "Replicas not meeting desired count (1/3)",
-                "timestamp": datetime.datetime.utcnow().isoformat()
-            },
-            {
-                "id": "issue-2",
-                "severity": "medium",
-                "kind": "Pod",
-                "name": "backend-app-78d5c8b6d4-2abcd",
-                "message": "Container restarting frequently",
-                "timestamp": datetime.datetime.utcnow().isoformat()
-            }
-        ]
-    elif namespace == "kube-system":
-        issues = [
-            {
-                "id": "issue-3",
-                "severity": "critical",
-                "kind": "Pod",
-                "name": "kube-dns-78d5c8b6d4-xyz12",
-                "message": "OOMKilled - Out of memory",
-                "timestamp": datetime.datetime.utcnow().isoformat()
-            }
-        ]
-    else:
-        issues = []
-    
-    return jsonify(issues)
-
-@app.route('/api/kubernetes/command', methods=['POST'])
-@jwt_required
-def run_command():
-    data = request.json
-    cluster_arn = data.get('clusterArn')
-    command = data.get('command')
-    namespace = data.get('namespace', 'default')
-    
-    if not cluster_arn:
-        return jsonify({"error": "clusterArn is required"}), 400
-    if not command:
-        return jsonify({"error": "command is required"}), 400
-    
-    # For demo purposes, return mock output based on the command
-    if 'get pods' in command:
-        output = """NAME                                READY   STATUS    RESTARTS   AGE
-frontend-app-78d5c8b6d4-abcd1       1/1     Running   0          3d2h
-frontend-app-78d5c8b6d4-abcd2       1/1     Running   0          3d2h
-backend-app-78d5c8b6d4-2abcd        0/1     Error     3          1d5h
-redis-cache-78d5c8b6d4-3abcd        1/1     Running   0          5d7h
-"""
-    elif 'get deployments' in command:
-        output = """NAME                READY   UP-TO-DATE   AVAILABLE   AGE
-frontend-app        2/3     3            2           5d
-backend-app         0/1     1            0           5d
-redis-cache         1/1     1            1           10d
-"""
-    elif 'describe pod' in command:
-        output = """Name:         backend-app-78d5c8b6d4-2abcd
-Namespace:    default
-Priority:     0
-Node:         ip-10-0-1-20.ec2.internal/10.0.1.20
-Start Time:   Wed, 10 May 2023 12:00:00 +0000
-Labels:       app=backend
-              pod-template-hash=78d5c8b6d4
-Status:       Running
-IP:           192.168.1.5
-Containers:
-  backend:
-    Container ID:  docker://abcdef1234567890
-    Image:         backend:latest
-    Image ID:      docker-pullable://backend@sha256:1234567890abcdef
-    Port:          8080/TCP
-    Host Port:     0/TCP
-    State:         Waiting
-      Reason:      CrashLoopBackOff
-    Last State:    Terminated
-      Reason:      Error
-      Exit Code:   1
-      Started:     Wed, 10 May 2023 15:15:20 +0000
-      Finished:    Wed, 10 May 2023 15:15:30 +0000
-    Ready:         False
-    Restart Count: 3
-Events:
-  Type     Reason     Age                    From               Message
-  ----     ------     ----                   ----               -------
-  Normal   Scheduled  5m                     default-scheduler  Successfully assigned default/backend-app-78d5c8b6d4-2abcd to ip-10-0-1-20.ec2.internal
-  Normal   Pulled     4m                     kubelet            Successfully pulled image "backend:latest"
-  Normal   Created    4m                     kubelet            Created container backend
-  Normal   Started    4m                     kubelet            Started container backend
-  Warning  BackOff    2m (x3 over 4m)        kubelet            Back-off restarting failed container
-"""
-    else:
-        output = f"Command executed: {command}\nCluster: {cluster_arn}\nNamespace: {namespace}\n\nNo specific mock output for this command."
-    
-    result = {
-        "output": output,
-        "exitCode": 0
-    }
-    
-    return jsonify(result)
-
-@app.route('/api/kubernetes/chat', methods=['POST'])
-@jwt_required
-def chat_with_assistant():
-    data = request.json
-    cluster_arn = data.get('clusterArn')
-    message = data.get('message')
-    namespace = data.get('namespace', 'default')
-    
-    if not cluster_arn:
-        return jsonify({"error": "clusterArn is required"}), 400
-    if not message:
-        return jsonify({"error": "message is required"}), 400
-    
-    # Generate a sample response
-    if 'pod' in message.lower() and 'error' in message.lower():
-        response = """I can help you troubleshoot the pod issue. First, let's check the pod's status and events:
-
-```bash
-kubectl get pod backend-app-78d5c8b6d4-2abcd -n default
-```
-
-The pod is in a CrashLoopBackOff state. Let's check the logs to see what's happening:
-
-```bash
-kubectl logs backend-app-78d5c8b6d4-2abcd -n default
-```
-
-Based on the logs, it looks like the application is failing to connect to the database. Let's check if the database service is running:
-
-```bash
-kubectl get svc postgres -n default
-```
-
-You should verify the database connection string in your application configuration. The most common issues are:
-
-1. Incorrect database hostname or credentials
-2. Database not running or not accessible from the pod
-3. Network policy blocking the connection
-
-Try updating the environment variables for your deployment with the correct database connection string:
-
-```bash
-kubectl set env deployment/backend-app DATABASE_URL=postgres://username:password@postgres:5432/dbname
-```
-
-Then restart the deployment:
-
-```bash
-kubectl rollout restart deployment backend-app
-```
-"""
-    elif 'deployment' in message.lower() and 'replica' in message.lower():
-        response = """Let me help troubleshoot the deployment replica issue. First, let's check the deployment status:
-
-```bash
-kubectl get deployment frontend-app -n default
-```
-
-The deployment shows 2/3 ready pods. Let's see what's happening with the pods:
-
-```bash
-kubectl get pods -l app=frontend-app -n default
-```
-
-Now let's check the events for the deployment:
-
-```bash
-kubectl describe deployment frontend-app -n default
-```
-
-Common reasons for replicas not meeting the desired count include:
-
-1. Resource constraints (not enough CPU/memory on nodes)
-2. Pod scheduling issues (node selectors, taints/tolerations)
-3. Image pull errors
-4. Application errors during startup
-
-Let's check if there are resource constraints on the nodes:
-
-```bash
-kubectl describe nodes | grep -A 5 "Allocated resources"
-```
-
-You can also check the events for any failed pods:
-
-```bash
-kubectl get events --sort-by='.lastTimestamp' | grep frontend-app
-```
-
-If it's a resource issue, consider updating your deployment to request less resources:
-
-```bash
-kubectl set resources deployment frontend-app --requests=cpu=100m,memory=256Mi
-```
-"""
-    else:
-        response = f"I understand you're asking about {message} for cluster {cluster_arn} in namespace {namespace}. Please provide more specific details about the issue you're encountering, and I'll help troubleshoot it."
-    
-    # Generate a debug file for this interaction
-    debug_content = f"""## Debug Log for Kubernetes Troubleshooting
-Timestamp: {datetime.datetime.utcnow().isoformat()}
-Cluster: {cluster_arn}
-Namespace: {namespace}
-
-## Request
-{message}
-
-## Response
-{response}
-"""
-    
-    # Upload to S3 and get the file path
-    file_name = f"debug-log-{str(uuid.uuid4())}.txt"
-    s3_url = upload_to_s3(debug_content, file_name)
-    
-    return jsonify({
-        "response": response,
-        "file_name": s3_url or file_name
     })
 
-@app.route('/api/kubernetes/debug-file/<session_id>', methods=['GET'])
-@jwt_required
-def get_debug_file(session_id):
-    # In a real app, retrieve the file from storage based on the session_id
-    # For demo, we'll return a mock URL
-    
-    if s3_client is not None:
-        file_name = f"debug-log-{session_id}.txt"
-        url = f"https://{S3_BUCKET_NAME}.s3.{S3_REGION}.amazonaws.com/{file_name}"
-    else:
-        url = f"https://example.com/debug-logs/debug-log-{session_id}.txt"
-    
-    return jsonify({
-        "url": url
-    })
-
-# Default route for API health check
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    return jsonify({"status": "ok", "message": "Kubernetes AI API is running"})
+    return jsonify({"status": "ok", "message": "API is running"})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
