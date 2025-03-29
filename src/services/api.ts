@@ -12,6 +12,13 @@ export interface UserAccess {
   avatar?: string;
 }
 
+// Import AuthTokens interface
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: number;
+}
+
 export interface User {
   id: string;
   name: string;
