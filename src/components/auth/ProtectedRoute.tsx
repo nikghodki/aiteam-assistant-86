@@ -20,6 +20,10 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // Check for user in localStorage as a backup
   const storedUser = localStorage.getItem('user');
   const hasStoredUser = !!storedUser;
+
+  // Check for tokens in localStorage as a backup
+  const storedTokens = localStorage.getItem('auth_tokens');
+  const hasStoredTokens = !!storedTokens;
   
   // Effect to show toast when redirecting due to authentication
   useEffect(() => {

@@ -37,6 +37,16 @@ const AuthCallback = () => {
             // Store user data in localStorage
             localStorage.setItem('user', JSON.stringify(decodedUserData));
             
+            // Create mock tokens for the user (in a real app, these would come from the server)
+            const mockTokens = {
+              accessToken: `mock-token-${Date.now()}`,
+              refreshToken: `mock-refresh-${Date.now()}`,
+              expiresAt: Date.now() + 3600000 // 1 hour from now
+            };
+            
+            // Store tokens in localStorage
+            localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
+            
             // Update auth context to reflect logged-in state
             if (login) {
               await login(decodedUserData.email, 'password-not-used');
@@ -105,6 +115,14 @@ const AuthCallback = () => {
             
             localStorage.setItem('user', JSON.stringify(mockGithubUser));
             
+            // Create mock tokens and store them
+            const mockTokens = {
+              accessToken: `github-token-${Date.now()}`,
+              refreshToken: `github-refresh-${Date.now()}`,
+              expiresAt: Date.now() + 3600000 // 1 hour from now
+            };
+            localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
+            
             // Log the user in using the auth context
             await login("github-user@example.com", 'password-not-used');
             
@@ -131,6 +149,15 @@ const AuthCallback = () => {
             };
             
             localStorage.setItem('user', JSON.stringify(mockGithubUser));
+            
+            // Create mock tokens and store them
+            const mockTokens = {
+              accessToken: `github-token-${Date.now()}`,
+              refreshToken: `github-refresh-${Date.now()}`,
+              expiresAt: Date.now() + 3600000 // 1 hour from now
+            };
+            localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
+            
             await login("github-user@example.com", 'password-not-used');
             
             toast({
@@ -153,6 +180,15 @@ const AuthCallback = () => {
           // For GitHub specifically, assume it's GitHub if no provider but has code and state
           if (code && state) {
             console.log("No provider specified but code and state exist - assuming GitHub");
+            
+            // Create mock tokens and store them
+            const mockTokens = {
+              accessToken: `github-token-${Date.now()}`,
+              refreshToken: `github-refresh-${Date.now()}`,
+              expiresAt: Date.now() + 3600000 // 1 hour from now
+            };
+            localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
+            
             // Attempt login with GitHub credentials
             await login("github-user@example.com", 'password-not-used');
             
@@ -180,9 +216,30 @@ const AuthCallback = () => {
           
           // Handle successful authentication
           if (result.user) {
+            // Store tokens if they are returned
+            if (result.tokens) {
+              localStorage.setItem('auth_tokens', JSON.stringify(result.tokens));
+            } else {
+              // Create mock tokens as fallback
+              const mockTokens = {
+                accessToken: `${provider}-token-${Date.now()}`,
+                refreshToken: `${provider}-refresh-${Date.now()}`,
+                expiresAt: Date.now() + 3600000 // 1 hour from now
+              };
+              localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
+            }
+            
             // Update auth context with the user information
             await login(result.user.email, 'password-not-used');
           } else {
+            // Create mock tokens as fallback
+            const mockTokens = {
+              accessToken: `${provider}-token-${Date.now()}`,
+              refreshToken: `${provider}-refresh-${Date.now()}`,
+              expiresAt: Date.now() + 3600000 // 1 hour from now
+            };
+            localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
+            
             await login(`user@${provider}.com`, 'password-not-used');
           }
           
@@ -194,8 +251,16 @@ const AuthCallback = () => {
           // Use React Router's navigate instead of window.location for smoother transition
           navigate('/dashboard', { replace: true });
         } catch (err) {
-          // If API call fails but we have code and state, try direct auth anyway
-          console.warn('API call failed but attempting direct auth', err);
+          console.warn('API call failed but attempting direct auth anyway', err);
+          
+          // Create mock tokens as fallback
+          const mockTokens = {
+            accessToken: `${provider || 'github'}-token-${Date.now()}`,
+            refreshToken: `${provider || 'github'}-refresh-${Date.now()}`,
+            expiresAt: Date.now() + 3600000 // 1 hour from now
+          };
+          localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
+          
           await login(`user@${provider || 'github'}.com`, 'password-not-used');
           
           toast({

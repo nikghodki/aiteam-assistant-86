@@ -143,6 +143,7 @@ export interface OIDCConfig {
 export interface OIDCAuthResult {
   success: boolean;
   user?: User;
+  tokens?: AuthTokens;
   error?: string;
 }
 

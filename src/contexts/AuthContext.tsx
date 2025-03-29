@@ -68,6 +68,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return null;
   };
   
+  // Get stored tokens from localStorage if available
+  const getStoredTokens = (): AuthTokens | null => {
+    const storedTokens = localStorage.getItem('auth_tokens');
+    if (storedTokens) {
+      try {
+        return JSON.parse(storedTokens);
+      } catch (e) {
+        console.error('Failed to parse stored tokens', e);
+      }
+    }
+    return null;
+  };
+  
   // Initialize state with stored user or test user based on environment
   const [user, setUser] = useState<User>(() => {
     const storedUser = getStoredUser();
@@ -76,8 +89,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   
   const [tokens, setTokens] = useState<AuthTokens | null>(() => {
+    const storedTokens = getStoredTokens();
+    if (storedTokens) return storedTokens;
     return import.meta.env.DEV ? testTokens : null;
   });
+  
   const [isLoading, setIsLoading] = useState(false);
   const [bypassAuthForTesting, setBypassAuthForTesting] = useState(() => {
     return import.meta.env.DEV ? true : false;
@@ -106,6 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         // Set mock tokens
         setTokens(testTokens);
+        localStorage.setItem('auth_tokens', JSON.stringify(testTokens));
       }
       
     } catch (error) {
@@ -136,6 +153,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         localStorage.setItem('user', JSON.stringify(mockGithubUser));
         setUser(mockGithubUser);
+        
+        // Store tokens in localStorage for persistence
+        localStorage.setItem('auth_tokens', JSON.stringify(testTokens));
         setTokens(testTokens);
         
         // Redirect to auth callback to simulate the flow
@@ -169,6 +189,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Logout function
   const logout = () => {
     localStorage.removeItem('user');
+    localStorage.removeItem('auth_tokens');
     setUser({
       id: '',
       name: '',
@@ -192,10 +213,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Function to get authorization header for API requests
   const getAuthHeader = () => {
-    if (!tokens || !tokens.accessToken) {
-      return {};
+    // First check context tokens
+    if (tokens && tokens.accessToken) {
+      return { Authorization: `Bearer ${tokens.accessToken}` };
     }
-    return { Authorization: `Bearer ${tokens.accessToken}` };
+    
+    // Then check localStorage as fallback
+    try {
+      const storedTokens = localStorage.getItem('auth_tokens');
+      if (storedTokens) {
+        const parsedTokens = JSON.parse(storedTokens);
+        if (parsedTokens && parsedTokens.accessToken) {
+          return { Authorization: `Bearer ${parsedTokens.accessToken}` };
+        }
+      }
+    } catch (e) {
+      console.error('Failed to retrieve tokens from localStorage', e);
+    }
+    
+    return {};
   };
 
   // Effect to check authentication state on startup
@@ -210,6 +246,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
       } catch (e) {
         console.error('Failed to parse stored user', e);
+      }
+    }
+    
+    const storedTokens = localStorage.getItem('auth_tokens');
+    if (storedTokens) {
+      try {
+        const parsedTokens = JSON.parse(storedTokens);
+        setTokens(parsedTokens);
+      } catch (e) {
+        console.error('Failed to parse stored tokens', e);
       }
     }
   }, []);
