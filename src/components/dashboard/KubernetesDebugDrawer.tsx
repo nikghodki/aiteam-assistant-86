@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Check, Copy, Download, X } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -50,67 +49,73 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [fileError, setFileError] = useState<string | null>(null);
 
-  // Effect to handle local file path
+  // Reset state when drawer closes
   useEffect(() => {
-    if (debugFilePath && isOpen) {
-      setIsLoadingFile(true);
+    if (!isOpen) {
+      setFileContent('');
       setFileError(null);
-      
-      const timer = setTimeout(() => {
-        fetch(debugFilePath)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`Failed to load file: ${response.status} ${response.statusText}`);
-            }
-            return response.text();
-          })
-          .then(content => {
-            setFileContent(content);
-            setIsLoadingFile(false);
-          })
-          .catch(error => {
-            console.error('Error loading debug file:', error);
-            setFileError(`Failed to load file: ${error.message}`);
-            setIsLoadingFile(false);
-            toast({
-              title: "Error",
-              description: "Failed to load debugging information",
-              variant: "destructive"
-            });
-          });
-      }, 500);
-      
-      return () => clearTimeout(timer);
     }
-  }, [debugFilePath, isOpen, toast]);
+  }, [isOpen]);
 
   // Effect to handle S3 file path
   useEffect(() => {
     if (s3FilePath && isOpen) {
+      console.log('Attempting to fetch S3 file:', s3FilePath);
       setIsLoadingFile(true);
       setFileError(null);
       
-      const fetchFile = async () => {
-        try {
-          console.log('Fetching S3 file:', s3FilePath);
-          const content = await fetchS3File(s3FilePath);
+      fetchS3File(s3FilePath)
+        .then(content => {
+          console.log('S3 file fetched successfully');
           setFileContent(content);
-        } catch (error) {
-          console.error('Error loading S3 file:', error);
-          setFileError(`Failed to load S3 file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        })
+        .catch(error => {
+          console.error('Error fetching S3 file:', error);
+          setFileError(`Failed to load S3 file: ${error.message}`);
           toast({
             title: "Error",
             description: "Failed to load debugging file from S3",
             variant: "destructive"
           });
-        } finally {
+        })
+        .finally(() => {
           setIsLoadingFile(false);
-        }
-      };
-      
-      fetchFile();
+        });
     }
   }, [s3FilePath, isOpen, toast]);
+
+  // Effect to handle local file path (as fallback)
+  useEffect(() => {
+    if (debugFilePath && isOpen && !s3FilePath) {
+      console.log('Attempting to fetch local file:', debugFilePath);
+      setIsLoadingFile(true);
+      setFileError(null);
+      
+      fetch(debugFilePath)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Failed to load file: ${response.status} ${response.statusText}`);
+          }
+          return response.text();
+        })
+        .then(content => {
+          console.log('Local file fetched successfully');
+          setFileContent(content);
+        })
+        .catch(error => {
+          console.error('Error loading debug file:', error);
+          setFileError(`Failed to load file: ${error.message}`);
+          toast({
+            title: "Error",
+            description: "Failed to load debugging information",
+            variant: "destructive"
+          });
+        })
+        .finally(() => {
+          setIsLoadingFile(false);
+        });
+    }
+  }, [debugFilePath, isOpen, s3FilePath, toast]);
 
   const copyToClipboard = (text: string, identifier: string) => {
     navigator.clipboard.writeText(text);
@@ -206,7 +211,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   };
 
   // Choose which content to use - prioritize S3 file content if available
-  const logToUse = fileContent || (debugSession ? debugSession.debugLog : '');
+  const logToUse = fileContent || (debugSession?.debugLog || '');
   
   const { request, sections } = formatDebugLog(logToUse);
 
