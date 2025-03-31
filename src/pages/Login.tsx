@@ -62,9 +62,7 @@ const Login = () => {
       
       await loginWithGithub();
       
-      // Note: We don't need to reset loggingInWithGithub here because the page will redirect
-      // If we get here, something went wrong with the redirect
-      console.log("GitHub login didn't redirect properly");
+      console.error("GitHub login didn't redirect properly");
       toast({
         title: "GitHub login failed",
         description: "There was a problem initiating GitHub login. Please try again.",
@@ -90,7 +88,6 @@ const Login = () => {
       authenticated: true
     }));
     
-    // Create mock tokens for development/testing
     const mockTokens = {
       accessToken: `test-token-${Date.now()}`,
       refreshToken: `test-refresh-${Date.now()}`,

@@ -23,6 +23,7 @@ import ReleaseDeployment from "./pages/ReleaseDeployment";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
 import Fallback from "./pages/Fallback";
+import ApiDebug from "./pages/ApiDebug";
 
 // Create a client with better error handling
 const queryClient = new QueryClient({
@@ -62,6 +63,7 @@ const App = () => {
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/fallback" element={<Fallback />} />
+                <Route path="/api-debug" element={<ApiDebug />} />
                 
                 {/* Auth callback routes - must not redirect if not authenticated */}
                 <Route path="/auth/callback" element={<AuthCallback />} />

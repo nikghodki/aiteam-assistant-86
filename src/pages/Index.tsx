@@ -1,7 +1,7 @@
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Terminal, Database, Server, Search, ArrowRight, Github } from 'lucide-react';
+import { Terminal, Database, Server, Search, ArrowRight, Github, Bug } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import GlassMorphicCard from '@/components/ui/GlassMorphicCard';
@@ -51,9 +51,17 @@ const Index = () => {
     try {
       console.log("Starting GitHub login from Index page");
       await loginWithGithub();
+      // Note: This should redirect the browser, so any code after this is unlikely to execute
     } catch (error) {
       console.error("GitHub login failed:", error);
     }
+  };
+
+  const handleDirectGithubLogin = () => {
+    // This is a direct link to the API endpoint, bypassing the context method
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+    console.log("Direct redirect to GitHub auth endpoint:", `${API_BASE_URL}/auth/github`);
+    window.location.href = `${API_BASE_URL}/auth/github`;
   };
 
   const handleGetStarted = () => {
@@ -74,17 +82,33 @@ const Index = () => {
             <span className="font-medium text-lg">SRE Assistant</span>
           </div>
           
-          <div>
+          <div className="flex gap-4">
+            <Button 
+              onClick={() => navigate('/api-debug')} 
+              variant="outline" 
+              size="sm" 
+              className="flex items-center gap-1"
+            >
+              <Bug size={16} />
+              API Debug
+            </Button>
+            
             {user?.authenticated ? (
               <Button onClick={() => navigate('/dashboard')} variant="outline" className="flex items-center gap-2">
                 Go to Dashboard
                 <ArrowRight size={16} />
               </Button>
             ) : (
-              <Button onClick={handleGithubLogin} variant="outline" className="flex items-center gap-2">
-                <Github size={16} />
-                Login with GitHub
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleDirectGithubLogin} variant="secondary" className="flex items-center gap-2">
+                  <Github size={16} />
+                  Direct GitHub
+                </Button>
+                <Button onClick={handleGithubLogin} variant="outline" className="flex items-center gap-2">
+                  <Github size={16} />
+                  Context GitHub
+                </Button>
+              </div>
             )}
           </div>
         </div>

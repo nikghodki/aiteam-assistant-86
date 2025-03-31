@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { OIDCConfig } from '@/services/api';
 import { toast } from '@/components/ui/use-toast';
@@ -99,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const [isLoading, setIsLoading] = useState(false);
   const [bypassAuthForTesting, setBypassAuthForTesting] = useState(() => {
-    return import.meta.env.DEV ? true : false;
+    return import.meta.env.DEV ? false : false; // Changed default to false to ensure auth flow is tested
   });
   
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
@@ -228,7 +229,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Redirect to our backend API endpoint for GitHub login
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
       console.log("Redirecting to GitHub auth endpoint:", `${API_BASE_URL}/auth/github`);
+      
+      // Force a direct browser redirect
       window.location.href = `${API_BASE_URL}/auth/github`;
+      
+      // Note: The function will stop here due to the redirect
     } catch (error) {
       console.error('GitHub login failed:', error);
       setIsLoading(false);
