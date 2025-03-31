@@ -95,7 +95,11 @@ const SandboxDetails: React.FC<SandboxDetailsProps> = ({ sandbox, onSandboxUpdat
       await sandboxApi.updateSandbox({
         id: sandbox.id,
         name: values.name,
-        services: values.services,
+        services: values.services.map(service => ({
+          name: service.name, // Ensure name is always provided
+          image: service.image,
+          environmentVariables: service.environmentVariables
+        })),
       });
       
       toast({
