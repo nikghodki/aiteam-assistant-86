@@ -668,7 +668,66 @@ def get_namespace_issues():
     else:
         return jsonify([]), 400
 
-# New endpoint to retrieve S3 objects for UI
+# New endpoint to retrieve files directly from container filesystem
+@app.route('/api/kubernetes/file', methods=['POST'])
+def get_file():
+    """Retrieve a file from the container filesystem"""
+    try:
+        data = request.json
+        if not data or 'filePath' not in data:
+            return jsonify({"error": "File path is required"}), 400
+        
+        file_path = data['filePath']
+        
+        # Strip leading slash if present
+        if file_path.startswith('/'):
+            file_path = file_path[1:]
+            
+        # Define base directory for debug files
+        # This should be a directory where the backend stores debug files
+        base_directory = os.environ.get('DEBUG_FILES_DIR', '/app/debug_files')
+        
+        # Construct the full path, ensuring it's within the allowed base directory
+        # This prevents directory traversal attacks
+        full_path = os.path.normpath(os.path.join(base_directory, file_path))
+        
+        # Ensure the path is within the base directory for security
+        if not full_path.startswith(base_directory):
+            return jsonify({"error": "Access denied - invalid file path"}), 403
+            
+        print(f"Accessing file: {full_path}")
+        
+        # Check if file exists
+        if not os.path.isfile(full_path):
+            return jsonify({"error": f"File not found: {file_path}"}), 404
+            
+        # Read file content
+        with open(full_path, 'r') as f:
+            file_content = f.read()
+            
+        # Determine content type based on file extension
+        content_type = 'text/plain'  # Default
+        if full_path.endswith('.json'):
+            content_type = 'application/json'
+        elif full_path.endswith('.yaml') or full_path.endswith('.yml'):
+            content_type = 'application/yaml'
+        elif full_path.endswith('.html'):
+            content_type = 'text/html'
+            
+        # Get file modification time
+        last_modified = os.path.getmtime(full_path)
+            
+        return jsonify({
+            "content": file_content,
+            "contentType": content_type,
+            "lastModified": time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(last_modified))
+        })
+    
+    except Exception as e:
+        print(f"Error processing file request: {str(e)}")
+        return jsonify({"error": f"Failed to retrieve file: {str(e)}"}), 500
+
+# Keep the existing S3 endpoint for backward compatibility
 @app.route('/api/kubernetes/s3-object', methods=['POST'])
 def get_s3_object():
     """Retrieve an object from S3 using IAM role credentials"""

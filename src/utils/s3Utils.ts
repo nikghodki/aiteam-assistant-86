@@ -1,6 +1,5 @@
-
 /**
- * Utility functions for handling S3 URIs and objects
+ * Utility functions for handling file URIs and paths
  */
 
 /**
@@ -55,8 +54,8 @@ export const isValidS3Uri = (uri: string): boolean => {
 };
 
 /**
- * Extracts filename from S3 key or path
- * @param key S3 object key or path
+ * Extracts filename from file key or path
+ * @param key File path or key
  * @returns filename portion
  */
 export const getFilenameFromKey = (key: string): string => {
@@ -67,20 +66,19 @@ export const getFilenameFromKey = (key: string): string => {
 };
 
 /**
- * Normalizes an S3 path for consistent handling
+ * Normalizes a path for consistent handling
  * @param path Path or URI to normalize
- * @param defaultBucket Default bucket to use if not in URI format
- * @returns Normalized S3 URI
+ * @returns Normalized path
  */
-export const normalizeS3Path = (path: string, defaultBucket: string = 'k8s-debugger-bucket'): string => {
-  // If it's already a valid S3 URI, return it as is
+export const normalizePath = (path: string): string => {
+  // If it's an S3 URI, extract just the path part
   if (isValidS3Uri(path)) {
-    return path;
+    const parsedUri = parseS3Uri(path);
+    if (parsedUri) {
+      path = parsedUri.key;
+    }
   }
   
   // If it starts with a slash, remove it
-  const cleanPath = path.startsWith('/') ? path.substring(1) : path;
-  
-  // Format as proper S3 URI with the default bucket
-  return formatS3Uri(defaultBucket, cleanPath);
+  return path.startsWith('/') ? path.substring(1) : path;
 };

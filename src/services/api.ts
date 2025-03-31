@@ -45,7 +45,7 @@ export interface CommandResult {
 export interface ChatResponse {
   response: string;
   file_name?: string;
-  s3_file_path?: string;
+  file_path?: string;
 }
 
 export interface DocumentResult {
@@ -174,44 +174,33 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json();
 };
 
-export const fetchS3File = async (filePath: string): Promise<string> => {
+/**
+ * Fetches a file from the backend container
+ * @param filePath Path to the file
+ * @returns Promise with file content
+ */
+export const fetchFile = async (filePath: string): Promise<string> => {
   if (!filePath) {
     throw new Error('File path is required');
   }
   
   try {
-    // Handle s3:// URI format
-    let cleanPath = filePath;
+    // Normalize file path - extract path from S3 URI if provided
+    const { normalizePath } = await import('../utils/s3Utils');
+    const cleanPath = normalizePath(filePath);
     
-    // If it's an S3 URI, extract just the path part
-    if (filePath.startsWith('s3://')) {
-      const parts = filePath.substring(5).split('/', 2);
-      const bucket = parts[0];
-      
-      // Remove bucket name from path if it's our known bucket
-      if (bucket === 'k8s-debugger-bucket') {
-        cleanPath = filePath.substring(5 + bucket.length);
-      } else {
-        throw new Error(`Unsupported bucket: ${bucket}. Only k8s-debugger-bucket is allowed.`);
-      }
-    }
+    console.log(`Fetching file via backend: ${cleanPath}`);
     
-    // Make sure to remove any leading slash
-    cleanPath = cleanPath.startsWith('/') ? cleanPath.substring(1) : cleanPath;
-    
-    console.log(`Fetching S3 file via backend proxy: ${cleanPath}`);
-    
-    // Always fetch via backend proxy which uses IAM role
-    // This ensures files are accessed through the backend container
-    const response = await apiCall<{ content: string }>(`/kubernetes/s3-object`, {
+    // Always fetch via backend
+    const response = await apiCall<{ content: string }>(`/kubernetes/file`, {
       method: 'POST',
       body: JSON.stringify({ filePath: cleanPath }),
     });
     
-    console.log(`Successfully fetched S3 file via IAM role: ${filePath}`);
+    console.log(`Successfully fetched file: ${filePath}`);
     return response.content;
   } catch (error) {
-    console.error("Error fetching S3 file:", error);
+    console.error("Error fetching file:", error);
     throw new Error(`Failed to fetch file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
@@ -344,8 +333,8 @@ export const kubernetesApi = {
     });
   },
 
-  getS3Object: (s3Uri: string): Promise<string> => {
-    return fetchS3File(s3Uri);
+  getFile: (filePath: string): Promise<string> => {
+    return fetchFile(filePath);
   },
 };
 

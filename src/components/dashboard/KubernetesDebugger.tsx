@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { cn } from '@/lib/utils';
-import { kubernetesApi, CommandResult, fetchS3File } from '@/services/api';
+import { kubernetesApi, CommandResult } from '@/services/api';
 import KubernetesDebugDrawer from './KubernetesDebugDrawer';
 import {
   Tabs,
@@ -223,15 +223,15 @@ const KubernetesDebugger = () => {
         setDebugFilePath(response.file_name);
         setS3FilePath(undefined);
       } 
-      else if (response.s3_file_path) {
-        setS3FilePath(response.s3_file_path);
-        setDebugFilePath(undefined);
+      else if (response.file_path) {
+        setS3FilePath(undefined);
+        setDebugFilePath(response.file_path);
         
         try {
-          await kubernetesApi.getS3Object(response.s3_file_path);
-          console.log("Successfully pre-fetched S3 file content using IAM role");
+          await kubernetesApi.getFile(response.file_path);
+          console.log("Successfully pre-fetched file content");
         } catch (err) {
-          console.warn("Pre-fetching S3 content failed, will try again when needed:", err);
+          console.warn("Pre-fetching file content failed, will try again when needed:", err);
         }
       } 
       else {
