@@ -1,3 +1,4 @@
+
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { 
   Terminal, 
@@ -92,6 +93,7 @@ const KubernetesDebugger = () => {
   
   const [debugSession, setDebugSession] = useState<{id: string; debugLog: string} | null>(null);
   const [debugFilePath, setDebugFilePath] = useState<string | undefined>(undefined);
+  const [s3FilePath, setS3FilePath] = useState<string | undefined>(undefined);
   
   const [isDebugDrawerOpen, setIsDebugDrawerOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<NamespaceIssue | null>(null);
@@ -200,6 +202,8 @@ const KubernetesDebugger = () => {
     }
     
     setDebugLoading(true);
+    setDebugFilePath(undefined);
+    setS3FilePath(undefined);
     
     try {
       const response = await kubernetesApi.chatWithAssistant(
@@ -207,6 +211,8 @@ const KubernetesDebugger = () => {
         message,
         selectedNamespace
       );
+      
+      console.log("Debug API response:", response);
       
       const commandMatch = response.response.match(/```(?:bash|sh)?\s*(kubectl .+?)```/);
       if (commandMatch && commandMatch[1]) {
@@ -218,14 +224,26 @@ const KubernetesDebugger = () => {
         debugLog: `## Request\n${message}\n\n## Response\n${response.response}`
       });
       
+      // Clear previous file paths before setting new ones
       if (response.file_name) {
+        console.log("Setting debug file path:", response.file_name);
         setDebugFilePath(response.file_name);
-      } else {
+        setS3FilePath(undefined);
+      } 
+      else if (response.s3_file_path) {
+        console.log("Setting S3 file path:", response.s3_file_path);
+        setS3FilePath(response.s3_file_path);
         setDebugFilePath(undefined);
+      } 
+      else {
+        console.log("No file path in response");
+        setDebugFilePath(undefined);
+        setS3FilePath(undefined);
       }
       
       setIsDebugDrawerOpen(true);
     } catch (error: any) {
+      console.error("Debug API error:", error);
       toast({
         title: "Debug Error",
         description: error.message || "Failed to get debugging assistance",
@@ -670,6 +688,7 @@ What steps should I take to investigate and resolve this issue?`;
           namespace: selectedNamespace
         } : undefined}
         debugFilePath={debugFilePath}
+        s3FilePath={s3FilePath}
         isLoading={debugLoading}
       />
     </div>
