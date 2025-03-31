@@ -340,7 +340,7 @@ export const kubernetesApi = {
   },
 
   // Add a new method to retrieve files from S3 bucket
-  async getS3File(bucketName: string, key: string): Promise<string> {
+  getS3File: async function(bucketName: string, key: string): Promise<string> {
     try {
       console.log(`Fetching file from S3 bucket: ${bucketName}, key: ${key}`);
       const response = await fetch(`/api/kubernetes/s3file`, {
@@ -366,7 +366,7 @@ export const kubernetesApi = {
     }
   },
 
-  async chatWithAssistant(message: string): Promise<any> {
+  chatWithAssistant: async function(message: string): Promise<ChatResponse> {
     try {
       const response = await fetch(`/api/kubernetes/chat`, {
         method: 'POST',

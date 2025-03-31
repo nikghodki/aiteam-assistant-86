@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertCircle, Send, Terminal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -63,13 +62,13 @@ const KubernetesDebugger = () => {
 
   // Fetch namespace issues when a namespace is selected
   const { data: namespaceIssues = [], refetch: refetchIssues } = useQuery({
-    queryKey: ['kubernetes', 'issues', selectedNamespace],
-    enabled: !!selectedNamespace,
+    queryKey: ['kubernetes', 'issues', selectedCluster, selectedNamespace],
+    enabled: !!selectedNamespace && !!selectedCluster,
     queryFn: async () => {
-      if (!selectedNamespace) return [];
+      if (!selectedNamespace || !selectedCluster) return [];
       
       try {
-        const response = await kubernetesApi.getNamespaceIssues(selectedNamespace);
+        const response = await kubernetesApi.getNamespaceIssues(selectedCluster, selectedNamespace);
         return response || [];
       } catch (error) {
         console.error('Error fetching namespace issues:', error);
@@ -102,9 +101,7 @@ const KubernetesDebugger = () => {
     setIsLoading(true);
     
     setTimeout(() => {
-      // Simulate getting debug information
       setIsLoading(false);
-      // Add any additional logic to fetch debug info if needed
     }, 1500);
   };
 
@@ -121,27 +118,24 @@ const KubernetesDebugger = () => {
       
       console.log('Chat response:', response);
       
-      // Check if the response contains a file path (either directly or within the response text)
-      let filePath = response.filePath;
+      let filePath = response.file_name;
       if (!filePath && response.response) {
-        // Try to extract file path from response text using regex patterns
         const s3Match = response.response.match(/s3:\/\/([^"\s]+)/);
         const urlMatch = response.response.match(/https?:\/\/[^"\s]+\.(?:log|txt|yaml|json|md)/);
         
         if (s3Match) {
-          filePath = s3Match[0]; // This will be something like s3://bucket-name/path/to/file.txt
+          filePath = s3Match[0];
         } else if (urlMatch) {
-          filePath = urlMatch[0]; // This will be a URL to a file
+          filePath = urlMatch[0];
         }
       }
       
-      // If file path is found, set it so the drawer can fetch the file
       if (filePath) {
         console.log('Found file path in response:', filePath);
         setDebugFilePath(filePath);
       }
       
-      const sessionId = response.sessionId || `session-${Date.now()}`;
+      const sessionId = `session-${Date.now()}`;
       
       setDebugSession({
         id: sessionId,
