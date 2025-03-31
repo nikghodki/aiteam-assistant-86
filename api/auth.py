@@ -2,6 +2,7 @@
 import os
 import datetime
 import jwt
+from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
 from functools import wraps
 from flask import request, jsonify
 
@@ -44,7 +45,9 @@ def jwt_required(f):
             # Store user info in request context for later use
             request.user = payload
             return f(*args, **kwargs)
-        except jwt.PyJWTError:
+        except ExpiredSignatureError:
+            return jsonify({'message': 'Token has expired'}), 401
+        except InvalidTokenError:
             return jsonify({'message': 'Invalid token'}), 401
 
     return decorated
