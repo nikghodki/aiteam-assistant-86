@@ -1,7 +1,7 @@
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Terminal, Database, Server, Search, ArrowRight, Github } from 'lucide-react';
+import { Terminal, Database, Server, Search, ArrowRight, Github, Code, Cpu } from 'lucide-react';
 import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import GlassMorphicCard from '@/components/ui/GlassMorphicCard';
 import { Layout } from '@/components/layout/Layout';
@@ -10,20 +10,20 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const features = [
   {
-    title: 'Access Management',
-    description: 'Streamline user access control across all your infrastructure systems.',
+    title: 'AI-Powered Access Management',
+    description: 'Smart access control across infrastructure systems using machine learning.',
     icon: Database,
     delay: 200,
   },
   {
-    title: 'Kubernetes Debugging',
-    description: 'Quickly identify and resolve issues in your Kubernetes clusters.',
+    title: 'Intelligent Kubernetes Debugging',
+    description: 'AI-assisted troubleshooting that learns from past issues to speed resolution.',
     icon: Server,
     delay: 400,
   },
   {
-    title: 'Documentation Search',
-    description: "Instant answers from your company's documentation and best practices.",
+    title: 'Smart Documentation Search',
+    description: "Contextual AI search that understands your team's documentation and best practices.",
     icon: Search,
     delay: 600,
   },
@@ -90,16 +90,16 @@ const Index = () => {
             <div className="flex flex-col items-start space-y-6">
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-2 animate-fade-in">
                 <Terminal size={16} className="mr-2" />
-                <span>aiteam-assistant</span>
+                <span>AI Software and Platform Team</span>
               </div>
               
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight animate-fade-in" style={{ animationDelay: '100ms' }}>
-                Simplify Your <br />
-                <span className="text-primary">Infrastructure</span> Management
+                AI-Powered <br />
+                <span className="text-primary">Infrastructure</span> Automation
               </h1>
               
               <p className="text-lg text-muted-foreground max-w-lg animate-fade-in" style={{ animationDelay: '200ms' }}>
-                An intelligent assistant for SREs and DevOps engineers to manage access, debug Kubernetes issues, and quickly find answers from documentation.
+                Boosting productivity with intelligent tools that automate infrastructure management, Kubernetes debugging, and documentation search for the AI Software and Platform team.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 pt-4 animate-fade-in" style={{ animationDelay: '300ms' }}>
@@ -129,18 +129,18 @@ const Index = () => {
               <div className="relative p-2 bg-gradient-to-br from-primary/20 to-transparent rounded-2xl">
                 <div className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-900 shadow-xl">
                   <img 
-                    src="https://images.unsplash.com/photo-1488590528505-98d2b5aba04b"
-                    alt="SRE Assistant Dashboard"
+                    src="https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7"
+                    alt="AI Platform Assistant Dashboard"
                     className="w-full h-full object-cover opacity-90"
                   />
                   <div className="absolute inset-0 bg-gradient-to-tr from-gray-900 to-transparent opacity-60"></div>
                   <div className="absolute bottom-0 left-0 right-0 p-6">
-                    <div className="text-white font-medium mb-2">Terminal Output</div>
+                    <div className="text-white font-medium mb-2">AI-Assisted Terminal</div>
                     <div className="bg-black/70 backdrop-blur-sm p-3 rounded text-xs text-green-400 font-mono">
-                      $ kubectl get pods -n monitoring<br />
-                      NAME                 READY   STATUS    RESTARTS   AGE<br />
-                      prometheus-0         1/1     Running   0          24h<br />
-                      grafana-7df4f85b85   1/1     Running   0          24h
+                      $ ai analyze --cluster prod-east<br />
+                      Analyzing cluster performance...<br />
+                      AI RECOMMENDATION: Scale up node group 'app-tier' by 2 instances<br />
+                      Apply changes? [Y/n] _
                     </div>
                   </div>
                 </div>
@@ -159,10 +159,10 @@ const Index = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 animate-fade-in">
-              Powerful Features for SREs
+              AI-Powered Tools for Platform Teams
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '100ms' }}>
-              Everything you need to manage and troubleshoot your infrastructure in one place
+              Purpose-built automation to streamline operations and boost productivity
             </p>
           </div>
           
@@ -189,6 +189,52 @@ const Index = () => {
         </div>
       </section>
       
+      {/* Tech Stack Section - New! */}
+      <section className="py-16 md:py-20 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-3xl font-bold mb-4">Our AI Technology Stack</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Built with cutting-edge AI and machine learning technologies
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
+            <div className="flex flex-col items-center text-center">
+              <div className="h-16 w-16 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+                <Cpu size={32} className="text-blue-600" />
+              </div>
+              <h3 className="font-medium mb-1">Machine Learning</h3>
+              <p className="text-sm text-muted-foreground">Predictive analytics for infrastructure</p>
+            </div>
+            
+            <div className="flex flex-col items-center text-center">
+              <div className="h-16 w-16 rounded-full bg-purple-50 flex items-center justify-center mb-4">
+                <Code size={32} className="text-purple-600" />
+              </div>
+              <h3 className="font-medium mb-1">Natural Language</h3>
+              <p className="text-sm text-muted-foreground">Understanding context and intent</p>
+            </div>
+            
+            <div className="flex flex-col items-center text-center">
+              <div className="h-16 w-16 rounded-full bg-green-50 flex items-center justify-center mb-4">
+                <Server size={32} className="text-green-600" />
+              </div>
+              <h3 className="font-medium mb-1">Neural Networks</h3>
+              <p className="text-sm text-muted-foreground">Deep learning for complex problems</p>
+            </div>
+            
+            <div className="flex flex-col items-center text-center">
+              <div className="h-16 w-16 rounded-full bg-amber-50 flex items-center justify-center mb-4">
+                <Database size={32} className="text-amber-600" />
+              </div>
+              <h3 className="font-medium mb-1">Knowledge Graphs</h3>
+              <p className="text-sm text-muted-foreground">Connecting data intelligently</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      
       {/* CTA Section */}
       <section className="py-16 md:py-24 px-6">
         <div className="max-w-7xl mx-auto">
@@ -199,10 +245,10 @@ const Index = () => {
               
               <div className="relative max-w-3xl mx-auto text-center">
                 <h2 className="text-3xl md:text-4xl font-bold mb-4 animate-fade-in">
-                  Ready to streamline your infrastructure management?
+                  Ready to boost your team's productivity?
                 </h2>
                 <p className="text-muted-foreground mb-8 animate-fade-in" style={{ animationDelay: '100ms' }}>
-                  Join other SRE teams who have reduced debugging time by 70% and improved access management security with aiteam-assistant.
+                  Join the AI Software and Platform team in using our specialized assistant to automate infrastructure tasks and increase productivity across your projects.
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '200ms' }}>
