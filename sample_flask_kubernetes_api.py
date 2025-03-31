@@ -13,15 +13,6 @@ import signal
 import sys
 import atexit
 
-# Conditionally import boto3 for AWS S3 access - will fail gracefully if not installed
-try:
-    import boto3
-    from botocore.exceptions import ClientError
-    S3_ENABLED = True
-except ImportError:
-    S3_ENABLED = False
-    print("Warning: boto3 library not installed. S3 functionality will be disabled.")
-
 # Conditionally import SAML libraries - will fail gracefully if not installed
 try:
     from onelogin.saml2.auth import OneLogin_Saml2_Auth
@@ -47,11 +38,6 @@ GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:80
 GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', 'your-github-client-id')
 GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', 'your-github-client-secret')
 GITHUB_REDIRECT_URI = os.environ.get('GITHUB_REDIRECT_URI', 'http://localhost:8000/api/auth/github/callback')
-
-# AWS S3 configuration
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '')
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
-AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
 
 # Mock data for demo purposes
 kubernetes_clusters = [
@@ -95,193 +81,6 @@ namespace_issues = {
     ]
 }
 
-# Mock S3 bucket content (for demo/test purposes)
-mock_s3_files = {
-    "k8s-debugger-bucket/pod-logs/pod-1.log": """
-## Request
-Why is my pod crashing with OOMKilled errors?
-
-## Response
-I see you're experiencing OOMKilled errors. Let me check the logs and configuration.
-
-The pod is being terminated because it's exceeding its memory limits. Let's look at the current resource allocation:
-
-```kubectl
-kubectl describe pod pod-1 -n namespace-a
-```
-
-Here's what I can see in the configuration:
-
-```
-Name:         pod-1
-Namespace:    namespace-a
-Priority:     0
-Node:         node-3/10.0.1.7
-Start Time:   Mon, 15 Jan 2024 09:12:34 -0800
-Labels:       app=backend
-Annotations:  kubernetes.io/created-by: admin
-
-Status:       CrashLoopBackOff
-Reason:       OOMKilled
-Message:      Container exceeded memory limit
-
-Containers:
-  main:
-    Container ID:   containerd://a72d3c2e5f
-    Image:          myapp:1.2.3
-    Image ID:       docker.io/library/myapp@sha256:a82d3
-    Port:           8080/TCP
-    Host Port:      0/TCP
-    State:          Waiting
-    Reason:         CrashLoopBackOff
-    Last State:     Terminated
-    Reason:         OOMKilled
-    Exit Code:      137
-    Ready:          False
-    Restart Count:  5
-    Limits:
-      cpu:     500m
-      memory:  256Mi
-    Requests:
-      cpu:     100m
-      memory:  128Mi
-```
-
-I recommend increasing the memory limit for this pod as follows:
-
-```kubectl
-kubectl edit deployment your-deployment-name -n namespace-a
-```
-
-Then update the memory limits:
-
-```yaml
-resources:
-  limits:
-    cpu: 500m
-    memory: 512Mi
-  requests:
-    cpu: 100m
-    memory: 256Mi
-```
-
-After making these changes, monitor the pod's memory usage with:
-
-```kubectl
-kubectl top pod pod-1 -n namespace-a
-```
-    """,
-    
-    "k8s-debugger-bucket/service-debug/service-3.log": """
-## Request
-Service connectivity issues between frontend and backend
-
-## Response
-Let's troubleshoot the service connectivity issue between your frontend and backend:
-
-First, let's check the service configuration:
-
-```kubectl
-kubectl get svc backend-service -n namespace-b -o yaml
-```
-
-Here's what I found:
-
-```
-apiVersion: v1
-kind: Service
-metadata:
-  name: backend-service
-  namespace: namespace-b
-  labels:
-    app: backend
-spec:
-  selector:
-    app: backend  # This selector must match your pod labels
-  ports:
-  - port: 8080
-    targetPort: 8080
-    protocol: TCP
-  type: ClusterIP
-```
-
-Now let's verify if the service has endpoints:
-
-```kubectl
-kubectl get endpoints backend-service -n namespace-b
-```
-
-The issue appears to be that your service selector doesn't match any pods. Let's check the pod labels:
-
-```kubectl
-kubectl get pods -n namespace-b -l app=backend
-```
-
-I notice your backend pods are labeled with `app=backend-api` but your service is looking for `app=backend`.
-
-You should update either the service selector or pod labels to match. Here's how to update the service:
-
-```kubectl
-kubectl patch service backend-service -n namespace-b -p '{"spec":{"selector":{"app":"backend-api"}}}'
-```
-    """,
-    
-    "k8s-debugger-bucket/deployment-logs/deployment-5.log": """
-## Request
-My deployment is failing with ImagePullBackOff
-
-## Response
-I'll help you diagnose the ImagePullBackOff issue with your deployment.
-
-Let's start by checking the pod status:
-
-```kubectl
-kubectl describe pod -l app=deployment-5 -n namespace-c
-```
-
-Based on this output, I can see:
-
-```
-Events:
-  Type     Reason     Age                From               Message
-  ----     ------     ----               ----               -------
-  Normal   Scheduled  5m                 default-scheduler  Successfully assigned namespace-c/deployment-5-7d9d4b8f59-xj4kl to node-2
-  Normal   Pulling    4m (x3 over 5m)    kubelet            Pulling image "myregistry.example.com/myapp:1.5.0"
-  Warning  Failed     4m (x3 over 5m)    kubelet            Failed to pull image "myregistry.example.com/myapp:1.5.0": rpc error: code = Unknown desc = Error response from daemon: pull access denied for myregistry.example.com/myapp, repository does not exist or may require 'docker login'
-  Warning  Failed     4m (x3 over 5m)    kubelet            Error: ErrImagePull
-  Warning  Failed     3m (x6 over 5m)    kubelet            Error: ImagePullBackOff
-  Normal   BackOff    2m (x11 over 5m)   kubelet            Back-off pulling image "myregistry.example.com/myapp:1.5.0"
-```
-
-The issue is that Kubernetes doesn't have access to pull the image from your private registry. Here are the steps to fix it:
-
-1. Create a Docker registry secret:
-
-```kubectl
-kubectl create secret docker-registry regcred \\
-  --docker-server=myregistry.example.com \\
-  --docker-username=<your-username> \\
-  --docker-password=<your-password> \\
-  --docker-email=<your-email> \\
-  --namespace=namespace-c
-```
-
-2. Update your deployment to use the secret:
-
-```kubectl
-kubectl patch deployment deployment-5 -n namespace-c -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"regcred"}]}}}}'
-```
-
-3. Restart the deployment:
-
-```kubectl
-kubectl rollout restart deployment deployment-5 -n namespace-c
-```
-
-This should resolve your ImagePullBackOff issue by providing the credentials needed to access your private registry.
-    """
-}
-
 # User storage - in production this would be a database
 users = {
     "nghodki@cisco.com": {
@@ -315,40 +114,6 @@ signal.signal(signal.SIGTERM, graceful_shutdown)
 
 # Also register at exit to catch non-signal terminations
 atexit.register(graceful_shutdown)
-
-# Function to initialize S3 client
-def get_s3_client():
-    if S3_ENABLED:
-        return boto3.client(
-            's3',
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-            region_name=AWS_REGION
-        )
-    return None
-
-# Function to read a file from S3
-def read_s3_file(bucket_name, key):
-    try:
-        if not S3_ENABLED:
-            # If S3 is not enabled, use mock data if available
-            s3_path = f"{bucket_name}/{key}"
-            if s3_path in mock_s3_files:
-                print(f"Using mock S3 file data for {s3_path}")
-                return mock_s3_files[s3_path]
-            else:
-                print(f"Mock S3 file not found for {s3_path}")
-                return f"# File not found\n\nThe requested file {bucket_name}/{key} was not found."
-        
-        # Use boto3 to get the file from S3
-        s3 = get_s3_client()
-        response = s3.get_object(Bucket=bucket_name, Key=key)
-        return response['Body'].read().decode('utf-8')
-    except Exception as e:
-        print(f"Error reading S3 file: {str(e)}")
-        if not S3_ENABLED:
-            return f"# Error reading mock file\n\n{str(e)}"
-        return f"# Error reading file\n\n{str(e)}"
 
 # SAML configuration
 def prepare_flask_request(request):
@@ -873,62 +638,33 @@ def run_command():
     result = f"Command '{command}' executed on cluster '{cluster}' in namespace '{namespace}'"
     return jsonify({"result": result})
 
-# Chat with Kubernetes assistant - updated to return file paths
+# Chat with Kubernetes assistant
 @app.route('/api/kubernetes/chat', methods=['POST'])
 def kubernetes_chat():
-    """Simulate interaction with a Kubernetes assistant with file paths"""
+    """Simulate interaction with a Kubernetes assistant"""
     data = request.json
-    message = data.get('message', '').lower()
+    message = data.get('message')
     
-    # Generate a session ID for this conversation
-    session_id = f"debug-{uuid.uuid4()}"
+    # Generate a canned response
+    responses = [
+        "I am an AI assistant for Kubernetes.",
+        "How can I help you today?",
+        "I can assist with deployments, troubleshooting, and more."
+    ]
     
-    # Look for certain keywords to determine the appropriate response and file
-    file_path = None
-    if 'oomkilled' in message or 'memory' in message or 'crashing' in message:
-        file_path = "s3://k8s-debugger-bucket/pod-logs/pod-1.log"
-        response = "I've analyzed your pod's memory issues. It seems your pod is being OOMKilled because it's exceeding the memory limits. I've attached the detailed logs and recommendations."
-    
-    elif 'service' in message or 'connectivity' in message or 'network' in message:
-        file_path = "s3://k8s-debugger-bucket/service-debug/service-3.log"
-        response = "I've diagnosed your service connectivity issues. The problem appears to be a mismatch between your service selector and pod labels. See the detailed analysis for more information."
-    
-    elif 'deployment' in message or 'imagepullbackoff' in message or 'image' in message:
-        file_path = "s3://k8s-debugger-bucket/deployment-logs/deployment-5.log"
-        response = "Your deployment is failing because of ImagePullBackOff errors. This typically happens when Kubernetes can't pull the container image. I've analyzed the logs and provided solutions."
-    
-    else:
-        # Default response for other queries
-        response = "I can help you troubleshoot Kubernetes issues. Based on your question, I need more specific information about the problem you're experiencing."
-    
-    return jsonify({
-        "response": response,
-        "sessionId": session_id,
-        "filePath": file_path
-    })
+    response = random.choice(responses)
+    return jsonify({"response": response})
 
-# New endpoint for retrieving files from S3
-@app.route('/api/kubernetes/s3file', methods=['POST'])
-def get_s3_file():
-    """Retrieve file from S3 bucket"""
+# Get issues in a namespace
+@app.route('/api/kubernetes/namespace-issues', methods=['POST'])
+def get_namespace_issues():
+    """Return list of issues for a given namespace"""
     data = request.json
-    if not data or 'bucketName' not in data or 'key' not in data:
-        return jsonify({"error": "Bucket name and key are required"}), 400
-    
-    bucket_name = data.get('bucketName')
-    key = data.get('key')
-    
-    try:
-        # Get the file content from S3 (or mock data)
-        file_content = read_s3_file(bucket_name, key)
-        
-        # Return the file content as plain text
-        response = make_response(file_content)
-        response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-        return response
-    except Exception as e:
-        print(f"Error retrieving S3 file: {str(e)}")
-        return jsonify({"error": f"Failed to retrieve file: {str(e)}"}), 500
+    namespace = data.get('namespace')
+    if namespace and namespace in namespace_issues:
+        return jsonify(namespace_issues[namespace])
+    else:
+        return jsonify([]), 400
 
 if __name__ == '__main__':
     # Set up proper connection and socket handling for Gunicorn

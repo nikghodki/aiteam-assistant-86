@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Check, Copy, Download, X } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -51,56 +52,21 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
       setIsLoadingFile(true);
       
       const timer = setTimeout(() => {
-        if (debugFilePath.startsWith('s3://') || debugFilePath.includes('k8s-debugger-bucket')) {
-          const bucketName = 'k8s-debugger-bucket';
-          let key = debugFilePath;
-          
-          if (debugFilePath.startsWith('s3://')) {
-            const parts = debugFilePath.replace('s3://', '').split('/');
-            if (parts[0] === bucketName) {
-              parts.shift();
-            }
-            key = parts.join('/');
-          } else if (debugFilePath.includes(bucketName)) {
-            const keyPart = debugFilePath.split(bucketName + '/')[1];
-            if (keyPart) {
-              key = keyPart;
-            }
-          }
-          
-          console.log(`Fetching S3 file with key: ${key} from bucket: ${bucketName}`);
-          
-          kubernetesApi.getS3File(bucketName, key)
-            .then(content => {
-              setDebugFileContent(content);
-              setIsLoadingFile(false);
-            })
-            .catch(error => {
-              console.error('Error loading S3 file:', error);
-              setIsLoadingFile(false);
-              toast({
-                title: "Error",
-                description: "Failed to load debugging information from S3",
-                variant: "destructive"
-              });
+        fetch(debugFilePath)
+          .then(response => response.text())
+          .then(content => {
+            setDebugFileContent(content);
+            setIsLoadingFile(false);
+          })
+          .catch(error => {
+            console.error('Error loading debug file:', error);
+            setIsLoadingFile(false);
+            toast({
+              title: "Error",
+              description: "Failed to load debugging information",
+              variant: "destructive"
             });
-        } else {
-          fetch(debugFilePath)
-            .then(response => response.text())
-            .then(content => {
-              setDebugFileContent(content);
-              setIsLoadingFile(false);
-            })
-            .catch(error => {
-              console.error('Error loading debug file:', error);
-              setIsLoadingFile(false);
-              toast({
-                title: "Error",
-                description: "Failed to load debugging information",
-                variant: "destructive"
-              });
-            });
-        }
+          });
       }, 500);
       
       return () => clearTimeout(timer);
@@ -133,6 +99,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     
     try {
       if (debugSession?.id) {
+        // Download using API if debugSession exists
         const response = await kubernetesApi.downloadDebugFile(debugSession.id);
         
         const link = document.createElement('a');
@@ -142,6 +109,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
         link.click();
         document.body.removeChild(link);
       } else if (debugFileContent) {
+        // Download the debug file content if available
         const blob = new Blob([debugFileContent], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         
@@ -321,7 +289,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                   <div className="w-3 h-3 bg-professional-purple/70 rounded-full animate-bounce delay-200"></div>
                   <div className="w-3 h-3 bg-professional-purple/70 rounded-full animate-bounce delay-300"></div>
                 </div>
-                <p className="text-sm text-muted-foreground">Loading debugging information from S3...</p>
+                <p className="text-sm text-muted-foreground">Loading debugging information...</p>
               </div>
             </div>
           ) : (
