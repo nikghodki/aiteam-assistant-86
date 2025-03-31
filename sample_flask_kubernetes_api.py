@@ -12,6 +12,9 @@ import requests
 import signal
 import sys
 import atexit
+import jwt
+from datetime import datetime, timedelta
+from functools import wraps
 
 # Conditionally import SAML libraries - will fail gracefully if not installed
 try:
@@ -26,8 +29,11 @@ except ImportError:
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=['*'], allow_headers=['Content-Type', 'Authorization'])
 
-# Set a secret key for sessions
+# Set a secret key for sessions and JWT
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', str(uuid.uuid4()))
+JWT_SECRET = os.environ.get('JWT_SECRET', str(uuid.uuid4()))
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRATION_MINUTES = 60 * 24  # 24 hours
 
 # Google OAuth configuration (would use real values in production)
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'your-google-client-id')
@@ -167,6 +173,61 @@ def init_saml_auth(req):
     auth = OneLogin_Saml2_Auth(req, saml_settings)
     return auth
 
+# JWT helper functions
+def create_jwt_token(user_id, email, name):
+    """Create a JWT token for the user"""
+    payload = {
+        'sub': user_id,  # subject (user id)
+        'iat': datetime.utcnow(),  # issued at
+        'exp': datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES),  # expiration
+        'email': email,
+        'name': name
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def decode_jwt_token(token):
+    """Decode and validate a JWT token"""
+    try:
+        # Remove 'Bearer ' prefix if present
+        if token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            
+        decoded = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return decoded
+    except jwt.ExpiredSignatureError:
+        return None  # Token expired
+    except jwt.InvalidTokenError:
+        return None  # Invalid token
+    except Exception as e:
+        print(f"Token decode error: {e}")
+        return None
+
+def token_required(f):
+    """Decorator to protect routes with JWT authentication"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        # Get token from header
+        auth_header = request.headers.get('Authorization')
+        
+        if auth_header:
+            if auth_header.startswith('Bearer '):
+                token = auth_header.split(' ')[1]
+        
+        if not token:
+            return jsonify({'error': 'Authentication token is required'}), 401
+        
+        # Validate token
+        decoded_token = decode_jwt_token(token)
+        if not decoded_token:
+            return jsonify({'error': 'Invalid or expired token'}), 401
+        
+        # Add the decoded token to the request for use in the endpoint
+        request.user = decoded_token
+        return f(*args, **kwargs)
+    
+    return decorated
+
 # Authentication endpoints
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -184,7 +245,10 @@ def login():
         session['user_id'] = users[email]['id']
         users[email]['authenticated'] = True
         
-        # Return user info
+        # Generate JWT token
+        token = create_jwt_token(users[email]['id'], email, users[email]['name'])
+        
+        # Return user info and token
         user_data = {
             "id": users[email]['id'],
             "name": users[email]['name'],
@@ -192,7 +256,7 @@ def login():
             "authenticated": True
         }
         
-        return jsonify({"success": True, "user": user_data})
+        return jsonify({"success": True, "user": user_data, "token": token})
     
     return jsonify({"error": "Invalid email or password"}), 401
 
@@ -381,17 +445,17 @@ def github_callback():
                 "authenticated": True
             }
         
-        # Create user session
-        session['user_id'] = users[primary_email]['id']
-        users[primary_email]['authenticated'] = True
+        # After successful authentication, generate JWT token
+        token = create_jwt_token(users[primary_email]['id'], primary_email, users[primary_email]['name'])
         
-        # Return user info by redirecting to the frontend with user data
+        # Return user info by redirecting to the frontend with user data and token
         user_info = {
             "id": users[primary_email]['id'],
             "name": users[primary_email]['name'],
             "email": primary_email,
             "photoUrl": users[primary_email].get('photoUrl'),
-            "authenticated": True
+            "authenticated": True,
+            "token": token  # Include token in user data
         }
         
         # Encode user data for URL
@@ -412,13 +476,18 @@ def github_callback():
 
 # Access management endpoints
 @app.route('/api/access/groups', methods=['POST'])
+@token_required
 def get_user_groups():
-    """Get groups for a user"""
+    """Get groups for a user (protected endpoint)"""
     data = request.json
     if not data or 'userEmail' not in data:
         return jsonify({"error": "User email is required"}), 400
     
     user_email = data.get('userEmail')
+    
+    # Ensure the requesting user can only access their own data
+    if request.user['email'] != user_email and 'admin' not in request.user.get('roles', []):
+        return jsonify({"error": "Unauthorized to access this user's data"}), 403
     
     # In a real application, you would query your database for the groups this user belongs to
     # For this example, we'll return mock data
@@ -516,7 +585,7 @@ def access_chat():
     response = random.choice(responses)
     return jsonify({"response": response})
 
-# Logout endpoint
+# Logout endpoint should invalidate the token
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():
     """Handle user logout"""
@@ -610,8 +679,9 @@ def get_stats():
 
 # Get clusters by environment
 @app.route('/api/kubernetes/clusters', methods=['GET'])
+@token_required
 def get_clusters():
-    """Return list of Kubernetes clusters"""
+    """Return list of Kubernetes clusters (protected endpoint)"""
     return jsonify(kubernetes_clusters)
 
 # Get namespaces for a cluster

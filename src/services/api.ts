@@ -1,3 +1,4 @@
+
 // API base URL should be configured in your environment
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -157,9 +158,29 @@ export interface NamespaceIssue {
 const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
   
+  // Get token from localStorage
+  const storedUser = localStorage.getItem('user');
+  let token = '';
+  
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      if (user.token) {
+        token = user.token;
+      }
+    } catch (error) {
+      console.error('Failed to parse stored user for token:', error);
+    }
+  }
+  
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
   };
+  
+  // Add Authorization header if token exists
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`;
+  }
 
   const response = await fetch(url, {
     ...options,

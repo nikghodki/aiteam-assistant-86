@@ -10,6 +10,7 @@ export interface User {
   email: string;
   photoUrl?: string;
   authenticated: boolean;
+  token?: string; // Added JWT token field
 }
 
 // Mock user for demonstration
@@ -18,6 +19,7 @@ const mockUser: User = {
   name: 'nghodki',
   email: 'nghodki@cisco.com',
   authenticated: false,
+  token: '', // Initialize with empty token
 };
 
 interface AuthContextType {
@@ -79,7 +81,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const data = await response.json();
       
       if (data.success && data.user) {
-        const authenticatedUser = { ...data.user, authenticated: true };
+        const authenticatedUser = { 
+          ...data.user, 
+          authenticated: true,
+          token: data.token // Save the token from response
+        };
         setUser(authenticatedUser);
         localStorage.setItem('user', JSON.stringify(authenticatedUser));
       } else {
@@ -126,6 +132,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${user.token}` // Include token in logout request
+        }
       });
     } catch (error) {
       console.error('Logout API call failed:', error);
