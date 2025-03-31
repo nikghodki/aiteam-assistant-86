@@ -671,7 +671,7 @@ def get_namespace_issues():
     else:
         return jsonify([]), 400
 
-# New endpoint to retrieve files directly from container filesystem
+# New endpoint to retrieve files directly from container filesystem with proper CORS handling
 @app.route('/api/kubernetes/file', methods=['POST', 'OPTIONS'])
 def get_file():
     """Retrieve a file from the container filesystem"""
@@ -682,7 +682,7 @@ def get_file():
         response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         response.headers.add('Access-Control-Max-Age', '3600')
-        return response
+        return response, 200
         
     try:
         data = request.json
@@ -705,13 +705,17 @@ def get_file():
         
         # Ensure the path is within the base directory for security
         if not full_path.startswith(base_directory):
-            return jsonify({"error": "Access denied - invalid file path"}), 403
+            response = jsonify({"error": "Access denied - invalid file path"}), 403
+            response[0].headers.add('Access-Control-Allow-Origin', '*')
+            return response
             
         print(f"Accessing file: {full_path}")
         
         # Check if file exists
         if not os.path.isfile(full_path):
-            return jsonify({"error": f"File not found: {file_path}"}), 404
+            response = jsonify({"error": f"File not found: {file_path}"}), 404
+            response[0].headers.add('Access-Control-Allow-Origin', '*')
+            return response
             
         # Read file content
         with open(full_path, 'r') as f:
