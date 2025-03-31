@@ -22,6 +22,7 @@ import SandboxOrchestration from "./pages/SandboxOrchestration";
 import ReleaseDeployment from "./pages/ReleaseDeployment";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
+import Fallback from "./pages/Fallback";
 
 // Create a client with better error handling
 const queryClient = new QueryClient({
@@ -30,9 +31,6 @@ const queryClient = new QueryClient({
       retry: 1,
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // 5 minutes
-      onError: (error) => {
-        console.error("Query error:", error);
-      }
     },
   },
 });
@@ -63,6 +61,7 @@ const App = () => {
                 {/* Public routes - must be accessible without auth */}
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/fallback" element={<Fallback />} />
                 
                 {/* Auth callback routes - must not redirect if not authenticated */}
                 <Route path="/auth/callback" element={<AuthCallback />} />

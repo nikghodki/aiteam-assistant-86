@@ -1,21 +1,30 @@
 
+import React, { StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
-import { StrictMode, Suspense } from 'react'
 import App from './App.tsx'
 import './index.css'
 
 // Error boundary for catching rendering errors
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("UI Rendering Error:", error);
     console.error("Error details:", errorInfo);
   }
@@ -77,7 +86,7 @@ if (rootElement) {
       <div style="padding: 20px; text-align: center;">
         <h1 style="color: #e11d48; font-size: 24px;">Application Failed to Load</h1>
         <p style="margin-top: 16px;">There was a critical error starting the application.</p>
-        <pre style="background: #f1f5f9; padding: 12px; margin-top: 16px; overflow: auto; text-align: left;">${error?.toString()}</pre>
+        <pre style="background: #f1f5f9; padding: 12px; margin-top: 16px; overflow: auto; text-align: left;">${error instanceof Error ? error.toString() : 'Unknown error'}</pre>
         <button style="margin-top: 16px; background: #0284c7; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;" onclick="window.location.reload()">Reload Page</button>
       </div>
     `;
