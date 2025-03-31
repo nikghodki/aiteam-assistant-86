@@ -1,3 +1,4 @@
+
 // API base URL should be configured in your environment
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 export const S3_BUCKET_URL = import.meta.env.VITE_S3_BUCKET_URL || 'https://k8s-debugger-bucket.s3.amazonaws.com';
@@ -183,14 +184,20 @@ export const fetchS3File = async (filePath: string): Promise<string> => {
     // Make sure to remove any leading slash
     const cleanPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
     
-    // First try to fetch via backend proxy which uses IAM role
+    // First try to fetch via backend proxy which uses IAM role with boto3
     try {
+      // Convert to S3 URI format if needed
+      let s3Uri = cleanPath;
+      if (!cleanPath.startsWith('s3://')) {
+        s3Uri = `s3://k8s-debugger-bucket/${cleanPath}`;
+      }
+      
       const response = await apiCall<{ content: string }>(`/kubernetes/s3-object`, {
         method: 'POST',
-        body: JSON.stringify({ filePath: cleanPath }),
+        body: JSON.stringify({ filePath: s3Uri }),
       });
       
-      console.log(`Successfully fetched S3 file via IAM role: ${filePath}`);
+      console.log(`Successfully fetched S3 file via IAM role: ${s3Uri}`);
       return response.content;
     } catch (proxyError) {
       console.warn("IAM role fetch failed, falling back to direct URL:", proxyError);
