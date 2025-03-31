@@ -57,7 +57,27 @@ const Index = () => {
   };
 
   return (
-    <Layout>
+    <div className="min-h-screen flex flex-col">
+      {/* GitHub login button in the top right */}
+      <div className="fixed top-4 right-4 z-50">
+        {!user.authenticated ? (
+          <Button 
+            onClick={handleGithubLogin} 
+            className="px-4 py-2 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white rounded-md"
+          >
+            <Github size={18} />
+            <span>Login with GitHub</span>
+          </Button>
+        ) : (
+          <Button 
+            onClick={() => navigate('/dashboard')} 
+            className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md"
+          >
+            Go to Dashboard
+          </Button>
+        )}
+      </div>
+
       {/* Hero Section */}
       <section className="pt-8 pb-16 md:pt-12 md:pb-24 relative overflow-hidden">
         <div 
@@ -70,7 +90,7 @@ const Index = () => {
             <div className="flex flex-col items-start space-y-6">
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-2 animate-fade-in">
                 <Terminal size={16} className="mr-2" />
-                <span>SRE Assistant</span>
+                <span>aiteam-assistant</span>
               </div>
               
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight animate-fade-in" style={{ animationDelay: '100ms' }}>
@@ -94,17 +114,8 @@ const Index = () => {
                 ) : (
                   <>
                     <Button 
-                      onClick={() => navigate('/login')}
-                      className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale flex items-center"
-                    >
-                      <span>Sign In</span>
-                      <ArrowRight size={16} className="ml-2" />
-                    </Button>
-                    
-                    <Button 
                       onClick={handleGithubLogin} 
-                      variant="outline"
-                      className="px-6 py-3 border border-input rounded-md font-medium hover:bg-muted transition-colors flex items-center"
+                      className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale flex items-center"
                     >
                       <Github size={16} className="mr-2" />
                       <span>Login with GitHub</span>
@@ -166,7 +177,7 @@ const Index = () => {
                 <p className="text-muted-foreground text-sm">{feature.description}</p>
                 
                 <button 
-                  onClick={() => navigate('/dashboard')}
+                  onClick={user.authenticated ? () => navigate('/dashboard') : handleGithubLogin}
                   className="mt-6 text-primary text-sm font-medium flex items-center hover:text-primary/80 transition-colors"
                 >
                   <span>Learn more</span>
@@ -191,19 +202,15 @@ const Index = () => {
                   Ready to streamline your infrastructure management?
                 </h2>
                 <p className="text-muted-foreground mb-8 animate-fade-in" style={{ animationDelay: '100ms' }}>
-                  Join other SRE teams who have reduced debugging time by 70% and improved access management security with SRE Assistant.
+                  Join other SRE teams who have reduced debugging time by 70% and improved access management security with aiteam-assistant.
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '200ms' }}>
                   <button 
-                    onClick={() => navigate('/dashboard')}
+                    onClick={user.authenticated ? () => navigate('/dashboard') : handleGithubLogin}
                     className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale"
                   >
-                    Get Started Now
-                  </button>
-                  
-                  <button className="px-6 py-3 border border-input rounded-md font-medium hover:bg-muted transition-colors">
-                    View Documentation
+                    {user.authenticated ? "Go to Dashboard" : "Get Started with GitHub"}
                   </button>
                 </div>
               </div>
@@ -211,7 +218,7 @@ const Index = () => {
           </GlassMorphicCard>
         </div>
       </section>
-    </Layout>
+    </div>
   );
 };
 

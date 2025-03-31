@@ -19,8 +19,8 @@ import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import JiraTicket from "./pages/JiraTicket";
 import RoleManagement from "./pages/RoleManagement";
-import SandboxOrchestration from "./pages/SandboxOrchestration"; // New import
-import ReleaseDeployment from "./pages/ReleaseDeployment"; // New import
+import SandboxOrchestration from "./pages/SandboxOrchestration";
+import ReleaseDeployment from "./pages/ReleaseDeployment";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 // Create a client
@@ -50,7 +50,13 @@ const App = () => (
               
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/dashboard" element={<Dashboard />} />
+              
+              {/* All other routes are protected */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
               <Route path="/access" element={
                 <ProtectedRoute>
                   <AccessControl />
@@ -86,7 +92,6 @@ const App = () => (
                   <RoleManagement />
                 </ProtectedRoute>
               } />
-              {/* New routes for Sandbox Orchestration and Release Deployment */}
               <Route path="/sandbox" element={
                 <ProtectedRoute>
                   <SandboxOrchestration />
@@ -97,6 +102,7 @@ const App = () => (
                   <ReleaseDeployment />
                 </ProtectedRoute>
               } />
+              
               {/* Catch all route for 404 errors */}
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -1,5 +1,7 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { OIDCConfig } from '@/services/api';
+import { useNavigate } from 'react-router-dom';
 
 // Simplified user model with authentication support
 export interface User {
@@ -132,6 +134,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser({ ...mockUser, authenticated: false });
     localStorage.removeItem('user');
     setIsLoading(false);
+    
+    // Force redirect to home page
+    window.location.href = '/';
   };
 
   const saveOIDCConfig = (provider: string, config: OIDCConfig) => {
