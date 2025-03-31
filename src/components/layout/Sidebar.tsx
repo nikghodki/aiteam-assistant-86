@@ -95,7 +95,7 @@ export const Sidebar = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login');
+      navigate('/', { replace: true });
       toast({
         title: "Logged out successfully",
         description: "You have been logged out of your account",
