@@ -5,7 +5,6 @@ import { Terminal, Database, Server, Search, ArrowRight, Github } from 'lucide-r
 import { useAuth } from '@/contexts/AuthContext';
 import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import GlassMorphicCard from '@/components/ui/GlassMorphicCard';
-import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 
 const features = [
@@ -50,6 +49,7 @@ const Index = () => {
 
   const handleGithubLogin = async () => {
     try {
+      console.log("Starting GitHub login from Index page");
       await loginWithGithub();
     } catch (error) {
       console.error("GitHub login failed:", error);
@@ -172,7 +172,7 @@ const Index = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <GlassMorphicCard key={index} className={`p-6 animate-fade-in delay-${feature.delay}`}>
+              <GlassMorphicCard key={index} className={`p-6`}>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <feature.icon size={24} className="text-primary" />
                 </div>
@@ -202,14 +202,14 @@ const Index = () => {
               <div className="absolute bottom-0 left-0 -mb-32 -ml-32 w-80 h-80 bg-primary/10 rounded-full blur-3xl"></div>
               
               <div className="relative max-w-3xl mx-auto text-center">
-                <h2 className="text-3xl md:text-4xl font-bold mb-4 animate-fade-in">
+                <h2 className="text-3xl md:text-4xl font-bold mb-4">
                   Ready to streamline your infrastructure management?
                 </h2>
-                <p className="text-muted-foreground mb-8 animate-fade-in" style={{ animationDelay: '100ms' }}>
+                <p className="text-muted-foreground mb-8">
                   Join other SRE teams who have reduced debugging time by 70% and improved access management security with SRE Assistant.
                 </p>
                 
-                <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '200ms' }}>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <button 
                     onClick={handleGetStarted}
                     className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale"

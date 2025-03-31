@@ -29,6 +29,7 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
     },
   },
 });
@@ -42,11 +43,11 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Public routes */}
+              {/* Public routes - must be accessible without auth */}
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
               
-              {/* Auth callback routes - need to catch ALL variations */}
+              {/* Auth callback routes - must not redirect if not authenticated */}
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="auth/callback" element={<AuthCallback />} />
               <Route path="*/auth/callback" element={<AuthCallback />} />

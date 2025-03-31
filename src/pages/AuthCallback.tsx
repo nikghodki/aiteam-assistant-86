@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -133,13 +134,13 @@ const AuthCallback = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-white to-professional-gray-light/50">
       {error ? (
-        <div className="text-center">
+        <div className="text-center p-6 bg-white rounded-lg shadow-md">
           <h1 className="text-2xl font-bold text-red-600">Authentication Failed</h1>
           <p className="mt-2 text-gray-600">{error}</p>
           <p className="mt-4">Redirecting to front page...</p>
         </div>
       ) : (
-        <div className="text-center">
+        <div className="text-center p-6 bg-white rounded-lg shadow-md">
           <h1 className="text-2xl font-bold">Authentication in progress</h1>
           <div className="mt-4 w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-4">Please wait while we complete your authentication...</p>
