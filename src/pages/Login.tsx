@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
-import { Github, Mail, AlertTriangle } from 'lucide-react';
+import { Github, Mail, AlertTriangle, Shield } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 
@@ -15,6 +15,7 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loggingInWithGithub, setLoggingInWithGithub] = useState(false);
+  const [loggingInWithSaml, setLoggingInWithSaml] = useState(false);
 
   useEffect(() => {
     if (bypassAuthForTesting || user?.authenticated) {
@@ -75,6 +76,41 @@ const Login = () => {
       toast({
         title: "GitHub login failed",
         description: "There was a problem signing in with GitHub. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSamlLogin = async () => {
+    try {
+      setLoggingInWithSaml(true);
+      console.log("Starting SAML login process");
+      
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+      
+      if (import.meta.env.DEV) {
+        setTimeout(() => {
+          const mockSamlUser = {
+            id: 'saml-user-id',
+            name: 'SAML User',
+            email: 'saml-user@example.com',
+            authenticated: true
+          };
+          
+          localStorage.setItem('user', JSON.stringify(mockSamlUser));
+          window.location.href = '/dashboard';
+        }, 1500);
+        return;
+      }
+      
+      window.location.href = `${API_BASE_URL}/auth/saml`;
+      
+    } catch (error) {
+      console.error('SAML login error:', error);
+      setLoggingInWithSaml(false);
+      toast({
+        title: "SAML login failed",
+        description: "There was a problem initiating SAML login. Please try again.",
         variant: "destructive",
       });
     }
@@ -151,7 +187,7 @@ const Login = () => {
             variant="outline" 
             className="w-full flex items-center justify-center gap-2" 
             onClick={handleGoogleLogin}
-            disabled={isLoading || bypassAuthForTesting || loggingInWithGithub}
+            disabled={isLoading || bypassAuthForTesting || loggingInWithGithub || loggingInWithSaml}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24">
               <path
@@ -179,7 +215,7 @@ const Login = () => {
             variant="outline" 
             className="w-full flex items-center justify-center gap-2" 
             onClick={handleGithubLogin}
-            disabled={isLoading || bypassAuthForTesting || loggingInWithGithub}
+            disabled={isLoading || bypassAuthForTesting || loggingInWithGithub || loggingInWithSaml}
           >
             {loggingInWithGithub ? (
               <>
@@ -190,6 +226,26 @@ const Login = () => {
               <>
                 <Github className="h-4 w-4" />
                 <span>Sign in with GitHub</span>
+              </>
+            )}
+          </Button>
+
+          <Button 
+            type="button" 
+            variant="outline" 
+            className="w-full flex items-center justify-center gap-2" 
+            onClick={handleSamlLogin}
+            disabled={isLoading || bypassAuthForTesting || loggingInWithGithub || loggingInWithSaml}
+          >
+            {loggingInWithSaml ? (
+              <>
+                <div className="w-4 h-4 border-2 border-t-transparent border-current rounded-full animate-spin mr-2"></div>
+                <span>Connecting with SAML...</span>
+              </>
+            ) : (
+              <>
+                <Shield className="h-4 w-4" />
+                <span>Sign in with SAML SSO</span>
               </>
             )}
           </Button>
@@ -224,7 +280,7 @@ const Login = () => {
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isLoading || bypassAuthForTesting}
+              disabled={isLoading || bypassAuthForTesting || loggingInWithSaml}
             >
               {isLoading ? (
                 <div className="flex items-center justify-center">

@@ -24,6 +24,7 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
 import Fallback from "./pages/Fallback";
 import ApiDebug from "./pages/ApiDebug";
+import SamlSetup from "./pages/SamlSetup"; // Import the new SAML setup page
 
 // Create a client with better error handling
 const queryClient = new QueryClient({
@@ -82,6 +83,7 @@ const App = () => {
                 <Route path="/roles" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
                 <Route path="/sandbox" element={<ProtectedRoute><SandboxOrchestration /></ProtectedRoute>} />
                 <Route path="/release" element={<ProtectedRoute><ReleaseDeployment /></ProtectedRoute>} />
+                <Route path="/saml-setup" element={<ProtectedRoute><SamlSetup /></ProtectedRoute>} />
                 
                 {/* Catch all route for 404 errors */}
                 <Route path="*" element={<NotFound />} />

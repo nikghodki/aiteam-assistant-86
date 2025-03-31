@@ -44,7 +44,8 @@ const ApiDebug = () => {
         toast({
           title: "API Response Warning",
           description: `Server responded with status: ${response.status}`,
-          variant: "warning",
+          // Changed from "warning" to "default"
+          variant: "default",
         });
       }
     } catch (error) {

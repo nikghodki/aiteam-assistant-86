@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/use-toast';
 import { oidcApi, OIDCConfig } from '@/services/api';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Shield } from 'lucide-react';
 
 const defaultConfig: Record<string, OIDCConfig> = {
   google: {
@@ -141,6 +141,33 @@ const Settings = () => {
         </div>
 
         <div className="grid gap-6">
+          {/* New SAML Card */}
+          <Card className="border border-border/50 shadow-md backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>SAML Authentication</CardTitle>
+                <CardDescription>
+                  Set up enterprise-grade Single Sign-On with your Identity Provider
+                </CardDescription>
+              </div>
+              <Shield className="h-8 w-8 text-primary opacity-80" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                SAML (Security Assertion Markup Language) enables secure authentication and single sign-on
+                capabilities for enterprise environments. Configure your connection with identity providers
+                like Okta, OneLogin, Azure AD, or Auth0.
+              </p>
+              <Button 
+                className="w-full" 
+                onClick={() => navigate('/saml-setup')}
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Configure SAML Integration
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card className="border border-border/50 shadow-md backdrop-blur-sm">
             <CardHeader>
               <CardTitle>OIDC Authentication Configuration</CardTitle>

@@ -7,6 +7,7 @@ import boto3
 from api.auth_routes import auth_bp, configure_auth
 from api.kubernetes_routes import kubernetes_bp
 from api.access_routes import access_bp
+from api.saml_routes import saml_bp
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +40,7 @@ configure_auth(app)
 app.register_blueprint(auth_bp)
 app.register_blueprint(kubernetes_bp)
 app.register_blueprint(access_bp)
+app.register_blueprint(saml_bp)  # Register the SAML blueprint
 
 # Simple health check endpoint
 @app.route('/api/health', methods=['GET'])
