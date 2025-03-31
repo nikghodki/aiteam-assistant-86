@@ -41,7 +41,7 @@ def github_callback():
         # Verify the state to prevent CSRF attacks
         stored_state = session.get('oauth_state')
         if not stored_state or stored_state != state:
-            return redirect(f"{FRONTEND_URL}?error=invalid_state")
+            return redirect(f"{FRONTEND_URL}/auth/callback?error=invalid_state")
 
         # Clear the state from the session
         session.pop('oauth_state', None)
@@ -63,7 +63,7 @@ def github_callback():
 
         # Check if the token request was successful
         if token_response.status_code != 200:
-            return redirect(f"{FRONTEND_URL}?error=token_error")
+            return redirect(f"{FRONTEND_URL}/auth/callback?error=token_error")
 
         token_data = token_response.json()
         github_access_token = token_data.get('access_token')
@@ -80,14 +80,14 @@ def github_callback():
         # Get user profile
         user_response = token_session.get(user_url, headers=headers)
         if user_response.status_code != 200:
-            return redirect(f"{FRONTEND_URL}?error=user_error")
+            return redirect(f"{FRONTEND_URL}/auth/callback?error=user_error")
 
         user_data = user_response.json()
 
         # Get user emails (to ensure we have the primary email)
         emails_response = token_session.get(user_emails_url, headers=headers)
         if emails_response.status_code != 200:
-            return redirect(f"{FRONTEND_URL}?error=email_error")
+            return redirect(f"{FRONTEND_URL}/auth/callback?error=email_error")
 
         emails_data = emails_response.json()
 
@@ -138,7 +138,7 @@ def github_callback():
         # Ensure we close any open resources
         if 'token_session' in locals():
             token_session.close()
-        return redirect(f"{FRONTEND_URL}?error=server_error")
+        return redirect(f"{FRONTEND_URL}/auth/callback?error=server_error")
 
 @auth_bp.route('/api/auth/login', methods=['POST'])
 def login():

@@ -18,258 +18,85 @@ const AuthCallback = () => {
         console.log("AuthCallback component mounted - processing authentication data");
         console.log("Current location:", location.pathname, location.search);
         
-        // Get the authorization code from URL
+        // Get the parameters from URL
         const urlParams = new URLSearchParams(location.search);
-        const code = urlParams.get('code');
-        const state = urlParams.get('state');
+        const accessToken = urlParams.get('accessToken');
+        const refreshToken = urlParams.get('refreshToken');
+        const expiresAt = urlParams.get('expiresAt');
         const error = urlParams.get('error');
-        const errorDescription = urlParams.get('error_description');
         
-        // Check for user_data (from Google, GitHub or SAML callback)
-        const userData = urlParams.get('user_data');
-        if (userData) {
-          console.log("Found user_data in URL, processing...");
-          try {
-            // Decode the user data
-            const decodedUserData = JSON.parse(atob(userData));
-            console.log("Successfully decoded user data:", decodedUserData.email || "no email");
-            
-            // Store user data in localStorage
-            localStorage.setItem('user', JSON.stringify(decodedUserData));
-            
-            // Create mock tokens for the user (in a real app, these would come from the server)
-            const mockTokens = {
-              accessToken: `mock-token-${Date.now()}`,
-              refreshToken: `mock-refresh-${Date.now()}`,
-              expiresAt: Date.now() + 3600000 // 1 hour from now
-            };
-            
-            // Store tokens in localStorage
-            localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
-            
-            // Update auth context to reflect logged-in state
-            if (login) {
-              await login(decodedUserData.email, 'password-not-used');
-              console.log("User authenticated successfully via context");
-              
-              // Show success toast
-              toast({
-                title: "Login successful",
-                description: `Welcome, ${decodedUserData.name || decodedUserData.email}!`,
-              });
-              
-              // Navigate to dashboard without page reload
-              navigate('/dashboard', { replace: true });
-            } else {
-              console.error("Login function not available in context");
-              window.location.href = '/dashboard';
-            }
-            return;
-          } catch (e) {
-            console.error('Failed to parse user data:', e);
-            setError('Authentication failed: Invalid user data');
-            setTimeout(() => navigate('/', { replace: true }), 2000);
-            return;
-          }
-        }
-        
-        // This must be an OIDC callback
-        // Get the provider from session storage
-        const provider = sessionStorage.getItem('oidc_provider');
-        
-        // Clear session storage
-        sessionStorage.removeItem('oidc_provider');
-        
+        // Handle any errors
         if (error) {
-          console.error('Authentication error:', error, errorDescription);
-          setError(errorDescription || 'Authentication failed');
+          console.error('Authentication error:', error);
+          setError('Authentication failed');
           toast({
             title: "Authentication failed",
-            description: errorDescription || "There was an error during authentication.",
+            description: "There was an error during authentication.",
             variant: "destructive",
           });
           setTimeout(() => navigate('/', { replace: true }), 2000);
           return;
         }
         
-        if (!code || !state) {
-          console.error('Missing code or state parameters');
-          setError('Missing required authentication parameters');
-          setTimeout(() => navigate('/', { replace: true }), 2000);
+        // If we have tokens, store them and redirect
+        if (accessToken && refreshToken && expiresAt) {
+          console.log("Received authentication tokens");
+          
+          // Store tokens
+          const tokens = {
+            accessToken,
+            refreshToken,
+            expiresAt: parseInt(expiresAt)
+          };
+          
+          localStorage.setItem('auth_tokens', JSON.stringify(tokens));
+          
+          // Make a request to get the user data using the token
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+          const response = await fetch(`${API_BASE_URL}/auth/session`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`
+            }
+          });
+          
+          if (response.ok) {
+            const userData = await response.json();
+            if (userData.user) {
+              // Store the user data
+              localStorage.setItem('user', JSON.stringify(userData.user));
+              
+              // Log the user in using the context
+              if (login) {
+                await login(userData.user.email, 'password-not-used');
+                
+                toast({
+                  title: "GitHub Login Successful",
+                  description: `Welcome, ${userData.user.name || userData.user.email}!`,
+                });
+                
+                navigate('/dashboard', { replace: true });
+              } else {
+                console.error("Login function not available in context");
+                window.location.href = '/dashboard';
+              }
+              return;
+            }
+          }
+          
+          // If we couldn't get user data, still try to proceed
+          navigate('/dashboard', { replace: true });
           return;
         }
         
-        // For GitHub specifically, handle GitHub login
-        if (provider === 'github' || state.includes('github')) {
-          console.log("Processing GitHub authentication");
-          
-          // In development, simulate successful GitHub login
-          if (import.meta.env.DEV) {
-            const mockGithubUser = {
-              id: 'github-user-id',
-              name: 'GitHub User',
-              email: 'github-user@example.com',
-              photoUrl: 'https://avatars.githubusercontent.com/u/1234567',
-              authenticated: true
-            };
-            
-            localStorage.setItem('user', JSON.stringify(mockGithubUser));
-            
-            // Create mock tokens and store them
-            const mockTokens = {
-              accessToken: `github-token-${Date.now()}`,
-              refreshToken: `github-refresh-${Date.now()}`,
-              expiresAt: Date.now() + 3600000 // 1 hour from now
-            };
-            localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
-            
-            // Log the user in using the auth context
-            await login("github-user@example.com", 'password-not-used');
-            
-            toast({
-              title: "GitHub Login Successful",
-              description: "Welcome, GitHub User!",
-            });
-            
-            navigate('/dashboard', { replace: true });
-            return;
-          }
-          
-          try {
-            // In a real app, this would call your backend to exchange the code for tokens
-            console.log("Exchanging GitHub code for tokens");
-            
-            // For now, we'll just simulate success
-            const mockGithubUser = {
-              id: 'github-user-id',
-              name: 'GitHub User',
-              email: 'github-user@example.com',
-              photoUrl: 'https://avatars.githubusercontent.com/u/1234567',
-              authenticated: true
-            };
-            
-            localStorage.setItem('user', JSON.stringify(mockGithubUser));
-            
-            // Create mock tokens and store them
-            const mockTokens = {
-              accessToken: `github-token-${Date.now()}`,
-              refreshToken: `github-refresh-${Date.now()}`,
-              expiresAt: Date.now() + 3600000 // 1 hour from now
-            };
-            localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
-            
-            await login("github-user@example.com", 'password-not-used');
-            
-            toast({
-              title: "GitHub Login Successful",
-              description: "Welcome, GitHub User!",
-            });
-            
-            navigate('/dashboard', { replace: true });
-            return;
-          } catch (error) {
-            console.error("Error during GitHub authentication:", error);
-            setError('GitHub authentication failed');
-            setTimeout(() => navigate('/', { replace: true }), 2000);
-            return;
-          }
-        }
-        
-        if (!provider) {
-          console.error('Missing provider in session storage');
-          // For GitHub specifically, assume it's GitHub if no provider but has code and state
-          if (code && state) {
-            console.log("No provider specified but code and state exist - assuming GitHub");
-            
-            // Create mock tokens and store them
-            const mockTokens = {
-              accessToken: `github-token-${Date.now()}`,
-              refreshToken: `github-refresh-${Date.now()}`,
-              expiresAt: Date.now() + 3600000 // 1 hour from now
-            };
-            localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
-            
-            // Attempt login with GitHub credentials
-            await login("github-user@example.com", 'password-not-used');
-            
-            toast({
-              title: "Authentication successful",
-              description: "Successfully authenticated with GitHub",
-            });
-            
-            navigate('/dashboard', { replace: true });
-            return;
-          } else {
-            setError('Authentication provider information missing');
-            setTimeout(() => navigate('/', { replace: true }), 2000);
-            return;
-          }
-        }
-        
-        // Process the callback with the backend
-        try {
-          const result = await oidcApi.processCallback(provider, code, state);
-          
-          if (!result.success) {
-            throw new Error(result.error || `Authentication with ${provider} failed`);
-          }
-          
-          // Handle successful authentication
-          if (result.user) {
-            // Store tokens if they are returned
-            if (result.tokens) {
-              localStorage.setItem('auth_tokens', JSON.stringify(result.tokens));
-            } else {
-              // Create mock tokens as fallback
-              const mockTokens = {
-                accessToken: `${provider}-token-${Date.now()}`,
-                refreshToken: `${provider}-refresh-${Date.now()}`,
-                expiresAt: Date.now() + 3600000 // 1 hour from now
-              };
-              localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
-            }
-            
-            // Update auth context with the user information
-            await login(result.user.email, 'password-not-used');
-          } else {
-            // Create mock tokens as fallback
-            const mockTokens = {
-              accessToken: `${provider}-token-${Date.now()}`,
-              refreshToken: `${provider}-refresh-${Date.now()}`,
-              expiresAt: Date.now() + 3600000 // 1 hour from now
-            };
-            localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
-            
-            await login(`user@${provider}.com`, 'password-not-used');
-          }
-          
-          toast({
-            title: "Authentication successful",
-            description: `Successfully authenticated with ${provider}`,
-          });
-          
-          // Use React Router's navigate instead of window.location for smoother transition
-          navigate('/dashboard', { replace: true });
-        } catch (err) {
-          console.warn('API call failed but attempting direct auth anyway', err);
-          
-          // Create mock tokens as fallback
-          const mockTokens = {
-            accessToken: `${provider || 'github'}-token-${Date.now()}`,
-            refreshToken: `${provider || 'github'}-refresh-${Date.now()}`,
-            expiresAt: Date.now() + 3600000 // 1 hour from now
-          };
-          localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
-          
-          await login(`user@${provider || 'github'}.com`, 'password-not-used');
-          
-          toast({
-            title: "Authentication successful",
-            description: `Successfully authenticated with ${provider || 'GitHub'}`,
-          });
-          
-          navigate('/dashboard', { replace: true });
-        }
+        // If no tokens and no error, something unexpected happened
+        console.error('Missing tokens in URL');
+        setError('Authentication data missing');
+        toast({
+          title: "Authentication failed",
+          description: "Could not complete authentication.",
+          variant: "destructive",
+        });
+        setTimeout(() => navigate('/', { replace: true }), 2000);
       } catch (err: any) {
         console.error('Error processing authentication callback:', err);
         setError(err?.message || 'An unexpected error occurred');

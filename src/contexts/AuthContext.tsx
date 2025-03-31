@@ -193,11 +193,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     
     try {
-      // Store the provider in session storage for the callback
-      sessionStorage.setItem('oidc_provider', 'github');
-      
       // In development mode, simulate GitHub login
-      if (import.meta.env.DEV) {
+      if (import.meta.env.DEV && bypassAuthForTesting) {
         const mockGithubUser = {
           id: 'github-user-id',
           name: 'GitHub User',
@@ -213,22 +210,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.setItem('auth_tokens', JSON.stringify(testTokens));
         setTokens(testTokens);
         
-        // Redirect to auth callback to simulate the flow
-        window.location.href = '/auth/callback?code=mock-code&state=mock-state';
+        toast({
+          title: "GitHub Login Successful (Dev Mode)",
+          description: "Welcome, GitHub User!",
+        });
+        
+        // Redirect to dashboard in dev mode
+        window.location.href = '/dashboard';
         return;
       }
       
-      // Redirect to GitHub login
-      const redirectUrl = `${window.location.origin}/auth/callback`;
-      const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${import.meta.env.VITE_GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUrl)}&scope=user:email&state=github`;
+      // Redirect to our backend API endpoint for GitHub login
+      window.location.href = `${API_BASE_URL}/auth/github`;
       
-      window.location.href = githubAuthUrl;
     } catch (error) {
       console.error('GitHub login failed:', error);
       setIsLoading(false);
       toast({
         title: "GitHub Login Failed",
-        description: "Could not redirect to GitHub authentication",
+        description: "Could not initiate GitHub authentication",
         variant: "destructive",
       });
     }

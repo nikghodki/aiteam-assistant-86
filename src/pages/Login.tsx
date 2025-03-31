@@ -15,6 +15,7 @@ const Login = () => {
   const { login, loginWithGoogle, loginWithGithub, isLoading, user, bypassAuthForTesting, toggleBypassAuth } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loggingInWithGithub, setLoggingInWithGithub] = useState(false);
 
   useEffect(() => {
     if (bypassAuthForTesting || user?.authenticated) {
@@ -57,9 +58,11 @@ const Login = () => {
 
   const handleGithubLogin = async () => {
     try {
+      setLoggingInWithGithub(true);
       await loginWithGithub();
     } catch (error) {
       console.error('GitHub login error:', error);
+      setLoggingInWithGithub(false);
       toast({
         title: "GitHub login failed",
         description: "There was a problem signing in with GitHub. Please try again.",
@@ -140,7 +143,7 @@ const Login = () => {
             variant="outline" 
             className="w-full flex items-center justify-center gap-2" 
             onClick={handleGoogleLogin}
-            disabled={isLoading || bypassAuthForTesting}
+            disabled={isLoading || bypassAuthForTesting || loggingInWithGithub}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24">
               <path
@@ -168,10 +171,19 @@ const Login = () => {
             variant="outline" 
             className="w-full flex items-center justify-center gap-2" 
             onClick={handleGithubLogin}
-            disabled={isLoading || bypassAuthForTesting}
+            disabled={isLoading || bypassAuthForTesting || loggingInWithGithub}
           >
-            <Github className="h-4 w-4" />
-            <span>Sign in with GitHub</span>
+            {loggingInWithGithub ? (
+              <>
+                <div className="w-4 h-4 border-2 border-t-transparent border-current rounded-full animate-spin mr-2"></div>
+                <span>Connecting to GitHub...</span>
+              </>
+            ) : (
+              <>
+                <Github className="h-4 w-4" />
+                <span>Sign in with GitHub</span>
+              </>
+            )}
           </Button>
 
           <div className="relative flex items-center justify-center">
