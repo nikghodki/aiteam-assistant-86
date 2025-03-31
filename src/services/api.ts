@@ -1,4 +1,3 @@
-
 // API base URL should be configured in your environment
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 export const S3_BUCKET_URL = import.meta.env.VITE_S3_BUCKET_URL || 'https://k8s-debugger-bucket.s3.amazonaws.com';
@@ -183,17 +182,29 @@ export const fetchS3File = async (filePath: string): Promise<string> => {
   try {
     // Make sure to remove any leading slash
     const cleanPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
-    const url = `${S3_BUCKET_URL}/${cleanPath}`;
     
-    console.log(`Fetching S3 file: ${url}`);
-    
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+    // First try to fetch via backend proxy which uses IAM role
+    try {
+      const response = await apiCall<{ content: string }>(`/kubernetes/s3-object`, {
+        method: 'POST',
+        body: JSON.stringify({ filePath: cleanPath }),
+      });
+      
+      console.log(`Successfully fetched S3 file via IAM role: ${filePath}`);
+      return response.content;
+    } catch (proxyError) {
+      console.warn("IAM role fetch failed, falling back to direct URL:", proxyError);
+      
+      // Fall back to direct URL if proxy fails
+      const url = `${S3_BUCKET_URL}/${cleanPath}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+      }
+      
+      return await response.text();
     }
-    
-    return await response.text();
   } catch (error) {
     console.error("Error fetching S3 file:", error);
     throw new Error(`Failed to fetch file: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -326,7 +337,11 @@ export const kubernetesApi = {
       method: 'POST',
       body: JSON.stringify({ clusterArn, namespace }),
     });
-  }
+  },
+
+  getS3Object: (filePath: string): Promise<string> => {
+    return fetchS3File(filePath);
+  },
 };
 
 export const jiraApi = {
