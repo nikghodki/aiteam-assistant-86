@@ -1,9 +1,8 @@
-
 import os
 import uuid
 import requests
 import jwt
-from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
+from jwt.exceptions import DecodeError, ExpiredSignatureError
 from flask import Blueprint, request, jsonify, redirect, session
 from api.auth import (
     jwt_required, users, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET,
@@ -211,8 +210,10 @@ def refresh_token():
         })
     except ExpiredSignatureError:
         return jsonify({'message': 'Refresh token has expired'}), 401
-    except InvalidTokenError:
+    except DecodeError:
         return jsonify({'message': 'Invalid refresh token'}), 401
+    except Exception:
+        return jsonify({'message': 'Token validation failed'}), 401
 
 @auth_bp.route('/api/auth/logout', methods=['POST'])
 @jwt_required
