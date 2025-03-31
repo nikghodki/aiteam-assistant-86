@@ -1,4 +1,3 @@
-
 // API base URL should be configured in your environment
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 export const S3_BUCKET_URL = import.meta.env.VITE_S3_BUCKET_URL || 'https://k8s-debugger-bucket.s3.amazonaws.com';
@@ -185,15 +184,30 @@ export const fetchS3File = async (filePath: string): Promise<string> => {
     const cleanPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
     const url = `${S3_BUCKET_URL}/${cleanPath}`;
     
-    console.log(`Fetching S3 file: ${url}`);
+    console.log(`Fetching S3 file from URL: ${url}`);
     
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      cache: 'no-store', // Disable caching to ensure we get fresh content
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
     
     if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error(`S3 fetch error: Status ${response.status}, Response:`, errorText);
       throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
     }
     
-    return await response.text();
+    const content = await response.text();
+    console.log(`S3 file fetched successfully. Content length: ${content.length}`);
+    if (!content || content.trim() === '') {
+      console.warn('Warning: S3 file content is empty');
+    }
+    
+    return content;
   } catch (error) {
     console.error("Error fetching S3 file:", error);
     throw new Error(`Failed to fetch file: ${error instanceof Error ? error.message : 'Unknown error'}`);
