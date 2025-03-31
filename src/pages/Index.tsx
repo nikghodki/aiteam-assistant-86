@@ -90,16 +90,16 @@ const Index = () => {
             <div className="flex flex-col items-start space-y-6">
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-2 animate-fade-in">
                 <Terminal size={16} className="mr-2" />
-                <span>AI Software and Platform Team</span>
+                <span>Internal AI Tool by SRE & QA Teams</span>
               </div>
               
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight animate-fade-in" style={{ animationDelay: '100ms' }}>
                 AI-Powered <br />
-                <span className="text-primary">Infrastructure</span> Automation
+                <span className="text-primary">Self-Service</span> Platform
               </h1>
               
               <p className="text-lg text-muted-foreground max-w-lg animate-fade-in" style={{ animationDelay: '200ms' }}>
-                Boosting productivity with intelligent tools that automate infrastructure management, Kubernetes debugging, and documentation search for the AI Software and Platform team.
+                Developed by the SRE and QA teams to provide AI-based automation tools that improve productivity and enable self-service for the AI Software and Platform team.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 pt-4 animate-fade-in" style={{ animationDelay: '300ms' }}>
@@ -159,10 +159,10 @@ const Index = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 animate-fade-in">
-              AI-Powered Tools for Platform Teams
+              Internal Self-Service Tools
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '100ms' }}>
-              Purpose-built automation to streamline operations and boost productivity
+              Created by the SRE & QA teams to help the AI Software and Platform team increase productivity
             </p>
           </div>
           
@@ -189,13 +189,13 @@ const Index = () => {
         </div>
       </section>
       
-      {/* Tech Stack Section - New! */}
+      {/* Tech Stack Section */}
       <section className="py-16 md:py-20 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold mb-4">Our AI Technology Stack</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4">Built For Your Productivity</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Built with cutting-edge AI and machine learning technologies
+              Created by the SRE & QA teams with cutting-edge AI technologies for the AI Software and Platform team
             </p>
           </div>
           
@@ -245,10 +245,10 @@ const Index = () => {
               
               <div className="relative max-w-3xl mx-auto text-center">
                 <h2 className="text-3xl md:text-4xl font-bold mb-4 animate-fade-in">
-                  Ready to boost your team's productivity?
+                  Ready to boost your productivity?
                 </h2>
                 <p className="text-muted-foreground mb-8 animate-fade-in" style={{ animationDelay: '100ms' }}>
-                  Join the AI Software and Platform team in using our specialized assistant to automate infrastructure tasks and increase productivity across your projects.
+                  This internal tool was built by the SRE and QA teams to help you automate infrastructure tasks and increase productivity. Sign in to get started!
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '200ms' }}>
