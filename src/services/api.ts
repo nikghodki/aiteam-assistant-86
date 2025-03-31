@@ -180,8 +180,24 @@ export const fetchS3File = async (filePath: string): Promise<string> => {
   }
   
   try {
+    // Handle s3:// URI format
+    let cleanPath = filePath;
+    
+    // If it's an S3 URI, extract just the path part
+    if (filePath.startsWith('s3://')) {
+      const parts = filePath.substring(5).split('/', 2);
+      const bucket = parts[0];
+      
+      // Remove bucket name from path if it's our known bucket
+      if (bucket === 'k8s-debugger-bucket') {
+        cleanPath = filePath.substring(5 + bucket.length);
+      } else {
+        throw new Error(`Unsupported bucket: ${bucket}. Only k8s-debugger-bucket is allowed.`);
+      }
+    }
+    
     // Make sure to remove any leading slash
-    const cleanPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
+    cleanPath = cleanPath.startsWith('/') ? cleanPath.substring(1) : cleanPath;
     
     // First try to fetch via backend proxy which uses IAM role
     try {
@@ -339,8 +355,8 @@ export const kubernetesApi = {
     });
   },
 
-  getS3Object: (filePath: string): Promise<string> => {
-    return fetchS3File(filePath);
+  getS3Object: (s3Uri: string): Promise<string> => {
+    return fetchS3File(s3Uri);
   },
 };
 
