@@ -1,9 +1,12 @@
+
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Terminal, Database, Server, Search, ArrowRight } from 'lucide-react';
+import { Terminal, Database, Server, Search, ArrowRight, Github } from 'lucide-react';
 import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import GlassMorphicCard from '@/components/ui/GlassMorphicCard';
 import { Layout } from '@/components/layout/Layout';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const features = [
   {
@@ -28,6 +31,7 @@ const features = [
 
 const Index = () => {
   const navigate = useNavigate();
+  const { loginWithGithub, user } = useAuth();
 
   // Adding subtle background scroll effect for depth
   useEffect(() => {
@@ -43,6 +47,14 @@ const Index = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleGithubLogin = async () => {
+    try {
+      await loginWithGithub();
+    } catch (error) {
+      console.error('GitHub login failed:', error);
+    }
+  };
 
   return (
     <Layout>
@@ -71,17 +83,34 @@ const Index = () => {
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 pt-4 animate-fade-in" style={{ animationDelay: '300ms' }}>
-                <button 
-                  onClick={() => navigate('/dashboard')}
-                  className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale flex items-center"
-                >
-                  <span>Get Started</span>
-                  <ArrowRight size={16} className="ml-2" />
-                </button>
-                
-                <button className="px-6 py-3 border border-input rounded-md font-medium hover:bg-muted transition-colors">
-                  Learn More
-                </button>
+                {user.authenticated ? (
+                  <Button 
+                    onClick={() => navigate('/dashboard')}
+                    className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale flex items-center"
+                  >
+                    <span>Go to Dashboard</span>
+                    <ArrowRight size={16} className="ml-2" />
+                  </Button>
+                ) : (
+                  <>
+                    <Button 
+                      onClick={() => navigate('/login')}
+                      className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale flex items-center"
+                    >
+                      <span>Sign In</span>
+                      <ArrowRight size={16} className="ml-2" />
+                    </Button>
+                    
+                    <Button 
+                      onClick={handleGithubLogin} 
+                      variant="outline"
+                      className="px-6 py-3 border border-input rounded-md font-medium hover:bg-muted transition-colors flex items-center"
+                    >
+                      <Github size={16} className="mr-2" />
+                      <span>Login with GitHub</span>
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
             
