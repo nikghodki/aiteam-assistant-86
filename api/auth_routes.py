@@ -208,12 +208,14 @@ def refresh_token():
             'accessToken': tokens['accessToken'],
             'expiresAt': tokens['expiresAt']
         })
-    except ExpiredSignatureError:
-        return jsonify({'message': 'Refresh token has expired'}), 401
-    except DecodeError:
-        return jsonify({'message': 'Invalid refresh token'}), 401
-    except Exception:
-        return jsonify({'message': 'Token validation failed'}), 401
+    except Exception as e:
+        error_message = str(e)
+        if "expired" in error_message.lower():
+            return jsonify({'message': 'Refresh token has expired'}), 401
+        elif "invalid" in error_message.lower():
+            return jsonify({'message': 'Invalid refresh token'}), 401
+        else:
+            return jsonify({'message': 'Token validation failed'}), 401
 
 @auth_bp.route('/api/auth/logout', methods=['POST'])
 @jwt_required
