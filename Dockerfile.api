@@ -19,6 +19,12 @@ RUN apt-get update && apt-get install -y openssl && \
 
 # Create a non-root user and switch to it
 RUN adduser --disabled-password --gecos '' appuser
+
+# Create debug_files directory and add sample files for testing
+RUN mkdir -p /app/debug_files
+RUN echo "This is a sample debug file content" > /app/debug_files/sample_debug.txt
+RUN echo '{"message": "Sample JSON content"}' > /app/debug_files/sample_debug.json
+
 RUN chown -R appuser:appuser /app
 USER appuser
 
@@ -32,7 +38,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     GITHUB_CLIENT_ID="your-real-github-client-id" \
     GITHUB_CLIENT_SECRET="your-real-github-client-secret" \
     GITHUB_REDIRECT_URI="http://localhost:8000/api/auth/github/callback" \
-    FRONTEND_URL="http://localhost:5173"
+    FRONTEND_URL="http://localhost:5173" \
+    DEBUG_FILES_DIR="/app/debug_files" \
+    FLASK_CORS_ALLOW_ORIGINS="*"
 
 # Command to run the application with Gunicorn
 # - workers: 2 worker processes (adjust based on available CPU cores)

@@ -26,7 +26,10 @@ except ImportError:
     print("Warning: SAML libraries not installed. SAML authentication will be disabled.")
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=['*'], allow_headers=['Content-Type', 'Authorization'])
+
+# Allow CORS for all routes, with credentials support and multiple origins
+allowed_origins = os.environ.get('FLASK_CORS_ALLOW_ORIGINS', '*').split(',')
+CORS(app, supports_credentials=True, origins=allowed_origins, allow_headers=['Content-Type', 'Authorization'])
 
 # Set a secret key for sessions
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', str(uuid.uuid4()))
@@ -669,9 +672,18 @@ def get_namespace_issues():
         return jsonify([]), 400
 
 # New endpoint to retrieve files directly from container filesystem
-@app.route('/api/kubernetes/file', methods=['POST'])
+@app.route('/api/kubernetes/file', methods=['POST', 'OPTIONS'])
 def get_file():
     """Retrieve a file from the container filesystem"""
+    # Handle OPTIONS request for CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Max-Age', '3600')
+        return response
+        
     try:
         data = request.json
         if not data or 'filePath' not in data:
@@ -716,16 +728,27 @@ def get_file():
             
         # Get file modification time
         last_modified = os.path.getmtime(full_path)
-            
-        return jsonify({
+
+        response = jsonify({
             "content": file_content,
             "contentType": content_type,
             "lastModified": time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(last_modified))
         })
+        
+        # Add CORS headers directly to the response
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        
+        return response
     
     except Exception as e:
         print(f"Error processing file request: {str(e)}")
-        return jsonify({"error": f"Failed to retrieve file: {str(e)}"}), 500
+        response = jsonify({"error": f"Failed to retrieve file: {str(e)}"}), 500
+        if isinstance(response, tuple) and len(response) > 0:
+            # Add CORS headers to error response
+            response[0].headers.add('Access-Control-Allow-Origin', '*')
+        return response
 
 # Keep the existing S3 endpoint for backward compatibility
 @app.route('/api/kubernetes/s3-object', methods=['POST'])
