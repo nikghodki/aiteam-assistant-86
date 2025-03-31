@@ -65,29 +65,3 @@ export const getFilenameFromKey = (key: string): string => {
   const parts = key.split('/');
   return parts[parts.length - 1] || '';
 };
-
-/**
- * Normalizes an S3 URI or path for use with our backend API
- * @param uriOrPath S3 URI (s3://bucket/key) or path (/path/to/file)
- * @param defaultBucket Default bucket name to use if path doesn't include bucket
- * @returns Normalized path to use with API
- */
-export const normalizeS3Path = (uriOrPath: string, defaultBucket: string = 'k8s-debugger-bucket'): string => {
-  // If it's already an S3 URI, parse it
-  if (uriOrPath.startsWith('s3://')) {
-    const parsed = parseS3Uri(uriOrPath);
-    if (!parsed) {
-      throw new Error('Invalid S3 URI format');
-    }
-    
-    // Only allow access to the specified bucket for security
-    if (parsed.bucket !== defaultBucket) {
-      throw new Error(`Access to bucket '${parsed.bucket}' is not allowed. Only '${defaultBucket}' is accessible.`);
-    }
-    
-    return parsed.key;
-  }
-  
-  // If it's a regular path, just clean it up
-  return uriOrPath.startsWith('/') ? uriOrPath.substring(1) : uriOrPath;
-};

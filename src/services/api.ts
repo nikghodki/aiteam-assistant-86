@@ -1,9 +1,6 @@
-
 // API base URL should be configured in your environment
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 export const S3_BUCKET_URL = import.meta.env.VITE_S3_BUCKET_URL || 'https://k8s-debugger-bucket.s3.amazonaws.com';
-
-import { isValidS3Uri, normalizeS3Path } from '@/utils/s3Utils';
 
 // Define interfaces for API responses
 export interface UserAccess {
