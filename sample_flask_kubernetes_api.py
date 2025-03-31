@@ -12,8 +12,6 @@ import requests
 import signal
 import sys
 import atexit
-import boto3
-from botocore.exceptions import ClientError
 
 # Conditionally import SAML libraries - will fail gracefully if not installed
 try:
@@ -667,54 +665,6 @@ def get_namespace_issues():
         return jsonify(namespace_issues[namespace])
     else:
         return jsonify([]), 400
-
-# Get S3 object using boto3
-@app.route('/api/kubernetes/s3-object', methods=['POST'])
-def get_s3_object():
-    """Retrieve an object from S3 using boto3 with instance IAM role credentials"""
-    data = request.json
-    if not data or 'filePath' not in data:
-        return jsonify({"error": "File path is required"}), 400
-    
-    file_path = data.get('filePath')
-    
-    # Convert URL path to S3 URI format if needed
-    if not file_path.startswith('s3://'):
-        # Extract just the path part if full URL was provided
-        if file_path.startswith('http'):
-            from urllib.parse import urlparse
-            parsed = urlparse(file_path)
-            file_path = parsed.path.lstrip('/')
-        # Construct the S3 URI
-        s3_uri = f"s3://k8s-debugger-bucket/{file_path}"
-    else:
-        s3_uri = file_path
-    
-    try:
-        # Parse the S3 URI
-        parts = s3_uri.replace('s3://', '').split('/', 1)
-        bucket_name = parts[0]
-        object_key = parts[1] if len(parts) > 1 else ''
-        
-        # Create S3 client with instance IAM role credentials
-        s3_client = boto3.client('s3')
-        
-        # Get object from S3
-        response = s3_client.get_object(Bucket=bucket_name, Key=object_key)
-        
-        # Read content as string
-        content = response['Body'].read().decode('utf-8')
-        
-        return jsonify({"content": content})
-    except ClientError as e:
-        error_code = e.response['Error']['Code']
-        error_message = e.response['Error']['Message']
-        return jsonify({
-            "error": f"S3 error ({error_code}): {error_message}", 
-            "s3_uri": s3_uri
-        }), 404
-    except Exception as e:
-        return jsonify({"error": str(e), "s3_uri": s3_uri}), 500
 
 if __name__ == '__main__':
     # Set up proper connection and socket handling for Gunicorn
