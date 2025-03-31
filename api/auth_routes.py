@@ -207,9 +207,7 @@ def refresh_token():
             'accessToken': tokens['accessToken'],
             'expiresAt': tokens['expiresAt']
         })
-    except jwt.ExpiredSignatureError:
-        return jsonify({'message': 'Refresh token has expired'}), 401
-    except jwt.InvalidTokenError:
+    except jwt.PyJWTError:
         return jsonify({'message': 'Invalid refresh token'}), 401
 
 @auth_bp.route('/api/auth/logout', methods=['POST'])

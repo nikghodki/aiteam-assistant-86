@@ -44,9 +44,7 @@ def jwt_required(f):
             # Store user info in request context for later use
             request.user = payload
             return f(*args, **kwargs)
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Token has expired'}), 401
-        except jwt.InvalidTokenError:
+        except jwt.PyJWTError:
             return jsonify({'message': 'Invalid token'}), 401
 
     return decorated
