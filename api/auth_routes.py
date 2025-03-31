@@ -1,8 +1,8 @@
+
 import os
 import uuid
 import requests
 import jwt
-from jwt.exceptions import DecodeError, ExpiredSignatureError
 from flask import Blueprint, request, jsonify, redirect, session
 from api.auth import (
     jwt_required, users, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET,
