@@ -199,28 +199,17 @@ export const fetchS3File = async (filePath: string): Promise<string> => {
     // Make sure to remove any leading slash
     cleanPath = cleanPath.startsWith('/') ? cleanPath.substring(1) : cleanPath;
     
-    // First try to fetch via backend proxy which uses IAM role
-    try {
-      const response = await apiCall<{ content: string }>(`/kubernetes/s3-object`, {
-        method: 'POST',
-        body: JSON.stringify({ filePath: cleanPath }),
-      });
-      
-      console.log(`Successfully fetched S3 file via IAM role: ${filePath}`);
-      return response.content;
-    } catch (proxyError) {
-      console.warn("IAM role fetch failed, falling back to direct URL:", proxyError);
-      
-      // Fall back to direct URL if proxy fails
-      const url = `${S3_BUCKET_URL}/${cleanPath}`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
-      }
-      
-      return await response.text();
-    }
+    console.log(`Fetching S3 file via backend proxy: ${cleanPath}`);
+    
+    // Always fetch via backend proxy which uses IAM role
+    // This ensures files are accessed through the backend container
+    const response = await apiCall<{ content: string }>(`/kubernetes/s3-object`, {
+      method: 'POST',
+      body: JSON.stringify({ filePath: cleanPath }),
+    });
+    
+    console.log(`Successfully fetched S3 file via IAM role: ${filePath}`);
+    return response.content;
   } catch (error) {
     console.error("Error fetching S3 file:", error);
     throw new Error(`Failed to fetch file: ${error instanceof Error ? error.message : 'Unknown error'}`);

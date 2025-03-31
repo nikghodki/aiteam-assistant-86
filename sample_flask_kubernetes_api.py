@@ -12,6 +12,8 @@ import requests
 import signal
 import sys
 import atexit
+import boto3
+from botocore.exceptions import ClientError
 
 # Conditionally import SAML libraries - will fail gracefully if not installed
 try:
@@ -665,6 +667,60 @@ def get_namespace_issues():
         return jsonify(namespace_issues[namespace])
     else:
         return jsonify([]), 400
+
+# New endpoint to retrieve S3 objects for UI
+@app.route('/api/kubernetes/s3-object', methods=['POST'])
+def get_s3_object():
+    """Retrieve an object from S3 using IAM role credentials"""
+    try:
+        data = request.json
+        if not data or 'filePath' not in data:
+            return jsonify({"error": "File path is required"}), 400
+        
+        file_path = data['filePath']
+        
+        # Strip leading slash if present
+        if file_path.startswith('/'):
+            file_path = file_path[1:]
+        
+        # Define bucket name - this is the only bucket we allow access to
+        bucket_name = 'k8s-debugger-bucket'
+        
+        print(f"Fetching S3 object from bucket: {bucket_name}, key: {file_path}")
+        
+        try:
+            # Get S3 client using IAM role
+            s3_client = get_s3_client()
+            
+            # Get the object
+            response = s3_client.get_object(
+                Bucket=bucket_name,
+                Key=file_path
+            )
+            
+            # Read the content
+            file_content = response['Body'].read().decode('utf-8')
+            
+            return jsonify({
+                "content": file_content,
+                "contentType": response['ContentType'],
+                "lastModified": response['LastModified'].isoformat() if 'LastModified' in response else None
+            })
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+            error_message = e.response['Error']['Message']
+            print(f"S3 client error: {error_code} - {error_message}")
+            
+            if error_code == 'NoSuchKey':
+                return jsonify({"error": f"File not found: {file_path}"}), 404
+            elif error_code == 'AccessDenied':
+                return jsonify({"error": "Access denied - IAM role does not have permission to access this object"}), 403
+            else:
+                return jsonify({"error": f"S3 error: {error_message}"}), 500
+                
+    except Exception as e:
+        print(f"Error processing S3 object request: {str(e)}")
+        return jsonify({"error": f"Failed to retrieve S3 object: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # Set up proper connection and socket handling for Gunicorn

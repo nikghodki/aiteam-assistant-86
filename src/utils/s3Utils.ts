@@ -65,3 +65,22 @@ export const getFilenameFromKey = (key: string): string => {
   const parts = key.split('/');
   return parts[parts.length - 1] || '';
 };
+
+/**
+ * Normalizes an S3 path for consistent handling
+ * @param path Path or URI to normalize
+ * @param defaultBucket Default bucket to use if not in URI format
+ * @returns Normalized S3 URI
+ */
+export const normalizeS3Path = (path: string, defaultBucket: string = 'k8s-debugger-bucket'): string => {
+  // If it's already a valid S3 URI, return it as is
+  if (isValidS3Uri(path)) {
+    return path;
+  }
+  
+  // If it starts with a slash, remove it
+  const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+  
+  // Format as proper S3 URI with the default bucket
+  return formatS3Uri(defaultBucket, cleanPath);
+};
