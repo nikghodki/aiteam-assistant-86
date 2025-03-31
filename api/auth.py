@@ -52,7 +52,7 @@ def jwt_required(f):
             elif "invalid" in error_message.lower():
                 return jsonify({'message': 'Invalid token'}), 401
             else:
-                return jsonify({'message': 'Token validation failed'}), 401
+                return jsonify({'message': f'Token validation failed: {error_message}'}), 401
 
     return decorated
 

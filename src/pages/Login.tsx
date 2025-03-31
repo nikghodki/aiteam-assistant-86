@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -5,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
-import { Github, LogIn, Mail, AlertTriangle } from 'lucide-react';
+import { Github, Mail, AlertTriangle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 
@@ -16,10 +17,10 @@ const Login = () => {
   const [password, setPassword] = useState('');
 
   useEffect(() => {
-    if (bypassAuthForTesting || user.authenticated) {
+    if (bypassAuthForTesting || user?.authenticated) {
       navigate('/dashboard', { replace: true });
     }
-  }, [bypassAuthForTesting, user.authenticated, navigate]);
+  }, [bypassAuthForTesting, user?.authenticated, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +33,7 @@ const Login = () => {
         description: `Welcome back, ${email}!`,
       });
     } catch (error) {
+      console.error('Login error:', error);
       toast({
         title: "Login failed",
         description: "Please check your credentials and try again.",
@@ -44,6 +46,7 @@ const Login = () => {
     try {
       await loginWithGoogle();
     } catch (error) {
+      console.error('Google login error:', error);
       toast({
         title: "Google login failed",
         description: "There was a problem signing in with Google. Please try again.",
@@ -56,6 +59,7 @@ const Login = () => {
     try {
       await loginWithGithub();
     } catch (error) {
+      console.error('GitHub login error:', error);
       toast({
         title: "GitHub login failed",
         description: "There was a problem signing in with GitHub. Please try again.",
@@ -71,6 +75,14 @@ const Login = () => {
       email: 'test@example.com',
       authenticated: true
     }));
+    
+    // Create mock tokens for development/testing
+    const mockTokens = {
+      accessToken: `test-token-${Date.now()}`,
+      refreshToken: `test-refresh-${Date.now()}`,
+      expiresAt: Date.now() + 3600000 // 1 hour from now
+    };
+    localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
     
     window.location.href = '/dashboard';
     
