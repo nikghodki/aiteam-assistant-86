@@ -96,9 +96,13 @@ const SandboxDetails: React.FC<SandboxDetailsProps> = ({ sandbox, onSandboxUpdat
         id: sandbox.id,
         name: values.name,
         services: values.services.map(service => ({
-          name: service.name, // Ensure name is always provided
+          name: service.name,
           image: service.image,
-          environmentVariables: service.environmentVariables
+          // Ensure all environment variables have required name and value properties
+          environmentVariables: service.environmentVariables.map(envVar => ({
+            name: envVar.name,
+            value: envVar.value
+          }))
         })),
       });
       
