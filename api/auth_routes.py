@@ -1,6 +1,8 @@
 
+import os
 import uuid
 import requests
+import jwt as pyjwt
 from flask import Blueprint, request, jsonify, redirect, session
 from api.auth import (
     jwt_required, users, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET,
@@ -175,8 +177,6 @@ def login():
 @auth_bp.route('/api/auth/refresh', methods=['POST'])
 def refresh_token():
     """Refresh the access token using the refresh token"""
-    import jwt as pyjwt
-    
     data = request.json
     refresh_token = data.get('refreshToken')
     
