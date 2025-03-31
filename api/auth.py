@@ -1,7 +1,7 @@
 
 import os
 import datetime
-import jwt as pyjwt
+import jwt
 from functools import wraps
 from flask import request, jsonify
 
@@ -40,13 +40,13 @@ def jwt_required(f):
 
         try:
             # Verify the token using PyJWT
-            payload = pyjwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
             # Store user info in request context for later use
             request.user = payload
             return f(*args, **kwargs)
-        except pyjwt.exceptions.ExpiredSignatureError:
+        except jwt.ExpiredSignatureError:
             return jsonify({'message': 'Token has expired'}), 401
-        except pyjwt.exceptions.InvalidTokenError:
+        except jwt.InvalidTokenError:
             return jsonify({'message': 'Invalid token'}), 401
 
     return decorated
@@ -68,8 +68,8 @@ def create_tokens_for_user(user_id, name, email):
         'exp': refresh_token_expiry
     }
     
-    access_token = pyjwt.encode(access_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-    refresh_token = pyjwt.encode(refresh_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    access_token = jwt.encode(access_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    refresh_token = jwt.encode(refresh_token_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     
     return {
         'accessToken': access_token,

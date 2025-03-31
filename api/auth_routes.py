@@ -1,8 +1,7 @@
-
 import os
 import uuid
 import requests
-import jwt as pyjwt
+import jwt
 from flask import Blueprint, request, jsonify, redirect, session
 from api.auth import (
     jwt_required, users, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET,
@@ -185,7 +184,7 @@ def refresh_token():
         
     try:
         # Verify the refresh token
-        payload = pyjwt.decode(refresh_token, os.environ.get('JWT_SECRET_KEY', 'your_jwt_secret_key_for_development'), algorithms=['HS256'])
+        payload = jwt.decode(refresh_token, os.environ.get('JWT_SECRET_KEY', 'your_jwt_secret_key_for_development'), algorithms=['HS256'])
         
         # Find user by ID
         user_id = payload['sub']
@@ -208,9 +207,9 @@ def refresh_token():
             'accessToken': tokens['accessToken'],
             'expiresAt': tokens['expiresAt']
         })
-    except pyjwt.exceptions.ExpiredSignatureError:
+    except jwt.ExpiredSignatureError:
         return jsonify({'message': 'Refresh token has expired'}), 401
-    except pyjwt.exceptions.InvalidTokenError:
+    except jwt.InvalidTokenError:
         return jsonify({'message': 'Invalid refresh token'}), 401
 
 @auth_bp.route('/api/auth/logout', methods=['POST'])
