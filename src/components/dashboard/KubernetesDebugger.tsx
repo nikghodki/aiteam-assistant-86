@@ -21,7 +21,6 @@ import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { cn } from '@/lib/utils';
 import { kubernetesApi, CommandResult } from '@/services/api';
 import KubernetesDebugDrawer from './KubernetesDebugDrawer';
-import { fetchFileFromS3 } from '@/utils/s3';
 import {
   Tabs,
   TabsContent,
@@ -93,7 +92,6 @@ const KubernetesDebugger = () => {
   
   const [debugSession, setDebugSession] = useState<{id: string; debugLog: string} | null>(null);
   const [debugFilePath, setDebugFilePath] = useState<string | undefined>(undefined);
-  const [debugFileContent, setDebugFileContent] = useState<string>('');
   
   const [isDebugDrawerOpen, setIsDebugDrawerOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<NamespaceIssue | null>(null);
@@ -222,21 +220,8 @@ const KubernetesDebugger = () => {
       
       if (response.file_name) {
         setDebugFilePath(response.file_name);
-        
-        try {
-          const fileContent = await fetchFileFromS3(response.file_name);
-          setDebugFileContent(fileContent);
-        } catch (error) {
-          console.error('Error fetching file from S3:', error);
-          toast({
-            title: "File Fetch Error",
-            description: "Failed to retrieve debug file from storage",
-            variant: "destructive",
-          });
-        }
       } else {
         setDebugFilePath(undefined);
-        setDebugFileContent('');
       }
       
       setIsDebugDrawerOpen(true);
@@ -685,7 +670,6 @@ What steps should I take to investigate and resolve this issue?`;
           namespace: selectedNamespace
         } : undefined}
         debugFilePath={debugFilePath}
-        debugFileContent={debugFileContent}
         isLoading={debugLoading}
       />
     </div>

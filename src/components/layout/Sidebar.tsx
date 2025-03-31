@@ -12,9 +12,7 @@ import {
   ChevronLeft, 
   ChevronRight,
   ShieldCheck,
-  LogOut,
-  Boxes,
-  GitMerge
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -70,18 +68,6 @@ export const Sidebar = () => {
       visible: hasPermission('jira', 'read') 
     },
     { 
-      name: 'Sandbox Orchestration', 
-      href: '/sandbox', 
-      icon: Boxes,
-      visible: hasPermission('kubernetes', 'read') 
-    },
-    { 
-      name: 'Release Deployment', 
-      href: '/release', 
-      icon: GitMerge,
-      visible: hasPermission('kubernetes', 'read') 
-    },
-    { 
       name: 'Role Management', 
       href: '/roles', 
       icon: ShieldCheck,
@@ -95,7 +81,7 @@ export const Sidebar = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/', { replace: true });
+      navigate('/login');
       toast({
         title: "Logged out successfully",
         description: "You have been logged out of your account",

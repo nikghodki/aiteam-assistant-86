@@ -1,11 +1,9 @@
-
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Terminal, Database, Server, Search, ArrowRight, Github, Bug } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Terminal, Database, Server, Search, ArrowRight } from 'lucide-react';
 import AnimatedIcon from '@/components/ui/AnimatedIcon';
 import GlassMorphicCard from '@/components/ui/GlassMorphicCard';
-import { Button } from '@/components/ui/button';
+import { Layout } from '@/components/layout/Layout';
 
 const features = [
   {
@@ -30,7 +28,6 @@ const features = [
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, loginWithGithub } = useAuth();
 
   // Adding subtle background scroll effect for depth
   useEffect(() => {
@@ -47,81 +44,16 @@ const Index = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleGithubLogin = async () => {
-    try {
-      console.log("Starting GitHub login from Index page");
-      await loginWithGithub();
-      // Note: This should redirect the browser, so any code after this is unlikely to execute
-    } catch (error) {
-      console.error("GitHub login failed:", error);
-    }
-  };
-
-  const handleDirectGithubLogin = () => {
-    // This is a direct link to the API endpoint, bypassing the context method
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
-    console.log("Direct redirect to GitHub auth endpoint:", `${API_BASE_URL}/auth/github`);
-    window.location.href = `${API_BASE_URL}/auth/github`;
-  };
-
-  const handleGetStarted = () => {
-    if (user?.authenticated) {
-      navigate('/dashboard');
-    } else {
-      navigate('/login');
-    }
-  };
-
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-primary/5 to-transparent">
-      {/* Header with Login Button */}
-      <header className="w-full py-4 px-6">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center">
-            <Terminal size={24} className="text-primary mr-2" />
-            <span className="font-medium text-lg">SRE Assistant</span>
-          </div>
-          
-          <div className="flex gap-4">
-            <Button 
-              onClick={() => navigate('/api-debug')} 
-              variant="outline" 
-              size="sm" 
-              className="flex items-center gap-1"
-            >
-              <Bug size={16} />
-              API Debug
-            </Button>
-            
-            {user?.authenticated ? (
-              <Button onClick={() => navigate('/dashboard')} variant="outline" className="flex items-center gap-2">
-                Go to Dashboard
-                <ArrowRight size={16} />
-              </Button>
-            ) : (
-              <div className="flex gap-2">
-                <Button onClick={handleDirectGithubLogin} variant="secondary" className="flex items-center gap-2">
-                  <Github size={16} />
-                  Direct GitHub
-                </Button>
-                <Button onClick={handleGithubLogin} variant="outline" className="flex items-center gap-2">
-                  <Github size={16} />
-                  Context GitHub
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-      
+    <Layout>
       {/* Hero Section */}
-      <section className="pt-8 pb-16 md:pt-12 md:pb-24 relative overflow-hidden flex-grow">
+      <section className="pt-8 pb-16 md:pt-12 md:pb-24 relative overflow-hidden">
         <div 
           id="hero-bg" 
           className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent -z-10"
         ></div>
         
-        <div className="max-w-7xl mx-auto relative z-0 px-6">
+        <div className="max-w-7xl mx-auto relative z-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="flex flex-col items-start space-y-6">
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-2 animate-fade-in">
@@ -140,7 +72,7 @@ const Index = () => {
               
               <div className="flex flex-col sm:flex-row gap-4 pt-4 animate-fade-in" style={{ animationDelay: '300ms' }}>
                 <button 
-                  onClick={handleGetStarted}
+                  onClick={() => navigate('/dashboard')}
                   className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale flex items-center"
                 >
                   <span>Get Started</span>
@@ -196,7 +128,7 @@ const Index = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <GlassMorphicCard key={index} className={`p-6`}>
+              <GlassMorphicCard key={index} className={`p-6 animate-fade-in delay-${feature.delay}`}>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <feature.icon size={24} className="text-primary" />
                 </div>
@@ -205,7 +137,7 @@ const Index = () => {
                 <p className="text-muted-foreground text-sm">{feature.description}</p>
                 
                 <button 
-                  onClick={handleGetStarted}
+                  onClick={() => navigate('/dashboard')}
                   className="mt-6 text-primary text-sm font-medium flex items-center hover:text-primary/80 transition-colors"
                 >
                   <span>Learn more</span>
@@ -226,16 +158,16 @@ const Index = () => {
               <div className="absolute bottom-0 left-0 -mb-32 -ml-32 w-80 h-80 bg-primary/10 rounded-full blur-3xl"></div>
               
               <div className="relative max-w-3xl mx-auto text-center">
-                <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                <h2 className="text-3xl md:text-4xl font-bold mb-4 animate-fade-in">
                   Ready to streamline your infrastructure management?
                 </h2>
-                <p className="text-muted-foreground mb-8">
+                <p className="text-muted-foreground mb-8 animate-fade-in" style={{ animationDelay: '100ms' }}>
                   Join other SRE teams who have reduced debugging time by 70% and improved access management security with SRE Assistant.
                 </p>
                 
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '200ms' }}>
                   <button 
-                    onClick={handleGetStarted}
+                    onClick={() => navigate('/dashboard')}
                     className="px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-primary/90 transition-colors hover-scale"
                   >
                     Get Started Now
@@ -250,11 +182,7 @@ const Index = () => {
           </GlassMorphicCard>
         </div>
       </section>
-      
-      <footer className="py-6 px-6 text-center text-sm text-muted-foreground">
-        <p>© {new Date().getFullYear()} SRE Assistant. All rights reserved.</p>
-      </footer>
-    </div>
+    </Layout>
   );
 };
 

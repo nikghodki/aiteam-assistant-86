@@ -14,7 +14,6 @@ import { Alert, AlertDescription } from '../ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { kubernetesApi } from '@/services/api';
-import { fetchFileFromS3 } from '@/utils/s3';
 
 interface KubernetesDebugDrawerProps {
   isOpen: boolean;
@@ -31,7 +30,6 @@ interface KubernetesDebugDrawerProps {
     namespace: string;
   };
   debugFilePath?: string;
-  debugFileContent?: string;
   isLoading?: boolean;
 }
 
@@ -41,52 +39,39 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   debugSession,
   issue,
   debugFilePath,
-  debugFileContent = '',
   isLoading = false,
 }) => {
   const { toast } = useToast();
   const [copying, setCopying] = useState<string | null>(null);
-  const [localDebugFileContent, setLocalDebugFileContent] = useState<string>('');
+  const [debugFileContent, setDebugFileContent] = useState<string>('');
   const [isLoadingFile, setIsLoadingFile] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   useEffect(() => {
-    if (debugFileContent) {
-      setLocalDebugFileContent(debugFileContent);
-      setIsLoadingFile(false);
-      return;
-    }
-    
-    if (debugFilePath && isOpen && !debugFileContent) {
+    if (debugFilePath && isOpen) {
       setIsLoadingFile(true);
       
-      const timer = setTimeout(async () => {
-        try {
-          const content = await fetchFileFromS3(debugFilePath);
-          setLocalDebugFileContent(content);
-        } catch (s3Error) {
-          console.error('Error loading from S3, falling back to direct fetch:', s3Error);
-          
-          try {
-            const response = await fetch(debugFilePath);
-            const content = await response.text();
-            setLocalDebugFileContent(content);
-          } catch (fetchError) {
-            console.error('Error loading debug file:', fetchError);
+      const timer = setTimeout(() => {
+        fetch(debugFilePath)
+          .then(response => response.text())
+          .then(content => {
+            setDebugFileContent(content);
+            setIsLoadingFile(false);
+          })
+          .catch(error => {
+            console.error('Error loading debug file:', error);
+            setIsLoadingFile(false);
             toast({
               title: "Error",
               description: "Failed to load debugging information",
               variant: "destructive"
             });
-          }
-        } finally {
-          setIsLoadingFile(false);
-        }
+          });
       }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [debugFilePath, debugFileContent, isOpen, toast]);
+  }, [debugFilePath, isOpen, toast]);
 
   const copyToClipboard = (text: string, identifier: string) => {
     navigator.clipboard.writeText(text);
@@ -101,7 +86,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   };
 
   const handleDownload = async () => {
-    if (!debugSession?.id && !localDebugFileContent) {
+    if (!debugSession?.id && !debugFileContent) {
       toast({
         title: "Error",
         description: "No debugging information available to download",
@@ -114,6 +99,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     
     try {
       if (debugSession?.id) {
+        // Download using API if debugSession exists
         const response = await kubernetesApi.downloadDebugFile(debugSession.id);
         
         const link = document.createElement('a');
@@ -122,8 +108,9 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-      } else if (localDebugFileContent) {
-        const blob = new Blob([localDebugFileContent], { type: 'text/plain' });
+      } else if (debugFileContent) {
+        // Download the debug file content if available
+        const blob = new Blob([debugFileContent], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         
         const link = document.createElement('a');
@@ -185,9 +172,10 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     return { request, response: responseRaw, sections };
   };
 
-  const logToUse = localDebugFileContent || debugFileContent || (debugSession ? debugSession.debugLog : '');
-  const formattedLog = formatDebugLog(logToUse);
+  const logToUse = debugFileContent || (debugSession ? debugSession.debugLog : '');
   
+  const { request, sections } = formatDebugLog(logToUse);
+
   const getTimeStamp = () => {
     const now = new Date();
     return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -228,7 +216,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
           <div className="flex justify-between items-center">
             <SheetTitle className="text-xl">Kubernetes Troubleshooting</SheetTitle>
             <div className="flex gap-2">
-              {(debugSession?.id || localDebugFileContent) && (
+              {(debugSession?.id || debugFileContent) && (
                 <Button 
                   variant="outline" 
                   size="icon" 
@@ -314,21 +302,21 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                 </Alert>
               ) : null}
               
-              {formattedLog.request && (
+              {request && (
                 <div className="flex justify-start mb-4">
                   <div className={cn("rounded-lg p-3 max-w-[85%] shadow-sm", getRequestBubbleStyle())}>
                     <div className="text-sm">
                       <p className="font-semibold text-professional-purple dark:text-professional-purple-light mb-1">You</p>
-                      <p className="whitespace-pre-wrap break-words">{formattedLog.request}</p>
+                      <p className="whitespace-pre-wrap break-words">{request}</p>
                       <p className="text-xs text-muted-foreground mt-1 text-right">{getTimeStamp()}</p>
                     </div>
                   </div>
                 </div>
               )}
               
-              {formattedLog.sections.length > 0 ? (
+              {sections.length > 0 ? (
                 <div className="space-y-4">
-                  {formattedLog.sections.map((section, index) => (
+                  {sections.map((section, index) => (
                     <div key={index} className={`flex ${section.type === 'text' ? 'justify-end' : 'justify-start'} mb-2`}>
                       {section.type === 'text' ? (
                         <div className={cn("rounded-lg p-3 max-w-[85%] shadow-sm", getChatBubbleStyle(section.type))}>
@@ -365,7 +353,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                   ))}
                 </div>
               ) : (
-                !formattedLog.request && !showMainLoadingState && (
+                !request && !showMainLoadingState && (
                   <Alert className="border-professional-purple-light/30 dark:border-professional-purple-dark/30">
                     <AlertDescription>
                       No debugging information is available. Please start a debugging session by selecting an issue or asking a question in the Kubernetes Assistant.

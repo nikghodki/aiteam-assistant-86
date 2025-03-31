@@ -1,22 +1,12 @@
 // API base URL should be configured in your environment
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
-// Import our auth hook to get JWT tokens
-import { useAuth } from '@/contexts/AuthContext';
-
 // Define interfaces for API responses
 export interface UserAccess {
   id: number;
   name: string;
   role: string;
   avatar?: string;
-}
-
-// Import AuthTokens interface
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken?: string;
-  expiresAt?: number;
 }
 
 export interface User {
@@ -150,7 +140,6 @@ export interface OIDCConfig {
 export interface OIDCAuthResult {
   success: boolean;
   user?: User;
-  tokens?: AuthTokens;
   error?: string;
 }
 
@@ -164,103 +153,12 @@ export interface NamespaceIssue {
   timestamp: string;
 }
 
-// Sandbox orchestration interfaces
-export interface Sandbox {
-  id: string;
-  name: string;
-  description?: string;
-  status: 'creating' | 'running' | 'failing' | 'stopped';
-  services: SandboxService[];
-  createdAt: string;
-  createdBy: string;
-  updatedAt: string;
-}
-
-export interface SandboxService {
-  id: string;
-  sandboxId: string;
-  name: string;
-  image: string;
-  tag: string;
-  status: 'running' | 'failing' | 'stopped';
-  environmentVariables: Record<string, string>;
-  port?: number;
-}
-
-export interface CreateSandboxRequest {
-  name: string;
-  description?: string;
-  services: Omit<SandboxService, 'id' | 'sandboxId' | 'status'>[];
-}
-
-export interface UpdateSandboxRequest {
-  name?: string;
-  description?: string;
-}
-
-export interface SandboxServiceUpdate {
-  image?: string;
-  tag?: string;
-  environmentVariables?: Record<string, string>;
-}
-
-// Release deployment interfaces
-export interface Release {
-  id: string;
-  name: string;
-  version: string;
-  status: 'planned' | 'in-progress' | 'deployed' | 'failed' | 'rolled-back';
-  environment: 'dev' | 'staging' | 'production';
-  scheduledDate: string;
-  deployedDate?: string;
-  events: ReleaseEvent[];
-}
-
-export interface ReleaseEvent {
-  id: string;
-  releaseId: string;
-  type: 'deployment' | 'rollback' | 'validation' | 'approval';
-  status: 'success' | 'failure' | 'in-progress' | 'pending';
-  description: string;
-  timestamp: string;
-}
-
-export interface CreateReleaseRequest {
-  name: string;
-  version: string;
-  environment: 'dev' | 'staging' | 'production';
-  scheduledDate: string;
-}
-
-export interface UpdateReleaseRequest {
-  status?: 'planned' | 'in-progress' | 'deployed' | 'failed' | 'rolled-back';
-  scheduledDate?: string;
-}
-
-// Helper function for API calls with JWT authentication
+// Helper function for API calls
 const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  // Get the auth header with JWT token
-  let authHeader = {};
-  
-  // Try to get the token from localStorage as a fallback
-  // This is needed because we can't use the useAuth hook directly in this function
-  try {
-    const tokenString = localStorage.getItem('auth_tokens');
-    if (tokenString) {
-      const tokens = JSON.parse(tokenString);
-      if (tokens && tokens.accessToken) {
-        authHeader = { Authorization: `Bearer ${tokens.accessToken}` };
-      }
-    }
-  } catch (e) {
-    console.error('Error retrieving auth token:', e);
-  }
-  
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
-    ...authHeader
   };
 
   const response = await fetch(url, {
@@ -277,39 +175,6 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   return response.json();
-};
-
-// Export a custom hook that includes the auth token
-export const useApiWithAuth = () => {
-  const { getAuthHeader } = useAuth();
-  
-  const apiCallWithAuth = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
-    const url = `${API_BASE_URL}${endpoint}`;
-    
-    const authHeader = getAuthHeader();
-    
-    const defaultHeaders: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...authHeader
-    };
-
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...defaultHeaders,
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `API error: ${response.status}`);
-    }
-
-    return response.json();
-  };
-  
-  return { apiCallWithAuth };
 };
 
 // Access Management API
@@ -592,134 +457,6 @@ export const oidcApi = {
   // List available providers
   listProviders: () => 
     apiCall<string[]>('/oidc/providers'),
-};
-
-// Sandbox Orchestration API
-export const sandboxApi = {
-  // Get all sandboxes for the current user
-  getSandboxes: () => 
-    apiCall<Sandbox[]>('/sandbox/list'),
-
-  // Get details for a specific sandbox
-  getSandboxDetails: (sandboxId: string) => 
-    apiCall<Sandbox>(`/sandbox/${sandboxId}`),
-
-  // Create a new sandbox
-  createSandbox: (data: CreateSandboxRequest) => 
-    apiCall<Sandbox>('/sandbox/create', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // Update sandbox details
-  updateSandbox: (sandboxId: string, data: UpdateSandboxRequest) => 
-    apiCall<Sandbox>(`/sandbox/${sandboxId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
-  // Delete a sandbox
-  deleteSandbox: (sandboxId: string) => 
-    apiCall<{ success: boolean }>(`/sandbox/${sandboxId}`, {
-      method: 'DELETE',
-    }),
-
-  // Start a sandbox
-  startSandbox: (sandboxId: string) => 
-    apiCall<Sandbox>(`/sandbox/${sandboxId}/start`, {
-      method: 'POST',
-    }),
-
-  // Stop a sandbox
-  stopSandbox: (sandboxId: string) => 
-    apiCall<Sandbox>(`/sandbox/${sandboxId}/stop`, {
-      method: 'POST',
-    }),
-
-  // Add a service to a sandbox
-  addService: (sandboxId: string, service: Omit<SandboxService, 'id' | 'sandboxId' | 'status'>) => 
-    apiCall<SandboxService>(`/sandbox/${sandboxId}/service`, {
-      method: 'POST',
-      body: JSON.stringify(service),
-    }),
-
-  // Update a service in a sandbox
-  updateService: (sandboxId: string, serviceId: string, updates: SandboxServiceUpdate) => 
-    apiCall<SandboxService>(`/sandbox/${sandboxId}/service/${serviceId}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    }),
-
-  // Remove a service from a sandbox
-  removeService: (sandboxId: string, serviceId: string) => 
-    apiCall<{ success: boolean }>(`/sandbox/${sandboxId}/service/${serviceId}`, {
-      method: 'DELETE',
-    }),
-
-  // Chat with assistant about sandbox orchestration
-  chatWithAssistant: (message: string, context?: { sandboxId?: string }) => 
-    apiCall<ChatResponse>('/sandbox/chat', {
-      method: 'POST',
-      body: JSON.stringify({ message, context }),
-    }),
-};
-
-// Release Deployment API
-export const releaseApi = {
-  // Get all releases
-  getReleases: (environment?: 'dev' | 'staging' | 'production') => 
-    apiCall<Release[]>(`/release/list${environment ? `?environment=${environment}` : ''}`),
-
-  // Get details for a specific release
-  getReleaseDetails: (releaseId: string) => 
-    apiCall<Release>(`/release/${releaseId}`),
-
-  // Create a new release
-  createRelease: (data: CreateReleaseRequest) => 
-    apiCall<Release>('/release/create', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // Update release details
-  updateRelease: (releaseId: string, data: UpdateReleaseRequest) => 
-    apiCall<Release>(`/release/${releaseId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
-  // Deploy a release
-  deployRelease: (releaseId: string) => 
-    apiCall<Release>(`/release/${releaseId}/deploy`, {
-      method: 'POST',
-    }),
-
-  // Rollback a release
-  rollbackRelease: (releaseId: string) => 
-    apiCall<Release>(`/release/${releaseId}/rollback`, {
-      method: 'POST',
-    }),
-
-  // Add event to a release
-  addReleaseEvent: (
-    releaseId: string, 
-    event: { 
-      type: ReleaseEvent['type']; 
-      status: ReleaseEvent['status']; 
-      description: string 
-    }
-  ) => 
-    apiCall<ReleaseEvent>(`/release/${releaseId}/event`, {
-      method: 'POST',
-      body: JSON.stringify(event),
-    }),
-
-  // Chat with assistant about release deployment
-  chatWithAssistant: (message: string, context?: { releaseId?: string }) => 
-    apiCall<ChatResponse>('/release/chat', {
-      method: 'POST',
-      body: JSON.stringify({ message, context }),
-    }),
 };
 
 // Getting the mock user for demo purposes

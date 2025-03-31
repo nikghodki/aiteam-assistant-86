@@ -1,27 +1,25 @@
-import { useState, useEffect } from 'react';
+
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
-import { Github, Mail, AlertTriangle, Shield } from 'lucide-react';
+import { Github, LogIn, Mail } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, loginWithGoogle, loginWithGithub, isLoading, user, bypassAuthForTesting, toggleBypassAuth } = useAuth();
+  const { login, loginWithGoogle, loginWithGithub, isLoading, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loggingInWithGithub, setLoggingInWithGithub] = useState(false);
-  const [loggingInWithSaml, setLoggingInWithSaml] = useState(false);
 
-  useEffect(() => {
-    if (bypassAuthForTesting || user?.authenticated) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [bypassAuthForTesting, user?.authenticated, navigate]);
+  // If user is already authenticated, redirect to dashboard
+  if (user.authenticated) {
+    navigate('/dashboard', { replace: true });
+    return null;
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +32,6 @@ const Login = () => {
         description: `Welcome back, ${email}!`,
       });
     } catch (error) {
-      console.error('Login error:', error);
       toast({
         title: "Login failed",
         description: "Please check your credentials and try again.",
@@ -46,8 +43,8 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     try {
       await loginWithGoogle();
+      // Note: The actual redirect will be handled by the Google auth flow
     } catch (error) {
-      console.error('Google login error:', error);
       toast({
         title: "Google login failed",
         description: "There was a problem signing in with Google. Please try again.",
@@ -58,95 +55,15 @@ const Login = () => {
 
   const handleGithubLogin = async () => {
     try {
-      setLoggingInWithGithub(true);
-      console.log("Starting GitHub login process");
-      
       await loginWithGithub();
-      
-      console.error("GitHub login didn't redirect properly");
-      toast({
-        title: "GitHub login failed",
-        description: "There was a problem initiating GitHub login. Please try again.",
-        variant: "destructive",
-      });
-      setLoggingInWithGithub(false);
+      // Note: The actual redirect will be handled by the GitHub auth flow
     } catch (error) {
-      console.error('GitHub login error:', error);
-      setLoggingInWithGithub(false);
       toast({
         title: "GitHub login failed",
         description: "There was a problem signing in with GitHub. Please try again.",
         variant: "destructive",
       });
     }
-  };
-
-  const handleSamlLogin = async () => {
-    try {
-      setLoggingInWithSaml(true);
-      console.log("Starting SAML login process");
-      
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
-      
-      if (import.meta.env.DEV) {
-        setTimeout(() => {
-          const mockSamlUser = {
-            id: 'saml-user-id',
-            name: 'SAML User',
-            email: 'saml-user@example.com',
-            authenticated: true
-          };
-          
-          localStorage.setItem('user', JSON.stringify(mockSamlUser));
-          window.location.href = '/dashboard';
-        }, 1500);
-        return;
-      }
-      
-      window.location.href = `${API_BASE_URL}/auth/saml`;
-      
-    } catch (error) {
-      console.error('SAML login error:', error);
-      setLoggingInWithSaml(false);
-      toast({
-        title: "SAML login failed",
-        description: "There was a problem initiating SAML login. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleBypassLogin = () => {
-    localStorage.setItem('user', JSON.stringify({
-      id: 'test-user-id',
-      name: 'Test User',
-      email: 'test@example.com',
-      authenticated: true
-    }));
-    
-    const mockTokens = {
-      accessToken: `test-token-${Date.now()}`,
-      refreshToken: `test-refresh-${Date.now()}`,
-      expiresAt: Date.now() + 3600000 // 1 hour from now
-    };
-    localStorage.setItem('auth_tokens', JSON.stringify(mockTokens));
-    
-    window.location.href = '/dashboard';
-    
-    toast({
-      title: "Bypassed login",
-      description: "You've bypassed the login for testing purposes.",
-    });
-  };
-
-  const handleToggleBypass = () => {
-    toggleBypassAuth();
-    toast({
-      title: bypassAuthForTesting ? "Authentication enabled" : "Authentication bypassed",
-      description: bypassAuthForTesting 
-        ? "Normal authentication is now required" 
-        : "You can now access all protected routes without authentication",
-    });
   };
 
   return (
@@ -159,35 +76,13 @@ const Login = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {import.meta.env.DEV && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md mb-4">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <h4 className="text-sm font-medium text-amber-800">Development Mode</h4>
-                  <p className="text-xs text-amber-700 mt-1">
-                    Toggle this switch to completely bypass authentication for all protected routes.
-                  </p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs font-medium text-amber-700">
-                      {bypassAuthForTesting ? "Auth bypass enabled" : "Auth bypass disabled"}
-                    </span>
-                    <Switch 
-                      checked={bypassAuthForTesting} 
-                      onCheckedChange={handleToggleBypass}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
+          {/* Google Sign-In Button */}
           <Button 
             type="button" 
             variant="outline" 
             className="w-full flex items-center justify-center gap-2" 
             onClick={handleGoogleLogin}
-            disabled={isLoading || bypassAuthForTesting || loggingInWithGithub || loggingInWithSaml}
+            disabled={isLoading}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24">
               <path
@@ -210,44 +105,16 @@ const Login = () => {
             <span>Sign in with Google</span>
           </Button>
 
+          {/* GitHub Sign-In Button */}
           <Button 
             type="button" 
             variant="outline" 
             className="w-full flex items-center justify-center gap-2" 
             onClick={handleGithubLogin}
-            disabled={isLoading || bypassAuthForTesting || loggingInWithGithub || loggingInWithSaml}
+            disabled={isLoading}
           >
-            {loggingInWithGithub ? (
-              <>
-                <div className="w-4 h-4 border-2 border-t-transparent border-current rounded-full animate-spin mr-2"></div>
-                <span>Connecting to GitHub...</span>
-              </>
-            ) : (
-              <>
-                <Github className="h-4 w-4" />
-                <span>Sign in with GitHub</span>
-              </>
-            )}
-          </Button>
-
-          <Button 
-            type="button" 
-            variant="outline" 
-            className="w-full flex items-center justify-center gap-2" 
-            onClick={handleSamlLogin}
-            disabled={isLoading || bypassAuthForTesting || loggingInWithGithub || loggingInWithSaml}
-          >
-            {loggingInWithSaml ? (
-              <>
-                <div className="w-4 h-4 border-2 border-t-transparent border-current rounded-full animate-spin mr-2"></div>
-                <span>Connecting with SAML...</span>
-              </>
-            ) : (
-              <>
-                <Shield className="h-4 w-4" />
-                <span>Sign in with SAML SSO</span>
-              </>
-            )}
+            <Github className="h-4 w-4" />
+            <span>Sign in with GitHub</span>
           </Button>
 
           <div className="relative flex items-center justify-center">
@@ -264,7 +131,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading || bypassAuthForTesting}
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -274,14 +141,10 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={isLoading || bypassAuthForTesting}
+                disabled={isLoading}
               />
             </div>
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isLoading || bypassAuthForTesting || loggingInWithSaml}
-            >
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <div className="flex items-center justify-center">
                   <div className="w-5 h-5 border-2 border-t-transparent border-white rounded-full animate-spin mr-2"></div>
@@ -295,22 +158,6 @@ const Login = () => {
               )}
             </Button>
           </form>
-          
-          {import.meta.env.DEV && !bypassAuthForTesting && (
-            <div className="mt-4">
-              <Button 
-                type="button" 
-                variant="secondary" 
-                className="w-full" 
-                onClick={handleBypassLogin}
-              >
-                Bypass Login (Testing Only)
-              </Button>
-              <p className="text-xs text-muted-foreground mt-1 text-center">
-                This button only appears in development mode
-              </p>
-            </div>
-          )}
         </CardContent>
         <CardFooter className="flex justify-center">
           <p className="text-sm text-muted-foreground">

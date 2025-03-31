@@ -8,8 +8,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY sample_flask_kubernetes_api.py .
-COPY api/ ./api/
+COPY sample_flask_kubernetes_api.py app.py
 
 # Generate self-signed certificate for development (in production, use proper certificates)
 RUN apt-get update && apt-get install -y openssl && \
@@ -41,4 +40,4 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # - bind: listening on all interfaces, port 8000
 # - capture output and forward to stdout/stderr
 # - graceful timeout for worker shutdown
-CMD ["gunicorn", "--workers=2", "--timeout=120", "--bind=0.0.0.0:8000", "--capture-output", "--access-logfile=-", "--error-logfile=-", "--graceful-timeout=30", "--keep-alive=5", "--log-level=info", "sample_flask_kubernetes_api:app"]
+CMD ["gunicorn", "--workers=2", "--timeout=120", "--bind=0.0.0.0:8000", "--capture-output", "--access-logfile=-", "--error-logfile=-", "--graceful-timeout=30", "--keep-alive=5", "--log-level=info", "app:app"]

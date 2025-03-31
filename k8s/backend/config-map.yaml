@@ -15,12 +15,3 @@ data:
   GITHUB_CLIENT_ID: "your-real-github-client-id"  # Replace with your GitHub Client ID
   GITHUB_CLIENT_SECRET: "your-real-github-client-secret"  # Replace with your GitHub Client Secret
   GITHUB_REDIRECT_URI: "http://localhost:8000/api/auth/github/callback"
-  
-  # SAML Configuration
-  SAML_SP_ENTITY_ID: "http://localhost:8000/api/auth/saml/metadata"
-  SAML_SP_ACS_URL: "http://localhost:8000/api/auth/saml/callback"
-  SAML_SP_SLO_URL: "http://localhost:8000/api/auth/saml/logout"
-  # IDP settings should be configured through the UI or environment variables
-  SAML_IDP_ENTITY_ID: ""
-  SAML_IDP_SSO_URL: ""
-  SAML_IDP_CERT: ""
