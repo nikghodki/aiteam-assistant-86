@@ -12,7 +12,7 @@ import {
 import { Alert, AlertDescription } from '../ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { kubernetesApi, fetchS3File } from '@/services/api';
+import { kubernetesApi, fetchFile } from '@/services/api';
 
 interface KubernetesDebugDrawerProps {
   isOpen: boolean;
@@ -49,7 +49,6 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [fileError, setFileError] = useState<string | null>(null);
 
-  // Reset state when drawer closes
   useEffect(() => {
     if (!isOpen) {
       setFileContent('');
@@ -57,14 +56,13 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     }
   }, [isOpen]);
 
-  // Effect to handle S3 file path
   useEffect(() => {
     if (s3FilePath && isOpen) {
       console.log('Attempting to fetch S3 file:', s3FilePath);
       setIsLoadingFile(true);
       setFileError(null);
       
-      fetchS3File(s3FilePath)
+      fetchFile(s3FilePath)
         .then(content => {
           console.log('S3 file fetched successfully');
           setFileContent(content);
@@ -84,7 +82,6 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     }
   }, [s3FilePath, isOpen, toast]);
 
-  // Effect to handle local file path (as fallback)
   useEffect(() => {
     if (debugFilePath && isOpen && !s3FilePath) {
       console.log('Attempting to fetch local file:', debugFilePath);
@@ -144,7 +141,6 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     setIsDownloading(true);
     
     try {
-      // Create and download the file
       const blob = new Blob([contentToDownload], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       
@@ -210,7 +206,6 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     return { request, response: responseRaw, sections };
   };
 
-  // Choose which content to use - prioritize S3 file content if available
   const logToUse = fileContent || (debugSession?.debugLog || '');
   
   const { request, sections } = formatDebugLog(logToUse);
