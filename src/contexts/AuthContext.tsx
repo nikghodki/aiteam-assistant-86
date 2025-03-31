@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { OIDCConfig } from '@/services/api';
 import { toast } from '@/components/ui/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 // Simplified user model with authentication support
 export interface User {
@@ -51,6 +52,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const navigate = useNavigate();
+
   // Get stored user from localStorage if available
   const getStoredUser = (): User | null => {
     const storedUser = localStorage.getItem('user');
@@ -193,7 +196,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     
     try {
-      // In development mode, simulate GitHub login
+      console.log("Initiating GitHub login");
+      
+      // In development mode with bypass enabled, simulate GitHub login
       if (import.meta.env.DEV && bypassAuthForTesting) {
         const mockGithubUser = {
           id: 'github-user-id',
@@ -216,13 +221,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         
         // Redirect to dashboard in dev mode
-        window.location.href = '/dashboard';
+        navigate('/dashboard');
         return;
       }
       
       // Redirect to our backend API endpoint for GitHub login
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+      console.log("Redirecting to GitHub auth endpoint:", `${API_BASE_URL}/auth/github`);
       window.location.href = `${API_BASE_URL}/auth/github`;
-      
     } catch (error) {
       console.error('GitHub login failed:', error);
       setIsLoading(false);

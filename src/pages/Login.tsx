@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -59,7 +58,19 @@ const Login = () => {
   const handleGithubLogin = async () => {
     try {
       setLoggingInWithGithub(true);
+      console.log("Starting GitHub login process");
+      
       await loginWithGithub();
+      
+      // Note: We don't need to reset loggingInWithGithub here because the page will redirect
+      // If we get here, something went wrong with the redirect
+      console.log("GitHub login didn't redirect properly");
+      toast({
+        title: "GitHub login failed",
+        description: "There was a problem initiating GitHub login. Please try again.",
+        variant: "destructive",
+      });
+      setLoggingInWithGithub(false);
     } catch (error) {
       console.error('GitHub login error:', error);
       setLoggingInWithGithub(false);

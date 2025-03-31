@@ -1,9 +1,7 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/use-toast';
-import { oidcApi } from '@/services/api';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -25,13 +23,20 @@ const AuthCallback = () => {
         const expiresAt = urlParams.get('expiresAt');
         const error = urlParams.get('error');
         
+        console.log("URL params received:", { 
+          accessToken: accessToken ? "present" : "missing", 
+          refreshToken: refreshToken ? "present" : "missing", 
+          expiresAt: expiresAt ? expiresAt : "missing",
+          error: error || "none"
+        });
+        
         // Handle any errors
         if (error) {
           console.error('Authentication error:', error);
-          setError('Authentication failed');
+          setError('Authentication failed: ' + error);
           toast({
             title: "Authentication failed",
-            description: "There was an error during authentication.",
+            description: `Error: ${error}`,
             variant: "destructive",
           });
           setTimeout(() => navigate('/', { replace: true }), 2000);
@@ -40,7 +45,7 @@ const AuthCallback = () => {
         
         // If we have tokens, store them and redirect
         if (accessToken && refreshToken && expiresAt) {
-          console.log("Received authentication tokens");
+          console.log("Received authentication tokens, storing them");
           
           // Store tokens
           const tokens = {
@@ -51,49 +56,58 @@ const AuthCallback = () => {
           
           localStorage.setItem('auth_tokens', JSON.stringify(tokens));
           
-          // Make a request to get the user data using the token
-          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
-          const response = await fetch(`${API_BASE_URL}/auth/session`, {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`
-            }
-          });
-          
-          if (response.ok) {
-            const userData = await response.json();
-            if (userData.user) {
-              // Store the user data
-              localStorage.setItem('user', JSON.stringify(userData.user));
+          try {
+            // Make a request to get the user data using the token
+            const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+            console.log("Fetching user session data from:", `${API_BASE_URL}/auth/session`);
+            
+            const response = await fetch(`${API_BASE_URL}/auth/session`, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`
+              }
+            });
+            
+            console.log("Session response status:", response.status);
+            
+            if (response.ok) {
+              const userData = await response.json();
+              console.log("User data received:", userData);
               
-              // Log the user in using the context
-              if (login) {
-                await login(userData.user.email, 'password-not-used');
+              if (userData.user) {
+                // Store the user data
+                localStorage.setItem('user', JSON.stringify(userData.user));
                 
+                // Show success toast
                 toast({
                   title: "GitHub Login Successful",
                   description: `Welcome, ${userData.user.name || userData.user.email}!`,
                 });
                 
+                // Navigate to dashboard
                 navigate('/dashboard', { replace: true });
+                return;
               } else {
-                console.error("Login function not available in context");
-                window.location.href = '/dashboard';
+                console.error("User data not found in response:", userData);
               }
-              return;
+            } else {
+              console.error("Failed to get user session:", await response.text());
             }
+          } catch (sessionError) {
+            console.error("Error fetching user session:", sessionError);
           }
           
-          // If we couldn't get user data, still try to proceed
+          // If we have tokens but couldn't get user data, still try to proceed
+          console.log("Redirecting to dashboard with tokens but without user data");
           navigate('/dashboard', { replace: true });
           return;
         }
         
         // If no tokens and no error, something unexpected happened
         console.error('Missing tokens in URL');
-        setError('Authentication data missing');
+        setError('Authentication data missing. Please try again.');
         toast({
           title: "Authentication failed",
-          description: "Could not complete authentication.",
+          description: "Could not complete authentication. Missing authentication data.",
           variant: "destructive",
         });
         setTimeout(() => navigate('/', { replace: true }), 2000);
