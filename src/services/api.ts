@@ -1,5 +1,6 @@
 // API base URL should be configured in your environment
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+export const S3_BUCKET_URL = import.meta.env.VITE_S3_BUCKET_URL || 'https://k8s-debugger-bucket.s3.amazonaws.com';
 
 // Define interfaces for API responses
 export interface UserAccess {
@@ -44,6 +45,7 @@ export interface CommandResult {
 export interface ChatResponse {
   response: string;
   file_name?: string;
+  s3_file_path?: string;
 }
 
 export interface DocumentResult {
@@ -78,7 +80,6 @@ export interface KubernetesCluster {
   nodeCount?: number;
 }
 
-// Enhanced Jira ticket interfaces
 export interface JiraTicketCreateRequest {
   summary: string;
   description: string;
@@ -99,7 +100,6 @@ export interface JiraIssueType {
   description?: string;
 }
 
-// RBAC interfaces
 export interface Role {
   id: string;
   name: string;
@@ -127,7 +127,6 @@ export interface UserPermission {
   permission: Permission;
 }
 
-// OIDC interfaces
 export interface OIDCConfig {
   clientId: string;
   authorizationEndpoint: string;
@@ -143,7 +142,6 @@ export interface OIDCAuthResult {
   error?: string;
 }
 
-// New interface for namespace issues
 export interface NamespaceIssue {
   id: string;
   severity: 'critical' | 'high' | 'medium' | 'low';
@@ -153,7 +151,6 @@ export interface NamespaceIssue {
   timestamp: string;
 }
 
-// Helper function for API calls
 const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
   
@@ -177,30 +174,46 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json();
 };
 
-// Access Management API
+export const fetchS3File = async (filePath: string): Promise<string> => {
+  try {
+    // Make sure to remove any leading slash
+    const cleanPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
+    const url = `${S3_BUCKET_URL}/${cleanPath}`;
+    
+    console.log(`Fetching S3 file: ${url}`);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+    }
+    
+    return await response.text();
+  } catch (error) {
+    console.error("Error fetching S3 file:", error);
+    throw new Error(`Failed to fetch file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
 export const accessApi = {
-  // Get user groups
   getUserGroups: (userEmail: string) => 
     apiCall<any[]>('/access/groups', {
       method: 'POST',
       body: JSON.stringify({ userEmail }),
     }),
 
-  // Request access to a group
   requestGroupAccess: (groupId: number, reason: string, userEmail: string) => 
     apiCall<JiraTicket>('/access/groups/request', {
       method: 'POST',
       body: JSON.stringify({ groupId, reason, userEmail }),
     }),
 
-  // Leave a group
   leaveGroup: (groupName: string, userEmail: string) =>
     apiCall<{ success: boolean }>('/access/groups/leave', {
       method: 'POST',
       body: JSON.stringify({ groupName, userEmail }),
     }),
 
-  // Chat with the assistant
   chatWithAssistant: (message: string, userEmail: string) => 
     apiCall<ChatResponse>('/access/chat', {
       method: 'POST',
@@ -208,27 +221,22 @@ export const accessApi = {
     }),
 };
 
-// Documentation API
 export const docsApi = {
-  // Search documentation
   searchDocumentation: (query: string) => 
     apiCall<DocumentResult[]>('/docs/search', {
       method: 'POST',
       body: JSON.stringify({ query }),
     }),
 
-  // Get document by ID
   getDocumentById: (id: number) => 
     apiCall<DocumentResult>(`/docs/${id}`),
 
-  // Submit feedback on documentation
   submitFeedback: (documentId: number, helpful: boolean) => 
     apiCall<{success: boolean}>('/docs/feedback', {
       method: 'POST',
       body: JSON.stringify({ documentId, helpful }),
     }),
 
-  // Chat with assistant
   chatWithAssistant: (message: string, context?: string[], history?: ChatMessage[]) => 
     apiCall<ChatResponse>('/docs/chat', {
       method: 'POST',
@@ -239,35 +247,28 @@ export const docsApi = {
       }),
     }),
 
-  // Get chat history
   getChatHistory: () => 
     apiCall<ChatMessage[]>('/docs/chat/history'),
 
-  // Get query history
   getQueryHistory: () => 
     apiCall<QueryHistoryItem[]>('/docs/history'),
 
-  // Clear chat history
   clearChatHistory: () => 
     apiCall<{success: boolean}>('/docs/chat/clear', {
       method: 'POST'
     }),
 };
 
-// Kubernetes Debugger API
 export const kubernetesApi = {
-  // Get clusters by environment
   getClusters: (environment?: 'production' | 'qa' | 'staging') => 
     apiCall<KubernetesCluster[]>(`/kubernetes/clusters${environment ? `?environment=${environment}` : ''}`),
 
-  // Create a debugging session
   createSession: (cluster: string, description: string) => 
     apiCall<JiraTicket>('/kubernetes/session', {
       method: 'POST',
       body: JSON.stringify({ cluster, description }),
     }),
 
-  // Run a kubectl command
   runCommand: (clusterArn: string, command: string, namespace: string, jiraTicketKey?: string) => 
     apiCall<CommandResult>('/kubernetes/command', {
       method: 'POST',
@@ -279,36 +280,25 @@ export const kubernetesApi = {
       }),
     }),
 
-  // Chat with the assistant - updated to include namespace and removed jiraTicketKey
   chatWithAssistant: (clusterArn: string, message: string, namespace: string) => 
     apiCall<ChatResponse>('/kubernetes/chat', {
       method: 'POST',
       body: JSON.stringify({ clusterArn, message, namespace }),
     }),
 
-  // Get debugging sessions
   getDebugSessions: () => 
     apiCall<any[]>('/kubernetes/sessions'),
 
-  // Get session details
   getSessionDetails: (sessionId: string) => 
     apiCall<any>(`/kubernetes/sessions/${sessionId}`),
 
-  // Get cluster health
   getClusterHealth: (cluster: string) => 
     apiCall<any>(`/kubernetes/health/${cluster}`),
     
-  // Download debug file
   downloadDebugFile: (sessionId: string) =>
     apiCall<{url: string}>(`/kubernetes/debug-file/${sessionId}`),
 
-  /**
-   * Get namespaces for a Kubernetes cluster
-   * @param clusterArn The ARN of the cluster
-   * @returns An array of namespace names
-   */
   getNamespaces: (clusterArn: string): Promise<string[]> => {
-    // The clusterArn is required
     if (!clusterArn) {
       return Promise.reject(new Error('Cluster ARN is required'));
     }
@@ -319,12 +309,6 @@ export const kubernetesApi = {
     });
   },
 
-  /**
-   * Get issues in a namespace
-   * @param clusterArn The ARN of the cluster
-   * @param namespace The namespace to check for issues
-   * @returns An array of issues found in the namespace
-   */
   getNamespaceIssues: (clusterArn: string, namespace: string): Promise<NamespaceIssue[]> => {
     if (!clusterArn) {
       return Promise.reject(new Error('Cluster ARN is required'));
@@ -340,36 +324,28 @@ export const kubernetesApi = {
   }
 };
 
-// Enhanced Jira Ticket API
 export const jiraApi = {
-  // Create a ticket with more detailed fields
   createTicket: (ticketData: JiraTicketCreateRequest) => 
     apiCall<JiraTicket>('/jira/ticket', {
       method: 'POST',
       body: JSON.stringify(ticketData),
     }),
 
-  // Get user's tickets with optional filters
   getUserTickets: (filters?: { reporter?: string, status?: string }) => 
     apiCall<JiraTicket[]>(`/jira/tickets${filters ? `?${new URLSearchParams(filters as Record<string, string>).toString()}` : ''}`),
   
-  // Get tickets reported by the current user
   getUserReportedTickets: () => 
     apiCall<JiraTicket[]>('/jira/tickets/reported-by-me'),
 
-  // Get ticket details
   getTicketDetails: (ticketKey: string) => 
     apiCall<JiraTicket>(`/jira/tickets/${ticketKey}`),
 
-  // Get available Jira projects
   getProjects: () => 
     apiCall<JiraProject[]>('/jira/projects'),
 
-  // Get issue types for a project
   getIssueTypes: (projectId?: string) => 
     apiCall<JiraIssueType[]>(`/jira/issue-types${projectId ? `?projectId=${projectId}` : ''}`),
 
-  // Chat with assistant for Jira
   chatWithAssistant: (message: string, context?: { ticketKey?: string }) => 
     apiCall<ChatResponse>('/jira/chat', {
       method: 'POST',
@@ -377,9 +353,7 @@ export const jiraApi = {
     }),
 };
 
-// RBAC API
 export const rbacApi = {
-  // Roles management
   getRoles: () => 
     apiCall<Role[]>('/rbac/roles'),
 
@@ -403,7 +377,6 @@ export const rbacApi = {
       method: 'DELETE',
     }),
 
-  // User roles management
   getUserRoles: (userId: string) => 
     apiCall<UserRole[]>(`/rbac/users/${userId}/roles`),
 
@@ -418,7 +391,6 @@ export const rbacApi = {
       method: 'DELETE',
     }),
 
-  // User permissions management
   getUserPermissions: (userId: string) => 
     apiCall<Permission[]>(`/rbac/users/${userId}/permissions`),
 
@@ -434,32 +406,26 @@ export const rbacApi = {
     }),
 };
 
-// OIDC Authentication API
 export const oidcApi = {
-  // Save OIDC configuration
   saveConfig: (provider: string, config: OIDCConfig) => 
     apiCall<{ success: boolean }>('/oidc/config', {
       method: 'POST',
       body: JSON.stringify({ provider, config }),
     }),
 
-  // Get OIDC configuration
   getConfig: (provider: string) => 
     apiCall<OIDCConfig>(`/oidc/config/${provider}`),
 
-  // Process OIDC callback
   processCallback: (provider: string, code: string, state: string) => 
     apiCall<OIDCAuthResult>('/oidc/callback', {
       method: 'POST',
       body: JSON.stringify({ provider, code, state }),
     }),
 
-  // List available providers
   listProviders: () => 
     apiCall<string[]>('/oidc/providers'),
 };
 
-// Getting the mock user for demo purposes
 export const getUserInfo = (): User => {
   return {
     id: '1',

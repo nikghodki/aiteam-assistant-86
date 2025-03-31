@@ -13,7 +13,7 @@ import {
 import { Alert, AlertDescription } from '../ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { kubernetesApi } from '@/services/api';
+import { kubernetesApi, fetchS3File } from '@/services/api';
 
 interface KubernetesDebugDrawerProps {
   isOpen: boolean;
@@ -30,6 +30,7 @@ interface KubernetesDebugDrawerProps {
     namespace: string;
   };
   debugFilePath?: string;
+  s3FilePath?: string;
   isLoading?: boolean;
 }
 
@@ -39,27 +40,37 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   debugSession,
   issue,
   debugFilePath,
+  s3FilePath,
   isLoading = false,
 }) => {
   const { toast } = useToast();
   const [copying, setCopying] = useState<string | null>(null);
-  const [debugFileContent, setDebugFileContent] = useState<string>('');
+  const [fileContent, setFileContent] = useState<string>('');
   const [isLoadingFile, setIsLoadingFile] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [fileError, setFileError] = useState<string | null>(null);
 
+  // Effect to handle local file path
   useEffect(() => {
     if (debugFilePath && isOpen) {
       setIsLoadingFile(true);
+      setFileError(null);
       
       const timer = setTimeout(() => {
         fetch(debugFilePath)
-          .then(response => response.text())
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`Failed to load file: ${response.status} ${response.statusText}`);
+            }
+            return response.text();
+          })
           .then(content => {
-            setDebugFileContent(content);
+            setFileContent(content);
             setIsLoadingFile(false);
           })
           .catch(error => {
             console.error('Error loading debug file:', error);
+            setFileError(`Failed to load file: ${error.message}`);
             setIsLoadingFile(false);
             toast({
               title: "Error",
@@ -72,6 +83,34 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
       return () => clearTimeout(timer);
     }
   }, [debugFilePath, isOpen, toast]);
+
+  // Effect to handle S3 file path
+  useEffect(() => {
+    if (s3FilePath && isOpen) {
+      setIsLoadingFile(true);
+      setFileError(null);
+      
+      const fetchFile = async () => {
+        try {
+          console.log('Fetching S3 file:', s3FilePath);
+          const content = await fetchS3File(s3FilePath);
+          setFileContent(content);
+        } catch (error) {
+          console.error('Error loading S3 file:', error);
+          setFileError(`Failed to load S3 file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          toast({
+            title: "Error",
+            description: "Failed to load debugging file from S3",
+            variant: "destructive"
+          });
+        } finally {
+          setIsLoadingFile(false);
+        }
+      };
+      
+      fetchFile();
+    }
+  }, [s3FilePath, isOpen, toast]);
 
   const copyToClipboard = (text: string, identifier: string) => {
     navigator.clipboard.writeText(text);
@@ -86,7 +125,9 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
   };
 
   const handleDownload = async () => {
-    if (!debugSession?.id && !debugFileContent) {
+    const contentToDownload = fileContent || (debugSession?.debugLog || '');
+    
+    if (!contentToDownload) {
       toast({
         title: "Error",
         description: "No debugging information available to download",
@@ -98,30 +139,22 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     setIsDownloading(true);
     
     try {
-      if (debugSession?.id) {
-        // Download using API if debugSession exists
-        const response = await kubernetesApi.downloadDebugFile(debugSession.id);
-        
-        const link = document.createElement('a');
-        link.href = response.url;
-        link.download = `debug-session-${debugSession.id}.txt`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else if (debugFileContent) {
-        // Download the debug file content if available
-        const blob = new Blob([debugFileContent], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `debug-file-${new Date().getTime()}.txt`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        URL.revokeObjectURL(url);
-      }
+      // Create and download the file
+      const blob = new Blob([contentToDownload], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      
+      const filename = s3FilePath ? 
+        `${s3FilePath.split('/').pop() || 'debug-file'}.txt` : 
+        `debug-file-${new Date().getTime()}.txt`;
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      URL.revokeObjectURL(url);
       
       toast({
         title: "Download started",
@@ -172,7 +205,8 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     return { request, response: responseRaw, sections };
   };
 
-  const logToUse = debugFileContent || (debugSession ? debugSession.debugLog : '');
+  // Choose which content to use - prioritize S3 file content if available
+  const logToUse = fileContent || (debugSession ? debugSession.debugLog : '');
   
   const { request, sections } = formatDebugLog(logToUse);
 
@@ -205,9 +239,8 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
     return 'bg-gray-100 dark:bg-gray-800';
   };
 
-  const showMainLoadingState = isLoading && !debugSession;
-
-  const showFileLoadingState = isLoadingFile && debugFilePath;
+  const showMainLoadingState = isLoading && !debugSession && !fileContent;
+  const showFileLoadingState = isLoadingFile;
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -216,7 +249,7 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
           <div className="flex justify-between items-center">
             <SheetTitle className="text-xl">Kubernetes Troubleshooting</SheetTitle>
             <div className="flex gap-2">
-              {(debugSession?.id || debugFileContent) && (
+              {(debugSession?.id || fileContent) && (
                 <Button 
                   variant="outline" 
                   size="icon" 
@@ -292,9 +325,13 @@ const KubernetesDebugDrawer: React.FC<KubernetesDebugDrawerProps> = ({
                 <p className="text-sm text-muted-foreground">Loading debugging information...</p>
               </div>
             </div>
+          ) : fileError ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{fileError}</AlertDescription>
+            </Alert>
           ) : (
             <div className="flex flex-col">
-              {issue && !debugSession && !showMainLoadingState ? (
+              {issue && !debugSession && !fileContent && !showMainLoadingState ? (
                 <Alert className="border-professional-purple-light/30 dark:border-professional-purple-dark/30 mb-4">
                   <AlertDescription>
                     Analyzing this issue. The AI assistant will provide debugging steps shortly.

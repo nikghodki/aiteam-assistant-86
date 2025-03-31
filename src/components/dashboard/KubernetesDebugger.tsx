@@ -92,6 +92,7 @@ const KubernetesDebugger = () => {
   
   const [debugSession, setDebugSession] = useState<{id: string; debugLog: string} | null>(null);
   const [debugFilePath, setDebugFilePath] = useState<string | undefined>(undefined);
+  const [s3FilePath, setS3FilePath] = useState<string | undefined>(undefined);
   
   const [isDebugDrawerOpen, setIsDebugDrawerOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<NamespaceIssue | null>(null);
@@ -220,8 +221,15 @@ const KubernetesDebugger = () => {
       
       if (response.file_name) {
         setDebugFilePath(response.file_name);
-      } else {
+        setS3FilePath(undefined);
+      } 
+      else if (response.s3_file_path) {
+        setS3FilePath(response.s3_file_path);
         setDebugFilePath(undefined);
+      } 
+      else {
+        setDebugFilePath(undefined);
+        setS3FilePath(undefined);
       }
       
       setIsDebugDrawerOpen(true);
@@ -670,6 +678,7 @@ What steps should I take to investigate and resolve this issue?`;
           namespace: selectedNamespace
         } : undefined}
         debugFilePath={debugFilePath}
+        s3FilePath={s3FilePath}
         isLoading={debugLoading}
       />
     </div>
