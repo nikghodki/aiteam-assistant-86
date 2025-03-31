@@ -337,7 +337,55 @@ export const kubernetesApi = {
       method: 'POST',
       body: JSON.stringify({ clusterArn, namespace }),
     });
-  }
+  },
+
+  // Add a new method to retrieve files from S3 bucket
+  async getS3File(bucketName: string, key: string): Promise<string> {
+    try {
+      console.log(`Fetching file from S3 bucket: ${bucketName}, key: ${key}`);
+      const response = await fetch(`/api/kubernetes/s3file`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          bucketName, 
+          key 
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch S3 file: ${response.statusText}`);
+      }
+      
+      const data = await response.text();
+      return data;
+    } catch (error) {
+      console.error('Error fetching S3 file:', error);
+      throw error;
+    }
+  },
+
+  async chatWithAssistant(message: string): Promise<any> {
+    try {
+      const response = await fetch(`/api/kubernetes/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to chat with assistant');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error chatting with assistant:', error);
+      throw error;
+    }
+  },
 };
 
 // Enhanced Jira Ticket API
