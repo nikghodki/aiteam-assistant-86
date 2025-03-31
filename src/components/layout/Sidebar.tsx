@@ -12,7 +12,9 @@ import {
   ChevronLeft, 
   ChevronRight,
   ShieldCheck,
-  LogOut
+  LogOut,
+  Box,
+  Rocket
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -72,6 +74,18 @@ export const Sidebar = () => {
       href: '/roles', 
       icon: ShieldCheck,
       visible: hasPermission('all', 'admin') 
+    },
+    { 
+      name: 'Sandbox Orchestration', 
+      href: '/sandbox', 
+      icon: Box,
+      visible: hasPermission('kubernetes', 'write') 
+    },
+    { 
+      name: 'Release Deployment', 
+      href: '/releases', 
+      icon: Rocket,
+      visible: hasPermission('kubernetes', 'write') 
     },
   ];
 
