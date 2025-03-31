@@ -23,56 +23,74 @@ import ReleaseDeployment from "./pages/ReleaseDeployment";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
 
-// Create a client
+// Create a client with better error handling
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // 5 minutes
+      onError: (error) => {
+        console.error("Query error:", error);
+      }
     },
   },
 });
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <RBACProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Public routes - must be accessible without auth */}
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              
-              {/* Auth callback routes - must not redirect if not authenticated */}
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="auth/callback" element={<AuthCallback />} />
-              <Route path="*/auth/callback" element={<AuthCallback />} />
-              <Route path="/*/auth/callback" element={<AuthCallback />} />
-              
-              {/* Protected routes - all require authentication */}
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/access" element={<ProtectedRoute><AccessControl /></ProtectedRoute>} />
-              <Route path="/kubernetes" element={<ProtectedRoute><Kubernetes /></ProtectedRoute>} />
-              <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-              <Route path="/jira" element={<ProtectedRoute><JiraTicket /></ProtectedRoute>} />
-              <Route path="/roles" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
-              <Route path="/sandbox" element={<ProtectedRoute><SandboxOrchestration /></ProtectedRoute>} />
-              <Route path="/release" element={<ProtectedRoute><ReleaseDeployment /></ProtectedRoute>} />
-              
-              {/* Catch all route for 404 errors */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </RBACProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+// Simple loading component for suspense
+const LoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="text-center p-6">
+      <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+      <p className="mt-4">Loading...</p>
+    </div>
+  </div>
 );
+
+const App = () => {
+  console.log("App component rendering");
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <RBACProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              
+              <Routes>
+                {/* Public routes - must be accessible without auth */}
+                <Route path="/" element={<Index />} />
+                <Route path="/login" element={<Login />} />
+                
+                {/* Auth callback routes - must not redirect if not authenticated */}
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="auth/callback" element={<AuthCallback />} />
+                <Route path="*/auth/callback" element={<AuthCallback />} />
+                <Route path="/*/auth/callback" element={<AuthCallback />} />
+                
+                {/* Protected routes - all require authentication */}
+                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/access" element={<ProtectedRoute><AccessControl /></ProtectedRoute>} />
+                <Route path="/kubernetes" element={<ProtectedRoute><Kubernetes /></ProtectedRoute>} />
+                <Route path="/docs" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                <Route path="/jira" element={<ProtectedRoute><JiraTicket /></ProtectedRoute>} />
+                <Route path="/roles" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
+                <Route path="/sandbox" element={<ProtectedRoute><SandboxOrchestration /></ProtectedRoute>} />
+                <Route path="/release" element={<ProtectedRoute><ReleaseDeployment /></ProtectedRoute>} />
+                
+                {/* Catch all route for 404 errors */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </TooltipProvider>
+          </RBACProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
