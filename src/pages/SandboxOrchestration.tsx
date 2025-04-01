@@ -9,6 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 import SandboxChat from '@/components/sandbox/SandboxChat';
 import SandboxList from '@/components/sandbox/SandboxList';
 import SandboxDetails from '@/components/sandbox/SandboxDetails';
+import { Button } from '@/components/ui/button';
+import { Grid, List } from 'lucide-react';
+import SandboxTable from '@/components/sandbox/SandboxTable';
 
 const SandboxOrchestration = () => {
   const { toast } = useToast();
@@ -16,6 +19,7 @@ const SandboxOrchestration = () => {
   const [selectedSandbox, setSelectedSandbox] = useState<Sandbox | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'details'>('chat');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   const fetchSandboxes = async () => {
     setIsLoading(true);
@@ -63,14 +67,43 @@ const SandboxOrchestration = () => {
         <ResizablePanelGroup direction="horizontal" className="min-h-[600px] rounded-lg border">
           <ResizablePanel defaultSize={25} minSize={20}>
             <div className="h-full p-4">
-              <h2 className="text-xl font-bold mb-4">Sandboxes</h2>
-              <SandboxList 
-                sandboxes={sandboxes}
-                onSandboxDelete={handleSandboxDelete}
-                onSelectSandbox={handleSandboxSelect}
-                selectedSandboxId={selectedSandbox?.id}
-                isLoading={isLoading}
-              />
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Sandboxes</h2>
+                <div className="flex space-x-1">
+                  <Button
+                    variant={viewMode === 'cards' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setViewMode('cards')}
+                  >
+                    <Grid size={16} />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'table' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setViewMode('table')}
+                  >
+                    <List size={16} />
+                  </Button>
+                </div>
+              </div>
+              
+              {viewMode === 'cards' ? (
+                <SandboxList 
+                  sandboxes={sandboxes}
+                  onSandboxDelete={handleSandboxDelete}
+                  onSelectSandbox={handleSandboxSelect}
+                  selectedSandboxId={selectedSandbox?.id}
+                  isLoading={isLoading}
+                />
+              ) : (
+                <SandboxTable
+                  sandboxes={sandboxes}
+                  onSandboxDelete={handleSandboxDelete}
+                  onSelectSandbox={handleSandboxSelect}
+                  selectedSandboxId={selectedSandbox?.id}
+                  isLoading={isLoading}
+                />
+              )}
             </div>
           </ResizablePanel>
           
