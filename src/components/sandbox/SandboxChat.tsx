@@ -56,6 +56,7 @@ const SandboxChat: React.FC<SandboxChatProps> = ({
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [demoMode, setDemoMode] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -92,39 +93,80 @@ const SandboxChat: React.FC<SandboxChatProps> = ({
     setIsLoading(true);
     
     try {
-      // Get the response from the sandbox assistant
-      const chatResponse: ChatResponse = await sandboxApi.chatWithAssistant(inputMessage, selectedSandboxId);
-      
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: chatResponse.response,
-        timestamp: new Date(),
-      };
-      
-      setMessages(prev => [...prev, assistantMessage]);
-      
-      // If the assistant took an action that should refresh the sandbox list
-      if (chatResponse.actionTaken) {
-        if (onSandboxChange) {
-          onSandboxChange();
-        }
+      // Check if this is a demo request for creating a sandbox
+      if (inputMessage.toLowerCase().includes('demo') || demoMode) {
+        setDemoMode(true);
         
-        // Show a toast notification if an action was taken
-        toast({
-          title: chatResponse.actionTaken === 'create' 
-            ? 'Sandbox Creation Started' 
-            : chatResponse.actionTaken === 'update' 
-            ? 'Sandbox Updated' 
-            : 'Sandbox Deleted',
-          description: chatResponse.actionTaken === 'delete' 
-            ? 'The sandbox has been deleted successfully.' 
-            : `The sandbox "${chatResponse.sandbox?.name}" has been ${chatResponse.actionTaken === 'create' ? 'initiated' : 'updated'} successfully.`,
-        });
+        // Use our simulation function instead of the real API
+        const chatResponse: ChatResponse = await sandboxApi.simulateSandboxCreation(inputMessage);
+        
+        const assistantMessage: ChatMessage = {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: chatResponse.response,
+          timestamp: new Date(),
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        // If the assistant took an action that should refresh the sandbox list
+        if (chatResponse.actionTaken) {
+          if (onSandboxChange) {
+            onSandboxChange();
+          }
+          
+          // Show a toast notification if an action was taken
+          toast({
+            title: chatResponse.actionTaken === 'create' 
+              ? 'Sandbox Creation Started' 
+              : chatResponse.actionTaken === 'update' 
+              ? 'Sandbox Updated' 
+              : 'Sandbox Deleted',
+            description: chatResponse.actionTaken === 'delete' 
+              ? 'The sandbox has been deleted successfully.' 
+              : `The sandbox "${chatResponse.sandbox?.name}" has been ${chatResponse.actionTaken === 'create' ? 'initiated' : 'updated'} successfully.`,
+          });
 
-        // If this is a create action, notify parent to show workflow
-        if (chatResponse.actionTaken === 'create' && onSandboxCreationStarted && chatResponse.sandbox) {
-          onSandboxCreationStarted(chatResponse.sandbox.id);
+          // If this is a create action, notify parent to show workflow
+          if (chatResponse.actionTaken === 'create' && onSandboxCreationStarted && chatResponse.sandbox) {
+            onSandboxCreationStarted(chatResponse.sandbox.id);
+          }
+        }
+      } else {
+        // Get the response from the sandbox assistant
+        const chatResponse: ChatResponse = await sandboxApi.chatWithAssistant(inputMessage, selectedSandboxId);
+        
+        const assistantMessage: ChatMessage = {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: chatResponse.response,
+          timestamp: new Date(),
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        // If the assistant took an action that should refresh the sandbox list
+        if (chatResponse.actionTaken) {
+          if (onSandboxChange) {
+            onSandboxChange();
+          }
+          
+          // Show a toast notification if an action was taken
+          toast({
+            title: chatResponse.actionTaken === 'create' 
+              ? 'Sandbox Creation Started' 
+              : chatResponse.actionTaken === 'update' 
+              ? 'Sandbox Updated' 
+              : 'Sandbox Deleted',
+            description: chatResponse.actionTaken === 'delete' 
+              ? 'The sandbox has been deleted successfully.' 
+              : `The sandbox "${chatResponse.sandbox?.name}" has been ${chatResponse.actionTaken === 'create' ? 'initiated' : 'updated'} successfully.`,
+          });
+
+          // If this is a create action, notify parent to show workflow
+          if (chatResponse.actionTaken === 'create' && onSandboxCreationStarted && chatResponse.sandbox) {
+            onSandboxCreationStarted(chatResponse.sandbox.id);
+          }
         }
       }
     } catch (error) {
@@ -172,7 +214,7 @@ const SandboxChat: React.FC<SandboxChatProps> = ({
             value={inputMessage}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Ask me to create or manage sandboxes..."
+            placeholder={demoMode ? "For demo, try: 'create a new sandbox for testing'" : "Ask me to create or manage sandboxes..."}
             className="w-full pr-10 resize-none focus:ring-0 focus-visible:ring-0 dark:bg-gray-700"
             rows={3}
             disabled={isLoading}
@@ -192,3 +234,4 @@ const SandboxChat: React.FC<SandboxChatProps> = ({
 };
 
 export default SandboxChat;
+
