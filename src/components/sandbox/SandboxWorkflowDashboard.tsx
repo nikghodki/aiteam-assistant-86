@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -50,7 +49,6 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
   const [showDebugToast, setShowDebugToast] = useState(false);
   const [failedStep, setFailedStep] = useState<WorkflowStep | null>(null);
   
-  // Define all possible workflow steps
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([
     {
       id: 'namespace_creation',
@@ -108,16 +106,13 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
     }
   ]);
 
-  // Function for simulating workflow progress with shorter timeframes for the demo
   const simulateWorkflowProgress = () => {
     if (!sandboxId || currentStepIndex >= workflowSteps.length) return;
     
     setIsLoading(true);
     
-    // Update current step to in_progress
     const updatedSteps = [...workflowSteps];
     
-    // Mark the current step as in progress
     if (updatedSteps[currentStepIndex].status === 'pending') {
       updatedSteps[currentStepIndex] = {
         ...updatedSteps[currentStepIndex],
@@ -128,15 +123,12 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
       setWorkflowSteps(updatedSteps);
     }
     
-    // Make the product_deployment step always fail in demo mode
     const shouldFail = updatedSteps[currentStepIndex].id === 'product_deployment';
     
-    // Simulate step completion after a short delay
     setTimeout(() => {
       const nextSteps = [...updatedSteps];
       
       if (!shouldFail) {
-        // Complete the current step
         nextSteps[currentStepIndex] = {
           ...nextSteps[currentStepIndex],
           status: 'completed',
@@ -144,15 +136,12 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
           logs: nextSteps[currentStepIndex].logs + '\nStep completed successfully.'
         };
         
-        // Move to next step
         const newIndex = currentStepIndex + 1;
         setCurrentStepIndex(newIndex);
         
-        // Update overall progress
         const progress = Math.min(100, Math.round((newIndex / workflowSteps.length) * 100));
         setWorkflowProgress(progress);
         
-        // Check if workflow is complete
         if (newIndex >= workflowSteps.length) {
           if (onWorkflowComplete) {
             onWorkflowComplete();
@@ -163,7 +152,6 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
           });
         }
       } else {
-        // Generate detailed error logs for the failed step
         const errorLogs = 
           '\n[ERROR] Failed to deploy product services' +
           '\n[ERROR] Error code: DEPLOYMENT_TIMEOUT' +
@@ -172,7 +160,6 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
           '\n[ERROR] Container healthcheck failed after 5 attempts' +
           '\n[ERROR] Check container logs for more details';
         
-        // Fail the product_deployment step
         nextSteps[currentStepIndex] = {
           ...nextSteps[currentStepIndex],
           status: 'failed',
@@ -180,43 +167,31 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
           logs: nextSteps[currentStepIndex].logs + errorLogs
         };
         
-        // Set the failed step for the debug toast
         setFailedStep(nextSteps[currentStepIndex]);
         setShowDebugToast(true);
-        
-        toast({
-          title: "Sandbox Creation Failed",
-          description: `Step "${nextSteps[currentStepIndex].name}" has failed. Click on "View Error" to see details and retry options.`,
-          variant: "destructive",
-        });
       }
       
       setWorkflowSteps(nextSteps);
       setIsLoading(false);
-    }, 2000); // Shortened delay for demo purposes
+    }, 2000);
   };
 
-  // Update the useEffect for workflow simulation with shorter polling intervals
   useEffect(() => {
     if (!sandboxId) return;
     
     let timeoutId: number;
     
     const runSimulation = () => {
-      // Only continue simulation if current step is not failed
       if (currentStepIndex < workflowSteps.length && 
           (currentStepIndex === 0 || workflowSteps[currentStepIndex - 1].status !== 'failed')) {
         simulateWorkflowProgress();
         
-        // Schedule the next update to make the demo more visually interesting
-        timeoutId = window.setTimeout(runSimulation, 3000); // Poll every 3 seconds
+        timeoutId = window.setTimeout(runSimulation, 3000);
       }
     };
     
-    // Start the simulation
     runSimulation();
     
-    // Cleanup
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
@@ -242,27 +217,23 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
       return;
     }
     
-    // Navigate to Kubernetes debugger with pre-populated params
     navigate(`/kubernetes?cluster=${clusterName}&namespace=${namespace}`);
     closeLogDialog();
-    setShowDebugToast(false); // Hide the debug toast when navigating
+    setShowDebugToast(false);
   };
 
-  // Helper function to retry a failed step
   const handleRetryStep = (stepId: string) => {
     const stepIndex = workflowSteps.findIndex(step => step.id === stepId);
     if (stepIndex === -1) return;
     
     const updatedSteps = [...workflowSteps];
     
-    // Reset the failed step to pending
     updatedSteps[stepIndex] = {
       ...updatedSteps[stepIndex],
       status: 'pending',
       logs: generateMockLogs(updatedSteps[stepIndex].name) + '\nRetrying step...'
     };
     
-    // Reset all subsequent steps to pending as well
     for (let i = stepIndex + 1; i < updatedSteps.length; i++) {
       updatedSteps[i] = {
         ...updatedSteps[i],
@@ -284,7 +255,6 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
     });
   };
 
-  // Helper function to generate mock logs
   const generateMockLogs = (stepName: string): string => {
     return `[${new Date().toISOString()}] Starting ${stepName}...\n` +
            `[${new Date().toISOString()}] Initializing ${stepName.toLowerCase()} process\n` +
@@ -371,7 +341,6 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
         ))}
       </div>
       
-      {/* Floating Debug Window */}
       {showDebugToast && failedStep && (
         <div className="fixed bottom-6 right-6 z-50 max-w-md bg-black/90 shadow-xl rounded-lg border border-red-500 text-white p-4 animate-in slide-in-from-right">
           <div className="flex items-start mb-2">
