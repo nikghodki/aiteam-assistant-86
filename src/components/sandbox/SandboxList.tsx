@@ -1,10 +1,10 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Sandbox } from '@/services/sandboxApi';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Edit3, Server, Star } from 'lucide-react';
+import { Trash2, Edit3, Server } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DialogClose } from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
@@ -27,44 +27,6 @@ const SandboxList: React.FC<SandboxListProps> = ({
   isLoading
 }) => {
   const { toast } = useToast();
-  const [showDemos, setShowDemos] = useState(sandboxes.length === 0);
-
-  const demoSandboxes: Sandbox[] = [
-    {
-      id: 'demo-web-app',
-      name: 'Web Application Stack',
-      status: 'stable',
-      createdAt: new Date().toISOString(),
-      services: [
-        { name: 'frontend', image: 'nginx:latest', status: 'running', environmentVariables: [] },
-        { name: 'api', image: 'node:16', status: 'running', environmentVariables: [] },
-        { name: 'database', image: 'postgres:13', status: 'running', environmentVariables: [] }
-      ]
-    },
-    {
-      id: 'demo-data-science',
-      name: 'Data Science Workbench',
-      status: 'stable',
-      createdAt: new Date().toISOString(),
-      services: [
-        { name: 'jupyter', image: 'jupyter/datascience-notebook:latest', status: 'running', environmentVariables: [] },
-        { name: 'postgres', image: 'postgres:13', status: 'running', environmentVariables: [] }
-      ]
-    },
-    {
-      id: 'demo-microservices',
-      name: 'Microservices Demo',
-      status: 'stable',
-      createdAt: new Date().toISOString(),
-      services: [
-        { name: 'gateway', image: 'nginx:latest', status: 'running', environmentVariables: [] },
-        { name: 'auth-service', image: 'node:16', status: 'running', environmentVariables: [] },
-        { name: 'user-service', image: 'node:16', status: 'running', environmentVariables: [] },
-        { name: 'product-service', image: 'node:16', status: 'running', environmentVariables: [] },
-        { name: 'mongodb', image: 'mongo:5', status: 'running', environmentVariables: [] }
-      ]
-    }
-  ];
 
   const handleDeleteSandbox = async (id: string) => {
     try {
@@ -84,75 +46,76 @@ const SandboxList: React.FC<SandboxListProps> = ({
     }
   };
 
-  const renderSandboxCard = (sandbox: Sandbox, isDemo = false) => (
-    <Card 
-      key={sandbox.id} 
-      className={cn(
-        "cursor-pointer hover:border-professional-purple transition-colors",
-        selectedSandboxId === sandbox.id && "border-professional-purple"
-      )}
-      onClick={() => onSelectSandbox(sandbox)}
-    >
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="flex items-center">
-              <CardTitle className="text-lg">{sandbox.name}</CardTitle>
-              {isDemo && (
-                <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200">
-                  <Star className="h-3 w-3 mr-1" />
-                  Demo
-                </Badge>
-              )}
-            </div>
-            <CardDescription className="text-xs">
-              {isDemo ? 'Template sandbox' : `Created on ${new Date(sandbox.createdAt).toLocaleDateString()}`}
-            </CardDescription>
-          </div>
-          <Badge
-            variant={
-              sandbox.status === 'stable' ? 'default' :
-              sandbox.status === 'initializing' ? 'outline' :
-              sandbox.status === 'error' ? 'destructive' : 'secondary'
-            }
-          >
-            {sandbox.status}
-          </Badge>
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-professional-purple border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (sandboxes.length === 0) {
+    return (
+      <Card className="border border-dashed border-gray-300 h-64 flex flex-col items-center justify-center">
+        <div className="text-center p-6">
+          <Server className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-4 text-lg font-medium text-gray-900">No sandboxes found</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Get started by creating a new sandbox using the chat assistant.
+          </p>
         </div>
-      </CardHeader>
-      
-      <CardContent>
-        <div className="text-sm">
-          <p className="text-muted-foreground mb-2">Services ({sandbox.services.length})</p>
-          <div className="space-y-1">
-            {sandbox.services.map((service, index) => (
-              <div key={index} className="flex justify-between items-center">
-                <span className="font-medium">{service.name}</span>
-                <Badge variant={service.status === 'running' ? 'default' : service.status === 'pending' ? 'outline' : 'destructive'}>
-                  {service.status}
-                </Badge>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {sandboxes.map((sandbox) => (
+        <Card 
+          key={sandbox.id} 
+          className={cn(
+            "cursor-pointer hover:border-professional-purple transition-colors",
+            selectedSandboxId === sandbox.id && "border-professional-purple"
+          )}
+          onClick={() => onSelectSandbox(sandbox)}
+        >
+          <CardHeader className="pb-2">
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle className="text-lg">{sandbox.name}</CardTitle>
+                <CardDescription className="text-xs">
+                  Created on {new Date(sandbox.createdAt).toLocaleDateString()}
+                </CardDescription>
               </div>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-      
-      <CardFooter className="flex justify-end gap-2">
-        {isDemo ? (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="text-professional-purple-dark border-professional-purple-dark hover:bg-professional-purple-light/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectSandbox(sandbox);
-            }}
-          >
-            <Star className="h-4 w-4 mr-1" />
-            Use Template
-          </Button>
-        ) : (
-          <>
+              <Badge
+                variant={
+                  sandbox.status === 'stable' ? 'default' :
+                  sandbox.status === 'initializing' ? 'outline' :
+                  sandbox.status === 'error' ? 'destructive' : 'secondary'
+                }
+              >
+                {sandbox.status}
+              </Badge>
+            </div>
+          </CardHeader>
+          
+          <CardContent>
+            <div className="text-sm">
+              <p className="text-muted-foreground mb-2">Services ({sandbox.services.length})</p>
+              <div className="space-y-1">
+                {sandbox.services.map((service, index) => (
+                  <div key={index} className="flex justify-between items-center">
+                    <span className="font-medium">{service.name}</span>
+                    <Badge variant={service.status === 'running' ? 'default' : service.status === 'pending' ? 'outline' : 'destructive'}>
+                      {service.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+          
+          <CardFooter className="flex justify-end gap-2">
             <Button 
               variant="outline" 
               size="sm" 
@@ -200,63 +163,9 @@ const SandboxList: React.FC<SandboxListProps> = ({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </>
-        )}
-      </CardFooter>
-    </Card>
-  );
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-professional-purple border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (sandboxes.length === 0) {
-    return (
-      <div className="space-y-4">
-        <Card className="border border-dashed border-gray-300 p-6 text-center">
-          <div className="flex flex-col items-center justify-center">
-            <Server className="h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No sandboxes found</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Get started by creating a new sandbox using the chat assistant or using a template.
-            </p>
-          </div>
+          </CardFooter>
         </Card>
-
-        <div className="space-y-3">
-          <h3 className="font-medium text-base">Sandbox Templates</h3>
-          {demoSandboxes.map(demo => renderSandboxCard(demo, true))}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        {sandboxes.map(sandbox => renderSandboxCard(sandbox))}
-      </div>
-
-      <div className="pt-2 border-t">
-        <Button 
-          variant="link" 
-          className="p-0 h-auto text-sm text-muted-foreground" 
-          onClick={() => setShowDemos(!showDemos)}
-        >
-          {showDemos ? "Hide templates" : "Show sandbox templates"}
-        </Button>
-      </div>
-
-      {showDemos && (
-        <div className="space-y-3">
-          <h3 className="font-medium text-base">Sandbox Templates</h3>
-          {demoSandboxes.map(demo => renderSandboxCard(demo, true))}
-        </div>
-      )}
+      ))}
     </div>
   );
 };

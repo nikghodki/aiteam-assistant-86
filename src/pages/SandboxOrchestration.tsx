@@ -46,30 +46,8 @@ const SandboxOrchestration = () => {
   }, []);
 
   const handleSandboxSelect = (sandbox: Sandbox) => {
-    // Handle demo sandboxes differently
-    if (sandbox.id.startsWith('demo-')) {
-      // If it's a demo sandbox, let's start a chat to create it
-      setSelectedSandbox(null);
-      setActiveTab('chat');
-      
-      // Slight delay to ensure the chat component is ready
-      setTimeout(() => {
-        // This event will be captured by the SandboxChat component
-        const customEvent = new CustomEvent('create-from-template', { 
-          detail: { template: sandbox.id, name: sandbox.name }
-        });
-        document.dispatchEvent(customEvent);
-      }, 300);
-      
-      toast({
-        title: "Template Selected",
-        description: `Creating a new sandbox using the "${sandbox.name}" template.`,
-      });
-    } else {
-      // Regular sandbox selection
-      setSelectedSandbox(sandbox);
-      setActiveTab('details');
-    }
+    setSelectedSandbox(sandbox);
+    setActiveTab('details');
   };
 
   const handleSandboxDelete = (id: string) => {
