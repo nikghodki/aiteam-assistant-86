@@ -196,7 +196,9 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
     let timeoutId: number;
     
     const runSimulation = () => {
-      if (currentStepIndex < workflowSteps.length) {
+      // Only continue simulation if current step is not failed
+      if (currentStepIndex < workflowSteps.length && 
+          (currentStepIndex === 0 || workflowSteps[currentStepIndex - 1].status !== 'failed')) {
         simulateWorkflowProgress();
         
         // Schedule the next update to make the demo more visually interesting

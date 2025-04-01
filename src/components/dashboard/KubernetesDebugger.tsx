@@ -1,3 +1,4 @@
+
 import { useState, useEffect, KeyboardEvent } from 'react';
 import { 
   Terminal, 
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import GlassMorphicCard from '../ui/GlassMorphicCard';
 import { cn } from '@/lib/utils';
 import { kubernetesApi, CommandResult } from '@/services/api';
@@ -78,6 +80,7 @@ type Environment = typeof environments[number]['id'];
 
 const KubernetesDebugger = () => {
   const { toast } = useToast();
+  const location = useLocation();
   const [selectedEnvironment, setSelectedEnvironment] = useState<Environment>('qa');
   const [selectedCluster, setSelectedCluster] = useState<string>('');
   const [selectedClusterArn, setSelectedClusterArn] = useState<string>('');
@@ -130,6 +133,32 @@ const KubernetesDebugger = () => {
       setSelectedClusterArn(clusters[0].arn);
     }
   }, [clusters]);
+
+  // Parse URL params for namespace and cluster when coming from sandbox workflow
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const namespaceParam = params.get('namespace');
+    const clusterParam = params.get('cluster');
+    
+    if (namespaceParam) {
+      setSelectedNamespace(namespaceParam);
+      toast({
+        title: "Namespace Selected",
+        description: `Debugging namespace: ${namespaceParam}`,
+      });
+    }
+    
+    if (clusterParam && clusters) {
+      const matchedCluster = clusters.find(c => c.name === clusterParam);
+      if (matchedCluster) {
+        setSelectedCluster(matchedCluster.name);
+        setSelectedClusterArn(matchedCluster.arn);
+      } else if (clusterParam) {
+        setSelectedCluster(clusterParam);
+        // Can't set ARN if not found, but can set the display name
+      }
+    }
+  }, [location.search, clusters]);
 
   useEffect(() => {
     if (selectedNamespace && command.includes('-n ')) {

@@ -1,9 +1,25 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import KubernetesDebugger from '@/components/dashboard/KubernetesDebugger';
+import { useToast } from '@/hooks/use-toast';
 
 const KubernetesDebug = () => {
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+  
+  useEffect(() => {
+    // Check if we're coming from sandbox workflow with namespace parameter
+    const namespace = searchParams.get('namespace');
+    if (namespace) {
+      toast({
+        title: 'Debugging Sandbox',
+        description: `Focusing on namespace: ${namespace}`,
+      });
+    }
+  }, [searchParams]);
+
   return (
     <Layout>
       <div className="space-y-8">
