@@ -44,8 +44,8 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
   const [selectedStep, setSelectedStep] = useState<WorkflowStep | null>(null);
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false);
   const [workflowProgress, setWorkflowProgress] = useState(0);
-  const [clusterName, setClusterName] = useState<string>('');
-  const [namespace, setNamespace] = useState<string>('');
+  const [clusterName, setClusterName] = useState<string>('demo-cluster');
+  const [namespace, setNamespace] = useState<string>('demo-namespace');
   
   // Define all possible workflow steps
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([
@@ -125,14 +125,14 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
       setWorkflowSteps(updatedSteps);
     }
     
-    // Randomly determine success or failure (90% chance of success)
-    const shouldSucceed = Math.random() < 0.9;
+    // Make the product_deployment step always fail in demo mode
+    const shouldFail = updatedSteps[currentStepIndex].id === 'product_deployment';
     
     // Simulate step completion after a short delay
     setTimeout(() => {
       const nextSteps = [...updatedSteps];
       
-      if (shouldSucceed) {
+      if (!shouldFail) {
         // Complete the current step
         nextSteps[currentStepIndex] = {
           ...nextSteps[currentStepIndex],
@@ -160,18 +160,26 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
           });
         }
       } else {
-        // Simulate an error
+        // Generate detailed error logs for the failed step
+        const errorLogs = 
+          '\n[ERROR] Failed to deploy product services' +
+          '\n[ERROR] Error code: DEPLOYMENT_TIMEOUT' +
+          '\n[ERROR] Deployment failed with exit code 1' +
+          '\n[ERROR] Service "api-gateway" failed to start' +
+          '\n[ERROR] Container healthcheck failed after 5 attempts' +
+          '\n[ERROR] Check container logs for more details';
+        
+        // Fail the product_deployment step
         nextSteps[currentStepIndex] = {
           ...nextSteps[currentStepIndex],
           status: 'failed',
           endTime: new Date(),
-          logs: nextSteps[currentStepIndex].logs + 
-                '\nERROR: Failed to complete step. See logs for details.'
+          logs: nextSteps[currentStepIndex].logs + errorLogs
         };
         
         toast({
           title: "Sandbox Creation Failed",
-          description: `Step "${nextSteps[currentStepIndex].name}" has failed.`,
+          description: `Step "${nextSteps[currentStepIndex].name}" has failed. Click on "View Error" to see details and retry options.`,
           variant: "destructive",
         });
       }
