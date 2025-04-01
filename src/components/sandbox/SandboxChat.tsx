@@ -2,9 +2,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Form, FormField, FormItem, FormLabel, FormControl } from '@/components/ui/form';
 import { ChatResponse, sandboxApi } from '@/services/sandboxApi';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useForm } from "react-hook-form";
 
 interface ChatMessage {
   id: string;
@@ -17,6 +22,15 @@ interface SandboxChatProps {
   onSandboxChange?: () => void;
   selectedSandboxId?: string;
   onSandboxCreationStarted?: (sandboxId: string) => void;
+}
+
+interface SandboxCreationForm {
+  base_image_path: string;
+  base_image_tag: string;
+  product_name: string;
+  custom_service_name: string;
+  custom_image_path: string;
+  custom_image_tag: string;
 }
 
 // Function to format code blocks in the message
@@ -57,6 +71,18 @@ const SandboxChat: React.FC<SandboxChatProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [demoMode, setDemoMode] = useState(false);
+  const [showCreationForm, setShowCreationForm] = useState(false);
+
+  const form = useForm<SandboxCreationForm>({
+    defaultValues: {
+      base_image_path: 'docker.io/library/ubuntu',
+      base_image_tag: 'latest',
+      product_name: '',
+      custom_service_name: '',
+      custom_image_path: 'docker.io/custom',
+      custom_image_tag: 'latest'
+    }
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,6 +102,77 @@ const SandboxChat: React.FC<SandboxChatProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputMessage(e.target.value);
+    
+    // Check if the message is about creating a sandbox
+    const createSandboxRegex = /create|new|start|launch|build|make|spin up/i;
+    const sandboxRegex = /sandbox|environment|env|container/i;
+    
+    if (createSandboxRegex.test(e.target.value) && sandboxRegex.test(e.target.value)) {
+      setShowCreationForm(true);
+    }
+  };
+
+  const handleSandboxFormSubmit = async (data: SandboxCreationForm) => {
+    // Add a user message showing the form submission
+    const formSummary = `
+Creating sandbox with:
+- Base image: ${data.base_image_path}:${data.base_image_tag}
+- Product: ${data.product_name}
+- Service: ${data.custom_service_name}
+- Custom image: ${data.custom_image_path}:${data.custom_image_tag}
+`;
+
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: formSummary,
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    setShowCreationForm(false);
+    
+    try {
+      // Use our simulation function for demo mode
+      const chatResponse: ChatResponse = await sandboxApi.simulateSandboxCreation(formSummary);
+      
+      const assistantMessage: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: chatResponse.response,
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // If the assistant took an action that should refresh the sandbox list
+      if (chatResponse.actionTaken) {
+        if (onSandboxChange) {
+          onSandboxChange();
+        }
+        
+        // Show a toast notification if an action was taken
+        toast({
+          title: 'Sandbox Creation Started',
+          description: `The sandbox "${chatResponse.sandbox?.name}" has been initiated successfully.`,
+        });
+
+        // Notify parent to show workflow
+        if (onSandboxCreationStarted && chatResponse.sandbox) {
+          onSandboxCreationStarted(chatResponse.sandbox.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error creating sandbox:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create sandbox',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -221,6 +318,79 @@ const SandboxChat: React.FC<SandboxChatProps> = ({
         ))}
         <div ref={messagesEndRef} />
       </div>
+      
+      {showCreationForm && (
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-muted/20 animate-in slide-in-from-bottom-5">
+          <h3 className="text-sm font-medium mb-2">Sandbox Creation Details</h3>
+          <form onSubmit={form.handleSubmit(handleSandboxFormSubmit)} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="base_image_path">Base Image Path</Label>
+                <Input
+                  id="base_image_path"
+                  {...form.register("base_image_path")}
+                />
+              </div>
+              <div>
+                <Label htmlFor="base_image_tag">Base Image Tag</Label>
+                <Input
+                  id="base_image_tag"
+                  {...form.register("base_image_tag")}
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="product_name">Product Name</Label>
+              <Input
+                id="product_name"
+                placeholder="e.g. platform, api, frontend"
+                {...form.register("product_name")}
+                required
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="custom_service_name">Custom Service Name</Label>
+              <Input
+                id="custom_service_name"
+                placeholder="e.g. auth-service, data-api"
+                {...form.register("custom_service_name")}
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="custom_image_path">Custom Image Path</Label>
+                <Input
+                  id="custom_image_path"
+                  {...form.register("custom_image_path")}
+                />
+              </div>
+              <div>
+                <Label htmlFor="custom_image_tag">Custom Image Tag</Label>
+                <Input
+                  id="custom_image_tag"
+                  {...form.register("custom_image_tag")}
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-2 pt-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setShowCreationForm(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Create Sandbox</Button>
+            </div>
+          </form>
+        </div>
+      )}
+      
       <div className="p-4 border-t dark:border-gray-700">
         <form onSubmit={(e) => {
           e.preventDefault();
