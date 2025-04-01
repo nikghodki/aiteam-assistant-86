@@ -62,20 +62,72 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
     'Content-Type': 'application/json',
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
-  });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+      credentials: 'include',
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `API error: ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `API error: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error(`API call failed to ${endpoint}:`, error);
+    
+    // For demo mode, fallback to simulated responses rather than failing
+    if (endpoint.includes('/sandbox/demo-')) {
+      console.log('Using simulated response for demo mode');
+      return simulateResponse(endpoint) as T;
+    }
+    
+    throw error;
   }
+};
 
-  return response.json();
+// Function to simulate responses for demo mode when actual API fails
+const simulateResponse = (endpoint: string): unknown => {
+  // Extract sandbox ID from endpoint if present
+  const sandboxIdMatch = endpoint.match(/\/sandbox\/(demo-\d+)/);
+  const sandboxId = sandboxIdMatch ? sandboxIdMatch[1] : `demo-${Date.now()}`;
+  
+  if (endpoint.startsWith('/sandbox/workflow')) {
+    return simulateWorkflowResponse(sandboxId);
+  } else if (endpoint.includes('/sandbox/') && !endpoint.includes('/workflow')) {
+    // Simulate sandbox details response
+    return {
+      id: sandboxId,
+      name: `Demo Sandbox ${sandboxId.substring(5, 9)}`,
+      status: 'initializing',
+      createdAt: new Date().toISOString(),
+      services: [
+        {
+          name: 'api-service',
+          image: 'api:latest',
+          status: 'pending',
+          environmentVariables: []
+        },
+        {
+          name: 'database',
+          image: 'postgres:13',
+          status: 'pending',
+          environmentVariables: [
+            { name: 'POSTGRES_USER', value: 'admin' },
+            { name: 'POSTGRES_PASSWORD', value: '********' }
+          ]
+        }
+      ]
+    };
+  }
+  
+  // Default fallback
+  return { success: true };
 };
 
 // For demo purposes, we'll simulate responses with more dynamic data
@@ -174,9 +226,14 @@ export const sandboxApi = {
 
   // Get workflow status for a sandbox (for demo, we'll simulate the response)
   getWorkflowStatus: (sandboxId: string) => {
-    // For demo, we'll return a simulated response
-    // In real implementation, this would call the API
-    return Promise.resolve(simulateWorkflowResponse(sandboxId));
+    // If it's a demo sandbox, just use our simulated response
+    if (sandboxId.startsWith('demo-')) {
+      console.log('Using simulated workflow status for demo sandbox', sandboxId);
+      return Promise.resolve(simulateWorkflowResponse(sandboxId));
+    }
+    
+    // Otherwise make the actual API call
+    return apiCall<WorkflowStatusResponse>(`/sandbox/workflow/${sandboxId}`);
   },
 
   // Get logs for a specific workflow step
