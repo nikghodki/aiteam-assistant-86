@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { sandboxApi } from '@/services/sandboxApi';
+import { sandboxApi, WorkflowStatusResponse } from '@/services/sandboxApi';
 
 export interface WorkflowStep {
   id: string;
@@ -105,121 +105,105 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
     }
   ]);
 
-  // Mock API polling for workflow status updates
-  // In production, this would call real API endpoints to get status
+  // Function for simulating workflow progress with shorter timeframes for the demo
+  const simulateWorkflowProgress = () => {
+    if (!sandboxId || currentStepIndex >= workflowSteps.length) return;
+    
+    setIsLoading(true);
+    
+    // Update current step to in_progress
+    const updatedSteps = [...workflowSteps];
+    
+    // Mark the current step as in progress
+    if (updatedSteps[currentStepIndex].status === 'pending') {
+      updatedSteps[currentStepIndex] = {
+        ...updatedSteps[currentStepIndex],
+        status: 'in_progress',
+        startTime: new Date(),
+        logs: generateMockLogs(updatedSteps[currentStepIndex].name)
+      };
+      setWorkflowSteps(updatedSteps);
+    }
+    
+    // Randomly determine success or failure (90% chance of success)
+    const shouldSucceed = Math.random() < 0.9;
+    
+    // Simulate step completion after a short delay
+    setTimeout(() => {
+      const nextSteps = [...updatedSteps];
+      
+      if (shouldSucceed) {
+        // Complete the current step
+        nextSteps[currentStepIndex] = {
+          ...nextSteps[currentStepIndex],
+          status: 'completed',
+          endTime: new Date(),
+          logs: nextSteps[currentStepIndex].logs + '\nStep completed successfully.'
+        };
+        
+        // Move to next step
+        const newIndex = currentStepIndex + 1;
+        setCurrentStepIndex(newIndex);
+        
+        // Update overall progress
+        const progress = Math.min(100, Math.round((newIndex / workflowSteps.length) * 100));
+        setWorkflowProgress(progress);
+        
+        // Check if workflow is complete
+        if (newIndex >= workflowSteps.length) {
+          if (onWorkflowComplete) {
+            onWorkflowComplete();
+          }
+          toast({
+            title: "Sandbox Creation Complete",
+            description: "All steps have been completed successfully.",
+          });
+        }
+      } else {
+        // Simulate an error
+        nextSteps[currentStepIndex] = {
+          ...nextSteps[currentStepIndex],
+          status: 'failed',
+          endTime: new Date(),
+          logs: nextSteps[currentStepIndex].logs + 
+                '\nERROR: Failed to complete step. See logs for details.'
+        };
+        
+        toast({
+          title: "Sandbox Creation Failed",
+          description: `Step "${nextSteps[currentStepIndex].name}" has failed.`,
+          variant: "destructive",
+        });
+      }
+      
+      setWorkflowSteps(nextSteps);
+      setIsLoading(false);
+    }, 2000); // Shortened delay for demo purposes
+  };
+
+  // Update the useEffect for workflow simulation with shorter polling intervals
   useEffect(() => {
     if (!sandboxId) return;
     
-    let intervalId: NodeJS.Timeout;
+    let timeoutId: number;
     
-    const pollWorkflowStatus = async () => {
-      try {
-        setIsLoading(true);
+    const runSimulation = () => {
+      if (currentStepIndex < workflowSteps.length) {
+        simulateWorkflowProgress();
         
-        // This would be a real API call in production
-        // For now, we'll simulate progress with a mock implementation
-        const response = await sandboxApi.getSandbox(sandboxId);
-        
-        // Extract cluster and namespace for debugging purposes
-        setClusterName(response.name.split('-')[0] || 'default');
-        setNamespace(`sandbox-${response.name}` || 'default');
-        
-        // Mock implementation - simulate workflow progression
-        if (currentStepIndex < workflowSteps.length) {
-          // Update current step to in_progress
-          const updatedSteps = [...workflowSteps];
-          
-          // Mark the current step as in progress
-          if (updatedSteps[currentStepIndex].status === 'pending') {
-            updatedSteps[currentStepIndex] = {
-              ...updatedSteps[currentStepIndex],
-              status: 'in_progress',
-              startTime: new Date(),
-              logs: generateMockLogs(updatedSteps[currentStepIndex].name)
-            };
-          }
-          
-          // Randomly complete steps (in production this would be real status)
-          const random = Math.random();
-          
-          // 90% chance of success in our mock
-          if (random < 0.9) {
-            // Complete the current step after a short delay
-            setTimeout(() => {
-              const completedSteps = [...updatedSteps];
-              completedSteps[currentStepIndex] = {
-                ...completedSteps[currentStepIndex],
-                status: 'completed',
-                endTime: new Date(),
-                logs: completedSteps[currentStepIndex].logs + '\nStep completed successfully.'
-              };
-              setWorkflowSteps(completedSteps);
-              
-              // Move to next step
-              const newIndex = currentStepIndex + 1;
-              setCurrentStepIndex(newIndex);
-              
-              // Update overall progress
-              const progress = Math.min(100, Math.round((newIndex / workflowSteps.length) * 100));
-              setWorkflowProgress(progress);
-              
-              // Check if workflow is complete
-              if (newIndex >= workflowSteps.length) {
-                if (onWorkflowComplete) {
-                  onWorkflowComplete();
-                }
-                toast({
-                  title: "Sandbox Creation Complete",
-                  description: "All steps have been completed successfully.",
-                });
-                clearInterval(intervalId);
-              }
-            }, 3000);
-          } else {
-            // Simulate an error at the current step
-            setTimeout(() => {
-              const failedSteps = [...updatedSteps];
-              failedSteps[currentStepIndex] = {
-                ...failedSteps[currentStepIndex],
-                status: 'failed',
-                endTime: new Date(),
-                logs: failedSteps[currentStepIndex].logs + 
-                      '\nERROR: Failed to complete step. See logs for details.'
-              };
-              setWorkflowSteps(failedSteps);
-              clearInterval(intervalId);
-              
-              toast({
-                title: "Sandbox Creation Failed",
-                description: `Step "${failedSteps[currentStepIndex].name}" has failed.`,
-                variant: "destructive",
-              });
-            }, 3000);
-          }
-          
-          setWorkflowSteps(updatedSteps);
-        }
-      } catch (error) {
-        console.error("Error fetching workflow status:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch workflow status",
-          variant: "destructive",
-        });
-        clearInterval(intervalId);
-      } finally {
-        setIsLoading(false);
+        // Schedule the next update to make the demo more visually interesting
+        timeoutId = window.setTimeout(runSimulation, 3000); // Poll every 3 seconds
       }
     };
     
-    // Poll initially and then every 5 seconds
-    pollWorkflowStatus();
-    intervalId = setInterval(pollWorkflowStatus, 5000);
+    // Start the simulation
+    runSimulation();
     
+    // Cleanup
     return () => {
-      clearInterval(intervalId);
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [sandboxId, currentStepIndex, workflowSteps, toast, onWorkflowComplete]);
+  }, [sandboxId, currentStepIndex]);
 
   const openLogDialog = (step: WorkflowStep) => {
     setSelectedStep(step);
@@ -244,6 +228,41 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
     // Navigate to Kubernetes debugger with pre-populated params
     navigate(`/kubernetes?cluster=${clusterName}&namespace=${namespace}`);
     closeLogDialog();
+  };
+
+  // Helper function to retry a failed step
+  const handleRetryStep = (stepId: string) => {
+    const stepIndex = workflowSteps.findIndex(step => step.id === stepId);
+    if (stepIndex === -1) return;
+    
+    const updatedSteps = [...workflowSteps];
+    
+    // Reset the failed step to pending
+    updatedSteps[stepIndex] = {
+      ...updatedSteps[stepIndex],
+      status: 'pending',
+      logs: generateMockLogs(updatedSteps[stepIndex].name) + '\nRetrying step...'
+    };
+    
+    // Reset all subsequent steps to pending as well
+    for (let i = stepIndex + 1; i < updatedSteps.length; i++) {
+      updatedSteps[i] = {
+        ...updatedSteps[i],
+        status: 'pending',
+        logs: undefined,
+        startTime: undefined,
+        endTime: undefined
+      };
+    }
+    
+    setWorkflowSteps(updatedSteps);
+    setCurrentStepIndex(stepIndex);
+    closeLogDialog();
+    
+    toast({
+      title: "Retrying Step",
+      description: `Retrying "${updatedSteps[stepIndex].name}"`,
+    });
   };
 
   // Helper function to generate mock logs
@@ -354,7 +373,7 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
             <div className="flex-1">
               {selectedStep?.status === 'failed' && (
                 <div className="text-sm font-medium text-red-600">
-                  This step has failed. You can debug the issue in Kubernetes Debugger.
+                  This step has failed. You can retry the step or debug the issue in Kubernetes Debugger.
                 </div>
               )}
             </div>
@@ -364,14 +383,24 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
               </Button>
               
               {selectedStep?.status === 'failed' && (
-                <Button 
-                  onClick={navigateToDebugger}
-                  className="bg-professional-purple-DEFAULT hover:bg-professional-purple-dark text-white"
-                >
-                  <Terminal className="h-4 w-4 mr-2" />
-                  Debug in Kubernetes
-                  <ExternalLink className="h-4 w-4 ml-2" />
-                </Button>
+                <>
+                  <Button 
+                    variant="outline"
+                    className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-700"
+                    onClick={() => selectedStep && handleRetryStep(selectedStep.id)}
+                  >
+                    Retry Step
+                  </Button>
+                  
+                  <Button 
+                    onClick={navigateToDebugger}
+                    className="bg-professional-purple-DEFAULT hover:bg-professional-purple-dark text-white"
+                  >
+                    <Terminal className="h-4 w-4 mr-2" />
+                    Debug in Kubernetes
+                    <ExternalLink className="h-4 w-4 ml-2" />
+                  </Button>
+                </>
               )}
             </div>
           </DialogFooter>

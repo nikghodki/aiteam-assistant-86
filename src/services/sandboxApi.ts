@@ -1,4 +1,3 @@
-
 import { API_BASE_URL } from './api';
 
 export interface Sandbox {
@@ -79,7 +78,7 @@ const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json();
 };
 
-// For demo purposes, we'll simulate responses for workflow status
+// For demo purposes, we'll simulate responses with more dynamic data
 const simulateWorkflowResponse = (sandboxId: string): WorkflowStatusResponse => {
   // In a real implementation, this would be actual API data
   return {
@@ -246,4 +245,3 @@ export const sandboxApi = {
     });
   }
 };
-

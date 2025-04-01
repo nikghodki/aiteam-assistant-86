@@ -58,9 +58,16 @@ const SandboxOrchestration = () => {
   };
 
   const handleSandboxCreationStarted = (sandboxId: string) => {
+    console.log("Sandbox creation started:", sandboxId);
     setCreatingNewSandbox(sandboxId);
     setWorkflowActive(true);
     setActiveTab('workflow');
+    
+    // Show a toast to make it obvious that the workflow has started
+    toast({
+      title: "Sandbox Creation Started",
+      description: "You can view the progress in the Workflow tab.",
+    });
   };
 
   const handleWorkflowComplete = () => {
@@ -184,10 +191,12 @@ const SandboxOrchestration = () => {
                     </TabsContent>
 
                     <TabsContent value="workflow" className="flex-1 overflow-auto p-4">
-                      <SandboxWorkflowDashboard
-                        sandboxId={creatingNewSandbox}
-                        onWorkflowComplete={handleWorkflowComplete}
-                      />
+                      {workflowActive && creatingNewSandbox && (
+                        <SandboxWorkflowDashboard
+                          sandboxId={creatingNewSandbox}
+                          onWorkflowComplete={handleWorkflowComplete}
+                        />
+                      )}
                     </TabsContent>
                   </Tabs>
                 </div>
