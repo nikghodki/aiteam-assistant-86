@@ -9,7 +9,8 @@ import {
   AlertTriangle,
   FileText,
   Terminal,
-  ExternalLink
+  ExternalLink,
+  Bug
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,8 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
   const [workflowProgress, setWorkflowProgress] = useState(0);
   const [clusterName, setClusterName] = useState<string>('demo-cluster');
   const [namespace, setNamespace] = useState<string>('demo-namespace');
+  const [showDebugToast, setShowDebugToast] = useState(false);
+  const [failedStep, setFailedStep] = useState<WorkflowStep | null>(null);
   
   // Define all possible workflow steps
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([
@@ -177,6 +180,10 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
           logs: nextSteps[currentStepIndex].logs + errorLogs
         };
         
+        // Set the failed step for the debug toast
+        setFailedStep(nextSteps[currentStepIndex]);
+        setShowDebugToast(true);
+        
         toast({
           title: "Sandbox Creation Failed",
           description: `Step "${nextSteps[currentStepIndex].name}" has failed. Click on "View Error" to see details and retry options.`,
@@ -238,6 +245,7 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
     // Navigate to Kubernetes debugger with pre-populated params
     navigate(`/kubernetes?cluster=${clusterName}&namespace=${namespace}`);
     closeLogDialog();
+    setShowDebugToast(false); // Hide the debug toast when navigating
   };
 
   // Helper function to retry a failed step
@@ -268,6 +276,7 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
     setWorkflowSteps(updatedSteps);
     setCurrentStepIndex(stepIndex);
     closeLogDialog();
+    setShowDebugToast(false);
     
     toast({
       title: "Retrying Step",
@@ -361,6 +370,43 @@ const SandboxWorkflowDashboard: React.FC<SandboxWorkflowDashboardProps> = ({
           </div>
         ))}
       </div>
+      
+      {/* Floating Debug Window */}
+      {showDebugToast && failedStep && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md bg-black/90 shadow-xl rounded-lg border border-red-500 text-white p-4 animate-in slide-in-from-right">
+          <div className="flex items-start mb-2">
+            <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 mr-2" />
+            <div>
+              <h4 className="font-bold text-white">Failed: {failedStep.name}</h4>
+              <p className="text-sm text-gray-300">Namespace: {namespace}</p>
+            </div>
+          </div>
+          
+          <p className="text-sm mb-4 text-gray-300">
+            A critical error occurred during sandbox creation. Debug the issue directly in Kubernetes to resolve it.
+          </p>
+          
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline"
+              size="sm"
+              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+              onClick={() => setShowDebugToast(false)}
+            >
+              Dismiss
+            </Button>
+            <Button 
+              onClick={navigateToDebugger}
+              size="sm"
+              className="bg-professional-purple-DEFAULT hover:bg-professional-purple-dark text-white"
+            >
+              <Bug className="h-4 w-4 mr-2" />
+              Debug in Kubernetes
+              <ExternalLink className="h-3 w-3 ml-2" />
+            </Button>
+          </div>
+        </div>
+      )}
       
       <Dialog open={isLogDialogOpen} onOpenChange={setIsLogDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
