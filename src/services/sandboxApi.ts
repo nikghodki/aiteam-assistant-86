@@ -41,6 +41,20 @@ export interface ChatResponse {
   sandbox?: Sandbox;
 }
 
+export interface WorkflowStatusResponse {
+  sandboxId: string;
+  steps: {
+    id: string;
+    name: string;
+    status: 'pending' | 'in_progress' | 'completed' | 'failed';
+    logs?: string;
+    startTime?: string;
+    endTime?: string;
+  }[];
+  currentStep: string;
+  progress: number;
+}
+
 // Helper function for API calls
 const apiCall = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -92,6 +106,20 @@ export const sandboxApi = {
   deleteSandbox: (id: string) => 
     apiCall<{ success: boolean }>(`/sandbox/${id}`, {
       method: 'DELETE',
+    }),
+
+  // Get workflow status for a sandbox
+  getWorkflowStatus: (sandboxId: string) => 
+    apiCall<WorkflowStatusResponse>(`/sandbox/${sandboxId}/workflow`),
+
+  // Get logs for a specific workflow step
+  getStepLogs: (sandboxId: string, stepId: string) => 
+    apiCall<{ logs: string }>(`/sandbox/${sandboxId}/workflow/step/${stepId}/logs`),
+
+  // Retry a failed workflow step
+  retryWorkflowStep: (sandboxId: string, stepId: string) => 
+    apiCall<{ success: boolean }>(`/sandbox/${sandboxId}/workflow/step/${stepId}/retry`, {
+      method: 'POST',
     }),
 
   // Chat with assistant for sandbox management

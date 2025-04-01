@@ -9,8 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 import SandboxChat from '@/components/sandbox/SandboxChat';
 import SandboxList from '@/components/sandbox/SandboxList';
 import SandboxDetails from '@/components/sandbox/SandboxDetails';
+import SandboxWorkflowDashboard from '@/components/sandbox/SandboxWorkflowDashboard';
 import { Button } from '@/components/ui/button';
-import { Grid, List } from 'lucide-react';
+import { Grid, List, Activity } from 'lucide-react';
 import SandboxTable from '@/components/sandbox/SandboxTable';
 
 const SandboxOrchestration = () => {
@@ -18,8 +19,10 @@ const SandboxOrchestration = () => {
   const [sandboxes, setSandboxes] = useState<Sandbox[]>([]);
   const [selectedSandbox, setSelectedSandbox] = useState<Sandbox | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'details'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'details' | 'workflow'>('chat');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [workflowActive, setWorkflowActive] = useState(false);
+  const [creatingNewSandbox, setCreatingNewSandbox] = useState<string | null>(null);
 
   const fetchSandboxes = async () => {
     setIsLoading(true);
@@ -52,6 +55,17 @@ const SandboxOrchestration = () => {
     if (selectedSandbox && selectedSandbox.id === id) {
       setSelectedSandbox(null);
     }
+  };
+
+  const handleSandboxCreationStarted = (sandboxId: string) => {
+    setCreatingNewSandbox(sandboxId);
+    setWorkflowActive(true);
+    setActiveTab('workflow');
+  };
+
+  const handleWorkflowComplete = () => {
+    fetchSandboxes();
+    setCreatingNewSandbox(null);
   };
 
   return (
@@ -112,11 +126,15 @@ const SandboxOrchestration = () => {
           <ResizablePanel defaultSize={75}>
             <Card className="h-full rounded-none border-none">
               {selectedSandbox ? (
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'details')} className="h-full flex flex-col">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'details' | 'workflow')} className="h-full flex flex-col">
                   <div className="flex justify-between items-center p-4 border-b">
                     <TabsList>
                       <TabsTrigger value="chat">Chat</TabsTrigger>
                       <TabsTrigger value="details">Sandbox Details</TabsTrigger>
+                      <TabsTrigger value="workflow" disabled={!workflowActive}>
+                        <Activity className="h-4 w-4 mr-2" />
+                        Workflow
+                      </TabsTrigger>
                     </TabsList>
                     <div className="text-sm font-medium">
                       {selectedSandbox.name}
@@ -127,6 +145,7 @@ const SandboxOrchestration = () => {
                     <SandboxChat 
                       onSandboxChange={fetchSandboxes}
                       selectedSandboxId={selectedSandbox.id}
+                      onSandboxCreationStarted={handleSandboxCreationStarted}
                     />
                   </TabsContent>
                   
@@ -136,10 +155,41 @@ const SandboxOrchestration = () => {
                       onSandboxUpdated={fetchSandboxes}
                     />
                   </TabsContent>
+
+                  <TabsContent value="workflow" className="flex-1 overflow-auto p-4">
+                    <SandboxWorkflowDashboard
+                      sandboxId={creatingNewSandbox || selectedSandbox.id}
+                      onWorkflowComplete={handleWorkflowComplete}
+                    />
+                  </TabsContent>
                 </Tabs>
               ) : (
                 <div className="h-full">
-                  <SandboxChat onSandboxChange={fetchSandboxes} />
+                  <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'workflow')} className="h-full flex flex-col">
+                    <div className="flex justify-between items-center p-4 border-b">
+                      <TabsList>
+                        <TabsTrigger value="chat">Chat</TabsTrigger>
+                        <TabsTrigger value="workflow" disabled={!workflowActive}>
+                          <Activity className="h-4 w-4 mr-2" />
+                          Workflow
+                        </TabsTrigger>
+                      </TabsList>
+                    </div>
+
+                    <TabsContent value="chat" className="flex-1 overflow-hidden">
+                      <SandboxChat 
+                        onSandboxChange={fetchSandboxes} 
+                        onSandboxCreationStarted={handleSandboxCreationStarted}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="workflow" className="flex-1 overflow-auto p-4">
+                      <SandboxWorkflowDashboard
+                        sandboxId={creatingNewSandbox}
+                        onWorkflowComplete={handleWorkflowComplete}
+                      />
+                    </TabsContent>
+                  </Tabs>
                 </div>
               )}
             </Card>

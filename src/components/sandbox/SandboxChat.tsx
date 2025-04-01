@@ -16,6 +16,7 @@ interface ChatMessage {
 interface SandboxChatProps {
   onSandboxChange?: () => void;
   selectedSandboxId?: string;
+  onSandboxCreationStarted?: (sandboxId: string) => void;
 }
 
 // Function to format code blocks in the message
@@ -40,7 +41,11 @@ const formatMessage = (message: string): JSX.Element => {
   );
 };
 
-const SandboxChat: React.FC<SandboxChatProps> = ({ onSandboxChange, selectedSandboxId }) => {
+const SandboxChat: React.FC<SandboxChatProps> = ({ 
+  onSandboxChange, 
+  selectedSandboxId,
+  onSandboxCreationStarted 
+}) => {
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([{
     id: '1',
@@ -108,14 +113,19 @@ const SandboxChat: React.FC<SandboxChatProps> = ({ onSandboxChange, selectedSand
         // Show a toast notification if an action was taken
         toast({
           title: chatResponse.actionTaken === 'create' 
-            ? 'Sandbox Created' 
+            ? 'Sandbox Creation Started' 
             : chatResponse.actionTaken === 'update' 
             ? 'Sandbox Updated' 
             : 'Sandbox Deleted',
           description: chatResponse.actionTaken === 'delete' 
             ? 'The sandbox has been deleted successfully.' 
-            : `The sandbox "${chatResponse.sandbox?.name}" has been ${chatResponse.actionTaken === 'create' ? 'created' : 'updated'} successfully.`,
+            : `The sandbox "${chatResponse.sandbox?.name}" has been ${chatResponse.actionTaken === 'create' ? 'initiated' : 'updated'} successfully.`,
         });
+
+        // If this is a create action, notify parent to show workflow
+        if (chatResponse.actionTaken === 'create' && onSandboxCreationStarted && chatResponse.sandbox) {
+          onSandboxCreationStarted(chatResponse.sandbox.id);
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error);
